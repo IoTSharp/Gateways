@@ -3,3 +3,7 @@
 ################################################################################
 
 /.vs/IoTSharp.Gateway.Modbus
+/bin/Debug/net6.0
+/obj
+/SQlLiteDatabase.db
+/IoTSharp.Gateway.Modbus.csproj.user

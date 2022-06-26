@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "sqlite1": {
+      "type": "sqlite",
+      "connectionId": "ConnectionStrings:DefaultConnection"
+    },
+    "secrets1": {
+      "type": "secrets",
+      "dynamicId": null
+    }
+  }
+}
