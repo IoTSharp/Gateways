@@ -3,6 +3,7 @@ using System;
 using IoTSharp.Gateway.Modbus.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,12 +11,79 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace IoTSharp.Gateway.Modbus.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20220626162542_ModBusDataMapping")]
+    partial class ModBusDataMapping
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "6.0.6");
+
+            modelBuilder.Entity("IoTSharp.Gateway.Modbus.Data.ModbusSlave", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeviceName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeviceNameFormat")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Slave")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TimeOut")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ModbusSlaves");
+                });
+
+            modelBuilder.Entity("IoTSharp.Gateway.Modbus.Data.PointMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Address")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CodePage")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DataCatalog")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DataName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DataType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DateTimeFormat")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("FunCode")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Length")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId");
+
+                    b.ToTable("PointMappings");
+                });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
@@ -213,6 +281,15 @@ namespace IoTSharp.Gateway.Modbus.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("IoTSharp.Gateway.Modbus.Data.PointMapping", b =>
+                {
+                    b.HasOne("IoTSharp.Gateway.Modbus.Data.ModbusSlave", "Owner")
+                        .WithMany("PointMappings")
+                        .HasForeignKey("OwnerId");
+
+                    b.Navigation("Owner");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -262,6 +339,11 @@ namespace IoTSharp.Gateway.Modbus.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("IoTSharp.Gateway.Modbus.Data.ModbusSlave", b =>
+                {
+                    b.Navigation("PointMappings");
                 });
 #pragma warning restore 612, 618
         }

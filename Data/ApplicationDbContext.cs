@@ -9,5 +9,9 @@ namespace IoTSharp.Gateway.Modbus.Data
             : base(options)
         {
         }
+
+        public DbSet<ModbusSlave> ModbusSlaves { get; set; }
+
+        public DbSet<PointMapping> PointMappings { get; set; }
     }
 }
