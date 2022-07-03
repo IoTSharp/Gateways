@@ -19,6 +19,7 @@ namespace IoTSharp.Gateway.Modbus.Data
     }
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
     [JsonConverter(typeof(StringEnumConverter))]
+ 
     public enum DataType
     {
         Boolean,

@@ -34,6 +34,6 @@ namespace IoTSharp.Gateway.Modbus.Data
         /// </summary>
         public string? DeviceNameFormat { get; set; }
 
-        public List<PointMapping>? PointMappings { get; set; }
+        public List<PointMapping>? PointMappings { get; set; } = new List<PointMapping>();
     }
 }

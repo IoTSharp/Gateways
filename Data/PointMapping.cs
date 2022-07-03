@@ -17,6 +17,7 @@ namespace IoTSharp.Gateway.Modbus.Data
         /// 如果是DataType为String， 则需指定编码格式CodePage， 
         /// 如果是DataType为Double， 如果Length是2个寄存器就是4个字节， 则是float， 如果是4个寄存器那就是8个字节， 就是double， 
         /// </summary>
+        
         public DataType DataType { get; set; }
         /// <summary>
         /// 数据分类

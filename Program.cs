@@ -1,7 +1,7 @@
 using IoTSharp.Gateway.Modbus.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using SilkierQuartz;
+ 
 
 namespace IoTSharp.Gateway.Modbus
 {
@@ -18,19 +18,10 @@ namespace IoTSharp.Gateway.Modbus
 
             builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount=false)
                 .AddEntityFrameworkStores<ApplicationDbContext>();
-            builder.Services.AddRazorPages();
-            builder.Services.AddSilkierQuartz(option =>
-            {
-                option.VirtualPathRoot = "/SilkierQuartz";
-                option.UseLocalTime = true;
-                option.DefaultDateFormat = "yyyy-MM-dd";
-                option.DefaultTimeFormat = "HH:mm:ss";
-            }, auth=>
-            {
-                auth.AccessRequirement = SilkierQuartzAuthenticationOptions.SimpleAccessRequirement.AllowAnonymous;
-            });
+      
+       
                 
-
+      builder.Services.AddRazorPages();
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
@@ -52,10 +43,10 @@ namespace IoTSharp.Gateway.Modbus
 
             app.UseAuthentication();
             app.UseAuthorization();
-            app.UseSilkierQuartz();
+       
            
             app.MapRazorPages();
-
+ 
             app.Run();
         }
     }

@@ -1,6 +1,6 @@
 ﻿@page
 @model IoTSharp.Gateway.Modbus.Pages.PointMapAdmin.CreateModel
-
+@using IoTSharp.Gateway.Modbus.Data;
 @{
     ViewData["Title"] = "Create";
 }
@@ -20,17 +20,17 @@
             </div>
             <div class="form-group">
                 <label asp-for="PointMapping.DataType" class="control-label"></label>
-                <select asp-for="PointMapping.DataType" class="form-control"></select>
+                <select asp-for="PointMapping.DataType" class="form-control" asp-items="@Html.GetEnumSelectList(typeof(IoTSharp.Gateway.Modbus.Data.DataType))"></select>
                 <span asp-validation-for="PointMapping.DataType" class="text-danger"></span>
             </div>
             <div class="form-group">
                 <label asp-for="PointMapping.DataCatalog" class="control-label"></label>
-                <select asp-for="PointMapping.DataCatalog" class="form-control"></select>
+                <select asp-for="PointMapping.DataCatalog" class="form-control" asp-items="@Html.GetEnumSelectList(typeof(IoTSharp.Gateway.Modbus.Data.DataCatalog))"></select>
                 <span asp-validation-for="PointMapping.DataCatalog" class="text-danger"></span>
             </div>
             <div class="form-group">
                 <label asp-for="PointMapping.FunCode" class="control-label"></label>
-                <select asp-for="PointMapping.FunCode" class="form-control"></select>
+                <select asp-for="PointMapping.FunCode" class="form-control" asp-items="@Html.GetEnumSelectList(typeof(IoTSharp.Gateway.Modbus.Data.FunCode))" ></select>
                 <span asp-validation-for="PointMapping.FunCode" class="text-danger"></span>
             </div>
             <div class="form-group">
