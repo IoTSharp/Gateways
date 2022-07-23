@@ -34,6 +34,11 @@
                 <select asp-for="PointMapping.FunCode" class="form-control" asp-items="@Html.GetEnumSelectList(typeof(IoTSharp.Gateway.Modbus.Data.FunCode))"  ></select>
                 <span asp-validation-for="PointMapping.FunCode" class="text-danger"></span>
             </div>
+              <div class="form-group">
+                <label asp-for="PointMapping.SlaveCode" class="control-label"></label>
+                <input asp-for="PointMapping.SlaveCode" class="form-control" />
+                <span asp-validation-for="PointMapping.SlaveCode" class="text-danger"></span>
+            </div>
             <div class="form-group">
                 <label asp-for="PointMapping.Address" class="control-label"></label>
                 <input asp-for="PointMapping.Address" class="form-control" />
