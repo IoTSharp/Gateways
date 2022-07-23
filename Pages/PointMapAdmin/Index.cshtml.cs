@@ -17,14 +17,19 @@ namespace IoTSharp.Gateway.Modbus.Pages.PointMapAdmin
         {
             _context = context;
         }
+        public Guid SlaveId { get; set; }
+        public IList<PointMapping> PointMapping { get;set; }
 
-        public IList<PointMapping> PointMapping { get;set; } = default!;
-
-        public async Task OnGetAsync(Guid? id)
+        public async Task OnGetAsync(Guid id)
         {
+            SlaveId = id;
             if (_context.PointMappings != null && id!=null)
             {
                 PointMapping = await _context.PointMappings.Include(pt => pt.Owner).Where(fm => fm.Owner!=null &&  fm.Owner.Id == id).ToListAsync();
+            }
+            else
+            {
+                PointMapping=new List<PointMapping>();  
             }
         }
     }

@@ -1,7 +1,7 @@
 using IoTSharp.Gateway.Modbus.Data;
+using IoTSharp.Gateway.Modbus.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
- 
 
 namespace IoTSharp.Gateway.Modbus
 {
@@ -18,10 +18,20 @@ namespace IoTSharp.Gateway.Modbus
 
             builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount=false)
                 .AddEntityFrameworkStores<ApplicationDbContext>();
-      
-       
-                
-      builder.Services.AddRazorPages();
+
+
+
+            builder.Services.AddRazorPages();
+
+            builder.Services.AddHostedService<ModbusMaster>();
+            builder.Services.AddIoTSharpMqttSdk(builder.Configuration);
+
+
+
+
+
+
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.

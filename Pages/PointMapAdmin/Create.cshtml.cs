@@ -18,7 +18,7 @@ namespace IoTSharp.Gateway.Modbus.Pages.PointMapAdmin
             _context = context;
         }
 
-        public IActionResult OnGet()
+        public IActionResult OnGet(Guid? id)
         {
             return Page();
         }
@@ -28,17 +28,18 @@ namespace IoTSharp.Gateway.Modbus.Pages.PointMapAdmin
         
 
         // To protect from overposting attacks, see https://aka.ms/RazorPagesCRUD
-        public async Task<IActionResult> OnPostAsync()
+        public async Task<IActionResult> OnPostAsync(Guid  id)
         {
-          if (!ModelState.IsValid || _context.PointMappings == null || PointMapping == null)
+            var owner = _context.ModbusSlaves.Find(id);
+          if (!ModelState.IsValid || _context.PointMappings == null || PointMapping == null || owner==null)
             {
                 return Page();
             }
-
+            PointMapping.Id = Guid.NewGuid();
+            PointMapping.Owner = owner;
             _context.PointMappings.Add(PointMapping);
             await _context.SaveChangesAsync();
-
-            return RedirectToPage("./Index");
+            return RedirectToPage($"./Index", id);
         }
     }
 }

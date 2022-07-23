@@ -8,6 +8,10 @@ namespace IoTSharp.Gateway.Modbus.Data
         [Key]
         public Guid Id { get; set; }
 
+        /// <summary>
+        /// 从机站代码
+        /// </summary>
+        public byte SlaveCode {get;set;}
         [Required]
         public string DataName { get; set; }
 
@@ -26,12 +30,12 @@ namespace IoTSharp.Gateway.Modbus.Data
 
         public FunCode FunCode { get; set; }
 
-        public int Address { get; set; }
+        public ushort Address { get; set; }
 
         /// <summary>
         /// 如果是读取寄存器， 那么一个寄存器就是2字节， 如果是线圈， 那就是 1位。 一个字节为 8位。 
         /// </summary>
-        public int Length { get; set; }
+        public ushort Length { get; set; }
 
         /// <summary>
         /// 默认不转换  
