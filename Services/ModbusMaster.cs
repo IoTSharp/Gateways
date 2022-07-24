@@ -74,7 +74,7 @@ namespace IoTSharp.Gateway.Modbus.Services
             } while (!stoppingToken.IsCancellationRequested);
         }
 
-        private async Task ReadDatas(ModbusSlave slave, IModbusClient? client, CancellationToken stoppingToken)
+        private async Task ReadDatas(ModbusSlave slave, IModbusClient client, CancellationToken stoppingToken)
         {
             var points = _dbContext.PointMappings.Include(p => p.Owner).Where(p => p.Owner == slave).ToList();
             foreach (var point in points)
@@ -259,14 +259,12 @@ namespace IoTSharp.Gateway.Modbus.Services
                     ParseDtuParam(url, dtu);
                     client = dtu;
                     break;
-
                 case "tcp":
                     client = new AMWD.Modbus.Tcp.Client.ModbusClient(url.Host, url.Port, mlog);
                     break;
-
                 case "d2t":
-                  //  client = new AMWD.Modbus.Tcp.Client.ModbusClient(url.Host, url.Port, mlog);
-             
+                    client = new AMWD.Modbus.SerialOverTCP.Client.ModbusClient(url.Host, url.Port, mlog);
+                    break;
                 default:
                     break;
             }
