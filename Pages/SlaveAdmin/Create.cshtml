@@ -15,13 +15,19 @@
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             <div class="form-group">
                 <label asp-for="ModbusSlave.Slave" class="control-label"></label>
-                <input asp-for="ModbusSlave.Slave" class="form-control" />
+                <input asp-for="ModbusSlave.Slave" class="form-control" /> Linux 中 DTU:  dtu://dev.ttyS0/?BaudRate=115200  Windows中 DTU:  dtu://COM1:115200
+                         TCP格式  tcp://www.host.com:602              
                 <span asp-validation-for="ModbusSlave.Slave" class="text-danger"></span>
             </div>
-            <div class="form-group">
+             <div class="form-group">
                 <label asp-for="ModbusSlave.TimeOut" class="control-label"></label>
-                <input asp-for="ModbusSlave.TimeOut" class="form-control" />
+                <input asp-for="ModbusSlave.TimeOut" class="form-control" /> 
                 <span asp-validation-for="ModbusSlave.TimeOut" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="ModbusSlave.TimeInterval" class="control-label"></label>
+                <input asp-for="ModbusSlave.TimeInterval" class="form-control" /> 
+                <span asp-validation-for="ModbusSlave.TimeInterval" class="text-danger"></span>
             </div>
             <div class="form-group">
                 <label asp-for="ModbusSlave.DeviceName" class="control-label"></label>
@@ -30,7 +36,7 @@
             </div>
             <div class="form-group">
                 <label asp-for="ModbusSlave.DeviceNameFormat" class="control-label"></label>
-                <input asp-for="ModbusSlave.DeviceNameFormat" class="form-control" />
+                <input asp-for="ModbusSlave.DeviceNameFormat" class="form-control" /> 如果为空， 则直接使用DeviceName
                 <span asp-validation-for="ModbusSlave.DeviceNameFormat" class="text-danger"></span>
             </div>
             <div class="form-group">

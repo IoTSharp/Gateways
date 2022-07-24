@@ -23,6 +23,7 @@ namespace IoTSharp.Gateway.Modbus
 
 
             builder.Services.AddRazorPages();
+            builder.Services.AddMemoryCache();
 
             builder.Services.AddHostedService<ModbusMaster>();
             builder.Services.AddIoTSharpMqttSdk(builder.Configuration);

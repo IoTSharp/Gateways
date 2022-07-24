@@ -3,6 +3,7 @@ using AMWD.Modbus.Common.Structures;
 using IoTSharp.Gateway.Modbus.Data;
 using IoTSharp.MqttSdk;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json.Linq;
 using System.IO.Ports;
 using System.Web;
@@ -16,15 +17,17 @@ namespace IoTSharp.Gateway.Modbus.Services
 
         private ApplicationDbContext _dbContext;
         private MQTTClient _client;
+        private IMemoryCache _cache;
         private IServiceScope _serviceScope;
-
-        public ModbusMaster(ILogger<ModbusMaster> logger, ILoggerFactory factory, IServiceScopeFactory scopeFactor, MQTTClient client)
+        private Dictionary<Guid,IModbusClient> _modbusclients = new Dictionary<Guid,IModbusClient>();
+        public ModbusMaster(ILogger<ModbusMaster> logger, ILoggerFactory factory, IServiceScopeFactory scopeFactor, MQTTClient client,IMemoryCache  cache)
         {
             _factory = factory;
             _logger = logger;
             _serviceScope = scopeFactor.CreateScope();
             _dbContext = _serviceScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             _client = client;
+            _cache = cache;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -40,18 +43,23 @@ namespace IoTSharp.Gateway.Modbus.Services
                 }
                 else
                 {
-                    var slaves = _dbContext.ModbusSlaves.ToList();
+                    var slaves = _cache.GetOrCreate("db_ModbusSlaves", fc => _dbContext.ModbusSlaves.ToList());
+
                     foreach (var slave in slaves)
                     {
                         /// DTU:  dtu://dev.ttyS0/?BaudRate=115200
                         /// DTU:  dtu://COM1:115200
                         /// TCP:  tcp://www.host.com:602
-                        var client = CreateModbusSlave(slave);
-                        if (client != null)
+                        if (!_modbusclients.ContainsKey(slave.Id))
+                        {
+                            _modbusclients.Add(slave.Id, CreateModbusSlave(slave));
+                        }
+                        if (_modbusclients.TryGetValue(slave.Id,out var client))
                         {
                             try
                             {
-                                await client.Connect(stoppingToken);
+                                
+                                      if (!client.IsConnected) await client.Connect(stoppingToken);
                                 if (client.IsConnected)
                                 {
                                     await ReadDatas(slave, client, stoppingToken);
@@ -68,6 +76,10 @@ namespace IoTSharp.Gateway.Modbus.Services
                             {
                                 client.Dispose();
                             }
+                        }
+                        else
+                        {
+                            _logger.LogWarning( $"从机对象异常，基本信息：{slave.Id}-{slave.DeviceName}-{slave.Slave}。");
                         }
                     }
                 }
