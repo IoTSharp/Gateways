@@ -41,7 +41,7 @@ namespace IoTSharp.MqttSdk
         /// <returns></returns>
         public static string TrimNull(this string  buffer)
         {
-            return buffer.Trim('\0','\r','\n',' ');
+            return buffer.Trim('\0');
         }
      
         public static string ToHex(this byte[] data)

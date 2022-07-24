@@ -188,7 +188,7 @@ namespace IoTSharp.Gateway.Modbus.Services
                 buffer.Add(p.HiByte);
                 buffer.Add(p.LoByte);
             });
-            var stringvalue = System.Text.Encoding.GetEncoding(point.CodePage).GetString(buffer.ToArray());
+            var stringvalue = System.Text.Encoding.GetEncoding(point.CodePage).GetString(buffer.ToArray()).TrimNull();
             return stringvalue;
         }
 
@@ -233,11 +233,11 @@ namespace IoTSharp.Gateway.Modbus.Services
                 switch (point.DataCatalog)
                 {
                     case DataCatalog.AttributeData:
-                        await _client.UploadAttributeAsync(slave.DeviceName, jo.ToString());
+                        await _client.UploadAttributeAsync(slave.DeviceName, jo);
                         break;
 
                     case DataCatalog.TelemetryData:
-                        await _client.UploadTelemetryDataAsync(slave.DeviceName, jo.ToString());
+                        await _client.UploadTelemetryDataAsync(slave.DeviceName, jo);
                         break;
 
                     default:
