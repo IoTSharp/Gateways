@@ -5,85 +5,72 @@ using IoTSharp.MqttSdk;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json.Linq;
+using Quartz;
 using System.IO.Ports;
 using System.Web;
 
-namespace IoTSharp.Gateway.Modbus.Services
+namespace IoTSharp.Gateway.Modbus.Jobs
 {
-    public class ModbusMaster : BackgroundService
+
+    public class ModbusMasterJob : IJob
     {
-        private readonly ILoggerFactory _factory;
-        private readonly ILogger _logger;
+
+        private   ILogger _logger;
 
         private ApplicationDbContext _dbContext;
         private MQTTClient _client;
         private IMemoryCache _cache;
+        private readonly ILoggerFactory _factory;
         private IServiceScope _serviceScope;
-        private Dictionary<Guid,IModbusClient> _modbusclients = new Dictionary<Guid,IModbusClient>();
-        public ModbusMaster(ILogger<ModbusMaster> logger, ILoggerFactory factory, IServiceScopeFactory scopeFactor, MQTTClient client,IMemoryCache  cache)
+
+        public ModbusMasterJob( ILoggerFactory factory, IServiceScopeFactory scopeFactor, MQTTClient client, IMemoryCache cache)
         {
             _factory = factory;
-            _logger = logger;
             _serviceScope = scopeFactor.CreateScope();
             _dbContext = _serviceScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             _client = client;
             _cache = cache;
         }
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        public async Task Execute(IJobExecutionContext context)
         {
-            do
+            var slave_id = new Guid( context.Trigger.JobDataMap.GetString("slave_id"));
+            var slave_name = context.Trigger.JobDataMap.GetString("slave_name");
+            _logger = _factory.CreateLogger($"{nameof(ModbusMasterJob)}_{slave_name}");
+            var slave = await _dbContext.ModbusSlaves.FirstOrDefaultAsync(m=>m.Id== slave_id);
+            if (slave != null)
             {
-                stoppingToken.ThrowIfCancellationRequested();
-                var pm = await _dbContext.Database.GetPendingMigrationsAsync();
-                if (pm?.Count()>0)
+                /// DTU:  dtu://dev.ttyS0/?BaudRate=115200
+                /// DTU:  dtu://COM1:115200
+                /// TCP:  tcp://www.host.com:602
+                var client = CreateModbusSlave(slave);
+                try
                 {
-                    _logger.LogWarning($"有挂起的数据库结构未合并。");
-                  await    Task.Delay(TimeSpan.FromMinutes(1));
-                }
-                else
-                {
-                    var slaves = _cache.GetOrCreate("db_ModbusSlaves", fc => _dbContext.ModbusSlaves.ToList());
 
-                    foreach (var slave in slaves)
+                    if (!client.IsConnected) await client.Connect(context.CancellationToken);
+                    if (client.IsConnected)
                     {
-                        /// DTU:  dtu://dev.ttyS0/?BaudRate=115200
-                        /// DTU:  dtu://COM1:115200
-                        /// TCP:  tcp://www.host.com:602
-                        if (!_modbusclients.ContainsKey(slave.Id))
-                        {
-                            _modbusclients.Add(slave.Id, CreateModbusSlave(slave));
-                        }
-                        if (_modbusclients.TryGetValue(slave.Id,out var client))
-                        {
-                            try
-                            {
-                                
-                                      if (!client.IsConnected) await client.Connect(stoppingToken);
-                                if (client.IsConnected)
-                                {
-                                    await ReadDatas(slave, client, stoppingToken);
-                                    await client.Disconnect(stoppingToken);
-                                }
-
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogError(ex, $"未能连接设备。{ex.Message}");
-                                await Task.Delay(TimeSpan.FromSeconds(5));
-                            }
-                            finally
-                            {
-                                client.Dispose();
-                            }
-                        }
-                        else
-                        {
-                            _logger.LogWarning( $"从机对象异常，基本信息：{slave.Id}-{slave.DeviceName}-{slave.Slave}。");
-                        }
+                        await ReadDatas(slave, client, context.CancellationToken);
+                        await client.Disconnect(context.CancellationToken);
                     }
+
                 }
-            } while (!stoppingToken.IsCancellationRequested);
+                catch (Exception ex)
+                {
+                    var msg = $"SlaveId:{slave_id},Device:{slave.DeviceName},IsConnected:{client?.IsConnected},Message:{ex.Message}";
+                    _logger.LogError(ex, msg);
+                    throw new Exception(msg, ex);
+                }
+                finally
+                {
+                    client.Dispose();
+                }
+            }
+            else
+            {
+                _logger.LogWarning($"未能找到从机{slave_id}");
+            }
+
         }
 
         private async Task ReadDatas(ModbusSlave slave, IModbusClient client, CancellationToken stoppingToken)
@@ -260,22 +247,21 @@ namespace IoTSharp.Gateway.Modbus.Services
 
         private IModbusClient? CreateModbusSlave(ModbusSlave slave)
         {
-            var mlog = _factory.CreateLogger($"ModbusSlave{slave.Id}");
             var url = slave.Slave;
             IModbusClient? client = null;
             switch (url.Scheme)
             {
                 case "dtu":
                     string comname = ParseCOMName(url);
-                    var dtu = new AMWD.Modbus.Serial.Client.ModbusClient(comname, mlog);
+                    var dtu = new AMWD.Modbus.Serial.Client.ModbusClient(comname, _logger);
                     ParseDtuParam(url, dtu);
                     client = dtu;
                     break;
                 case "tcp":
-                    client = new AMWD.Modbus.Tcp.Client.ModbusClient(url.Host, url.Port, mlog);
+                    client = new AMWD.Modbus.Tcp.Client.ModbusClient(url.Host, url.Port, _logger);
                     break;
                 case "d2t":
-                    client = new AMWD.Modbus.SerialOverTCP.Client.ModbusClient(url.Host, url.Port, mlog);
+                    client = new AMWD.Modbus.SerialOverTCP.Client.ModbusClient(url.Host, url.Port, _logger);
                     break;
                 default:
                     break;
@@ -358,5 +344,6 @@ namespace IoTSharp.Gateway.Modbus.Services
                 }
             }
         }
+      
     }
 }

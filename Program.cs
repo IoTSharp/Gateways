@@ -1,7 +1,8 @@
 using IoTSharp.Gateway.Modbus.Data;
-using IoTSharp.Gateway.Modbus.Services;
+using IoTSharp.Gateway.Modbus.Jobs;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Quartz;
 
 namespace IoTSharp.Gateway.Modbus
 {
@@ -25,10 +26,31 @@ namespace IoTSharp.Gateway.Modbus
             builder.Services.AddRazorPages();
             builder.Services.AddMemoryCache();
 
-            builder.Services.AddHostedService<ModbusMaster>();
-            builder.Services.AddIoTSharpMqttSdk(builder.Configuration);
+       builder.Services.AddIoTSharpMqttSdk(builder.Configuration);
 
+            builder.Services.AddQuartz(q =>
+            {
+                q.UseMicrosoftDependencyInjectionJobFactory();
 
+                var ModbusSchedulerJobKey = new JobKey("ModbusSchedulerJob");
+                q.AddJob<ModbusSchedulerJob>(opts => opts.WithIdentity(ModbusSchedulerJobKey));
+                q.AddTrigger(opts => opts
+                    .ForJob(ModbusSchedulerJobKey)
+                    .WithIdentity("ModbusSchedulerJob-trigger")
+                    .WithSimpleSchedule(x => x
+                        .WithIntervalInMinutes(1)
+                        .RepeatForever()).StartNow());
+ 
+                // base quartz scheduler, job and trigger configuration
+            });
+
+            // ASP.NET Core hosting
+            builder.Services.AddQuartzServer(options =>
+            {
+                options.StartDelay = TimeSpan.FromSeconds(10);
+                // when shutting down we want jobs to complete gracefully
+                options.WaitForJobsToComplete = true;
+            });
 
 
 
