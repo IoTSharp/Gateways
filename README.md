@@ -5,3 +5,8 @@ IoTSharp的Modbus主站网关可以通过页面设置和添加采集映射信息可以完成自动化采集。主
 1. 管理被采集的从机基本信息（已实现）
 2. 管理采集点和IoTSharp的映射 （已实现）
 3. 接收IoTSharp的下行数据和控制 (未实现)
+
+
+| 公众号 |    [QQ群63631741](https://jq.qq.com/?_wv=1027&k=HJ7h3gbO)  |  微信群  |
+| ------ | ---- | ---- |
+| ![](https://github.com/IoTSharp/IoTSharp/raw/master/docs/static/img/qrcode.jpg) | ![](https://github.com/IoTSharp/IoTSharp/raw/master/docs/static/img/IoTSharpQQGruop.png) | ![企业微信群](https://github.com/IoTSharp/IoTSharp/raw/master/docs/static/img/qyqun.jpg) |
