@@ -43,6 +43,7 @@ namespace IoTSharp.Gateway.Modbus.Jobs
                 /// DTU:  dtu://dev.ttyS0/?BaudRate=115200
                 /// DTU:  dtu://COM1:115200
                 /// TCP:  tcp://www.host.com:602
+                /// d2t:  d2t://www.host.com:602
                 var client = CreateModbusSlave(slave);
                 try
                 {
@@ -332,7 +333,7 @@ namespace IoTSharp.Gateway.Modbus.Jobs
                             break;
 
                         case nameof(dtu.DataBits):
-                            if (Enum.TryParse(query.Get(key), true, out int _DataBits))
+                            if (int.TryParse(query.Get(key), out int _DataBits))
                             {
                                 dtu.DataBits = _DataBits;
                             }
