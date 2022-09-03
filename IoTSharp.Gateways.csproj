@@ -4,7 +4,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>annotations</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>aspnet-IoTSharp.Gateway.Modbus-554A6128-AB47-40BC-8BC3-40D3123C6BFF</UserSecretsId>
+    <UserSecretsId>aspnet-IoTSharp.Gateways-554A6128-AB47-40BC-8BC3-40D3123C6BFF</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <DockerfileContext>.</DockerfileContext>
 	  <RestoreAdditionalProjectSources>

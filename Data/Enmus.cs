@@ -3,7 +3,7 @@ using Newtonsoft.Json.Converters;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 
-namespace IoTSharp.Gateway.Modbus.Data
+namespace IoTSharp.Gateways.Data
 {
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
     [JsonConverter(typeof(StringEnumConverter))]

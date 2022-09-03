@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace IoTSharp.Gateway.Modbus.Migrations
+namespace IoTSharp.Gateways.Migrations
 {
     public partial class ModBusDataMapping : Migration
     {

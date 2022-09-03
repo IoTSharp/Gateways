@@ -1,4 +1,4 @@
-# IoTSharp.Gateway.Modbus 
+# IoTSharp.Gateways 
 
 IoTSharp的Modbus主站网关可以通过页面设置和添加采集映射信息可以完成自动化采集。主要功能如下:
 

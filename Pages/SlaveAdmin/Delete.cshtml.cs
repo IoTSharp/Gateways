@@ -5,15 +5,15 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using IoTSharp.Gateway.Modbus.Data;
+using IoTSharp.Gateways.Data;
 
-namespace IoTSharp.Gateway.Modbus.Pages.SlaveAdmin
+namespace IoTSharp.Gateways.Pages.SlaveAdmin
 {
     public class DeleteModel : PageModel
     {
-        private readonly IoTSharp.Gateway.Modbus.Data.ApplicationDbContext _context;
+        private readonly IoTSharp.Gateways.Data.ApplicationDbContext _context;
 
-        public DeleteModel(IoTSharp.Gateway.Modbus.Data.ApplicationDbContext context)
+        public DeleteModel(IoTSharp.Gateways.Data.ApplicationDbContext context)
         {
             _context = context;
         }

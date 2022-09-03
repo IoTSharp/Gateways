@@ -1,5 +1,5 @@
 ﻿@page
-@model IoTSharp.Gateway.Modbus.Pages.PointMapAdmin.DetailsModel
+@model IoTSharp.Gateways.Pages.PointMapAdmin.DetailsModel
 
 @{
     ViewData["Title"] = "Details";
@@ -41,12 +41,7 @@
         <dd class="col-sm-10">
             @Html.DisplayFor(model => model.PointMapping.SlaveCode)
         </dd>
-          <dt class="col-sm-2">
-            @Html.DisplayNameFor(model => model.PointMapping.Cycles)
-        </dt>
-        <dd class="col-sm-10">
-            @Html.DisplayFor(model => model.PointMapping.Cycles)
-        </dd>
+    
         <dt class="col-sm-2">
             @Html.DisplayNameFor(model => model.PointMapping.Address)
         </dt>
@@ -60,10 +55,10 @@
             @Html.DisplayFor(model => model.PointMapping.Length)
         </dd>
         <dt class="col-sm-2">
-            @Html.DisplayNameFor(model => model.PointMapping.DateTimeFormat)
+            @Html.DisplayNameFor(model => model.PointMapping.DataFormat)
         </dt>
         <dd class="col-sm-10">
-            @Html.DisplayFor(model => model.PointMapping.DateTimeFormat)
+            @Html.DisplayFor(model => model.PointMapping.DataFormat)
         </dd>
         <dt class="col-sm-2">
             @Html.DisplayNameFor(model => model.PointMapping.CodePage)

@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 
-namespace IoTSharp.Gateway.Modbus.Data
+namespace IoTSharp.Gateways.Data
 {
     public class ModbusSlave
     {

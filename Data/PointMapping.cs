@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 
-namespace IoTSharp.Gateway.Modbus.Data
+namespace IoTSharp.Gateways.Data
 {
     public class PointMapping
     {
@@ -48,8 +48,8 @@ namespace IoTSharp.Gateway.Modbus.Data
         /// <summary>
         /// 默认不转换  
         /// </summary>
-        [DisplayName("时间格式")]
-        public string? DateTimeFormat { get; set; }
+        [DisplayName("数据格式")]
+        public string? DataFormat { get; set; }
         /// <summary>
         /// 默认 65001 ， 简体中文 936 繁体 950
         /// </summary>
@@ -57,13 +57,7 @@ namespace IoTSharp.Gateway.Modbus.Data
         [DefaultValue(936)]
         public int CodePage { get; set; } = 936;
 
-        /// <summary>
-        /// 每循环几次才采集此点位。 每个循环间隔由从机采集间隔由ModbusSlave的TimeInterval决定，
-        /// 所以， 此点位采集间隔则为  Cycles*(TimeInterval+通讯延迟)
-        /// </summary>
-        [DisplayName("采集跃次")]
-        [DefaultValue(1)]
-        public int Cycles { get; set; } = 1;
+ 
 
        public ModbusSlave? Owner { get; set; }
 

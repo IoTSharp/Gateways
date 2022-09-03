@@ -6,15 +6,15 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using IoTSharp.Gateway.Modbus.Data;
+using IoTSharp.Gateways.Data;
 
-namespace IoTSharp.Gateway.Modbus.Pages.PointMapAdmin
+namespace IoTSharp.Gateways.Pages.PointMapAdmin
 {
     public class EditModel : PageModel
     {
-        private readonly IoTSharp.Gateway.Modbus.Data.ApplicationDbContext _context;
+        private readonly IoTSharp.Gateways.Data.ApplicationDbContext _context;
 
-        public EditModel(IoTSharp.Gateway.Modbus.Data.ApplicationDbContext context)
+        public EditModel(IoTSharp.Gateways.Data.ApplicationDbContext context)
         {
             _context = context;
         }

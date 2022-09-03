@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace IoTSharp.Gateway.Modbus.Migrations
+namespace IoTSharp.Gateways.Migrations
 {
     public partial class modify2022 : Migration
     {

@@ -1,8 +1,8 @@
-﻿using IoTSharp.Gateway.Modbus.Data;
+﻿using IoTSharp.Gateways.Data;
 using Quartz;
 using Quartz.Impl;
 
-namespace IoTSharp.Gateway.Modbus.Jobs
+namespace IoTSharp.Gateways.Jobs
 {
     public class ModbusSchedulerJob : IJob
     {

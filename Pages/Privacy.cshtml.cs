@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace IoTSharp.Gateway.Modbus.Pages
+namespace IoTSharp.Gateways.Pages
 {
     public class PrivacyModel : PageModel
     {

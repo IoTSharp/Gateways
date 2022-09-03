@@ -1,6 +1,6 @@
 ﻿using AMWD.Modbus.Common.Interfaces;
 using AMWD.Modbus.Common.Structures;
-using IoTSharp.Gateway.Modbus.Data;
+using IoTSharp.Gateways.Data;
 using IoTSharp.MqttSdk;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -9,7 +9,7 @@ using Quartz;
 using System.IO.Ports;
 using System.Web;
 
-namespace IoTSharp.Gateway.Modbus.Jobs
+namespace IoTSharp.Gateways.Jobs
 {
 
     public class ModbusMasterJob : IJob

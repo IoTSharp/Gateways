@@ -1,5 +1,5 @@
 ﻿@page
-@model IoTSharp.Gateway.Modbus.Pages.PointMapAdmin.DeleteModel
+@model IoTSharp.Gateways.Pages.PointMapAdmin.DeleteModel
 
 @{
     ViewData["Title"] = "Delete";
@@ -49,10 +49,10 @@
             @Html.DisplayFor(model => model.PointMapping.Length)
         </dd>
         <dt class="col-sm-2">
-            @Html.DisplayNameFor(model => model.PointMapping.DateTimeFormat)
+            @Html.DisplayNameFor(model => model.PointMapping.DataFormat)
         </dt>
         <dd class="col-sm-10">
-            @Html.DisplayFor(model => model.PointMapping.DateTimeFormat)
+            @Html.DisplayFor(model => model.PointMapping.DataFormat)
         </dd>
         <dt class="col-sm-2">
             @Html.DisplayNameFor(model => model.PointMapping.CodePage)

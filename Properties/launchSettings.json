@@ -8,7 +8,7 @@
     }
   },
   "profiles": {
-    "IoTSharp.Gateway.Modbus": {
+    "IoTSharp.Gateways": {
       "commandName": "Project",
       "launchBrowser": true,
       "environmentVariables": {

@@ -1,10 +1,10 @@
-using IoTSharp.Gateway.Modbus.Data;
-using IoTSharp.Gateway.Modbus.Jobs;
+using IoTSharp.Gateways.Data;
+using IoTSharp.Gateways.Jobs;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Quartz;
 
-namespace IoTSharp.Gateway.Modbus
+namespace IoTSharp.Gateways
 {
     public class Program
     {

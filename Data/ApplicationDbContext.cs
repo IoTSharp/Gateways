@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
-namespace IoTSharp.Gateway.Modbus.Data
+namespace IoTSharp.Gateways.Data
 {
     public class ApplicationDbContext : IdentityDbContext
     {

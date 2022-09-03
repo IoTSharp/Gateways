@@ -1,5 +1,5 @@
 ﻿@page
-@model IoTSharp.Gateway.Modbus.Pages.PointMapAdmin.EditModel
+@model IoTSharp.Gateways.Pages.PointMapAdmin.EditModel
 
 @{
     ViewData["Title"] = "Edit";
@@ -21,17 +21,17 @@
             </div>
             <div class="form-group">
                 <label asp-for="PointMapping.DataType" class="control-label"></label>
-                <select asp-for="PointMapping.DataType" class="form-control" asp-items="@Html.GetEnumSelectList(typeof(IoTSharp.Gateway.Modbus.Data.DataType))" ></select>
+                <select asp-for="PointMapping.DataType" class="form-control" asp-items="@Html.GetEnumSelectList(typeof(IoTSharp.Gateways.Data.DataType))" ></select>
                 <span asp-validation-for="PointMapping.DataType" class="text-danger"></span>
             </div>
             <div class="form-group">
                 <label asp-for="PointMapping.DataCatalog" class="control-label"></label>
-                <select asp-for="PointMapping.DataCatalog" class="form-control" asp-items="@Html.GetEnumSelectList(typeof(IoTSharp.Gateway.Modbus.Data.DataCatalog))"  ></select>
+                <select asp-for="PointMapping.DataCatalog" class="form-control" asp-items="@Html.GetEnumSelectList(typeof(IoTSharp.Gateways.Data.DataCatalog))"  ></select>
                 <span asp-validation-for="PointMapping.DataCatalog" class="text-danger"></span>
             </div>
             <div class="form-group">
                 <label asp-for="PointMapping.FunCode" class="control-label"></label>
-                <select asp-for="PointMapping.FunCode" class="form-control" asp-items="@Html.GetEnumSelectList(typeof(IoTSharp.Gateway.Modbus.Data.FunCode))"  ></select>
+                <select asp-for="PointMapping.FunCode" class="form-control" asp-items="@Html.GetEnumSelectList(typeof(IoTSharp.Gateways.Data.FunCode))"  ></select>
                 <span asp-validation-for="PointMapping.FunCode" class="text-danger"></span>
             </div>
               <div class="form-group">
@@ -39,11 +39,7 @@
                 <input asp-for="PointMapping.SlaveCode" class="form-control" />
                 <span asp-validation-for="PointMapping.SlaveCode" class="text-danger"></span>
             </div>
-            <div class="form-group">
-                <label asp-for="PointMapping.Cycles" class="control-label"></label>
-                <input asp-for="PointMapping.Cycles" class="form-control" /> 
-                <span asp-validation-for="PointMapping.Cycles" class="text-danger"></span>
-            </div>
+ 
             <div class="form-group">
                 <label asp-for="PointMapping.Address" class="control-label"></label>
                 <input asp-for="PointMapping.Address" class="form-control" />
@@ -55,9 +51,9 @@
                 <span asp-validation-for="PointMapping.Length" class="text-danger"></span>
             </div>
             <div class="form-group">
-                <label asp-for="PointMapping.DateTimeFormat" class="control-label"></label>
-                <input asp-for="PointMapping.DateTimeFormat" class="form-control" />
-                <span asp-validation-for="PointMapping.DateTimeFormat" class="text-danger"></span>
+                <label asp-for="PointMapping.DataFormat" class="control-label"></label>
+                <input asp-for="PointMapping.DataFormat" class="form-control" />
+                <span asp-validation-for="PointMapping.DataFormat" class="text-danger"></span>
             </div>
             <div class="form-group">
                 <label asp-for="PointMapping.CodePage" class="control-label"></label>

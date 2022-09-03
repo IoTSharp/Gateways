@@ -1,5 +1,5 @@
 ﻿@page
-@model IoTSharp.Gateway.Modbus.Pages.PointMapAdmin.IndexModel
+@model IoTSharp.Gateways.Pages.PointMapAdmin.IndexModel
 
 @{
     ViewData["Title"] = "Index";
@@ -32,7 +32,7 @@
                 @Html.DisplayNameFor(model => model.PointMapping[0].Length)
             </th>
             <th>
-                @Html.DisplayNameFor(model => model.PointMapping[0].DateTimeFormat)
+                @Html.DisplayNameFor(model => model.PointMapping[0].DataFormat)
             </th>
             <th>
                 @Html.DisplayNameFor(model => model.PointMapping[0].CodePage)
@@ -63,7 +63,7 @@
                 @Html.DisplayFor(modelItem => item.Length)
             </td>
             <td>
-                @Html.DisplayFor(modelItem => item.DateTimeFormat)
+                @Html.DisplayFor(modelItem => item.DataFormat)
             </td>
             <td>
                 @Html.DisplayFor(modelItem => item.CodePage)

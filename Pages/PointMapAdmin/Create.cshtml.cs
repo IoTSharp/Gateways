@@ -5,15 +5,15 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using IoTSharp.Gateway.Modbus.Data;
+using IoTSharp.Gateways.Data;
 
-namespace IoTSharp.Gateway.Modbus.Pages.PointMapAdmin
+namespace IoTSharp.Gateways.Pages.PointMapAdmin
 {
     public class CreateModel : PageModel
     {
-        private readonly IoTSharp.Gateway.Modbus.Data.ApplicationDbContext _context;
+        private readonly IoTSharp.Gateways.Data.ApplicationDbContext _context;
 
-        public CreateModel(IoTSharp.Gateway.Modbus.Data.ApplicationDbContext context)
+        public CreateModel(IoTSharp.Gateways.Data.ApplicationDbContext context)
         {
             _context = context;
         }
