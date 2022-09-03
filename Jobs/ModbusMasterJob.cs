@@ -277,7 +277,7 @@ namespace IoTSharp.Gateways.Jobs
         private async Task UploadData(ModbusSlave slave, PointMapping point, BitVector32 value)
         {
             Dictionary<string, short> lst = new Dictionary<string, short>();
-            var _format = point.DateTimeFormat ?? $"{point.DataName}_unknow1:8;{point.DataName}_unknow2:8";
+            var _format = point.DataFormat ?? $"{point.DataName}_unknow1:8;{point.DataName}_unknow2:8";
             _format.Split(';').ToList().ForEach(s =>
             {
                 var sk = s.Split(':');
