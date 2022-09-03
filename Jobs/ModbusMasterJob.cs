@@ -8,6 +8,9 @@ using Newtonsoft.Json.Linq;
 using Quartz;
 using System.IO.Ports;
 using System.Web;
+using System.Numerics;
+using System.Collections.Specialized;
+ 
 
 namespace IoTSharp.Gateways.Jobs
 {
@@ -36,10 +39,11 @@ namespace IoTSharp.Gateways.Jobs
         {
             var slave_id = new Guid( context.Trigger.JobDataMap.GetString("slave_id"));
             var slave_name = context.Trigger.JobDataMap.GetString("slave_name");
-            _logger = _factory.CreateLogger($"{nameof(ModbusMasterJob)}_{slave_name}");
+         
             var slave = await _dbContext.ModbusSlaves.FirstOrDefaultAsync(m=>m.Id== slave_id);
             if (slave != null)
             {
+                _logger = _factory.CreateLogger($"Slaver:{slave_name}({slave.Slave})");
                 /// DTU:  dtu://dev.ttyS0/?BaudRate=115200
                 /// DTU:  dtu://COM1:115200
                 /// TCP:  tcp://www.host.com:602
@@ -79,27 +83,35 @@ namespace IoTSharp.Gateways.Jobs
             var points = _dbContext.PointMappings.Include(p => p.Owner).Where(p => p.Owner == slave).ToList();
             foreach (var point in points)
             {
-                switch (point.FunCode)
+                try
                 {
-                    case FunCode.ReadCoils:
-                        var _coils = await client.ReadCoils(point.SlaveCode, point.Address, point.Length, stoppingToken);
-                        await UploadCoils(slave, point, _coils);
-                        break;
-                    case FunCode.ReadDiscreteInputs:
-                        await UploadDiscreteInputs(slave, client, point, stoppingToken);
-                        break;
+                    switch (point.FunCode)
+                    {
+                        case FunCode.ReadCoils:
+                            var _coils = await client.ReadCoils(point.SlaveCode, point.Address, point.Length, stoppingToken);
+                            await UploadCoils(slave, point, _coils);
+                            break;
+                        case FunCode.ReadDiscreteInputs:
+                            await UploadDiscreteInputs(slave, client, point, stoppingToken);
+                            break;
 
-                    case FunCode.ReadMultipleHoldingRegisters:
-                        var _registers = await client.ReadHoldingRegisters(point.SlaveCode, point.Address, point.Length, stoppingToken);
-                        await UploadRegisters(slave, point, _registers);
-                        break;
+                        case FunCode.ReadMultipleHoldingRegisters:
+                            var _registers = await client.ReadHoldingRegisters(point.SlaveCode, point.Address, point.Length, stoppingToken);
+                            await UploadRegisters(slave, point, _registers);
+                            break;
 
-                    case FunCode.ReadInputRegisters:
-                        var _input_registers = await client.ReadInputRegisters(point.SlaveCode, point.Address, point.Length, stoppingToken);
-                        await UploadRegisters(slave, point, _input_registers);
-                        break;
-                    default:
-                        break;
+                        case FunCode.ReadInputRegisters:
+                            var _input_registers = await client.ReadInputRegisters(point.SlaveCode, point.Address, point.Length, stoppingToken);
+                            await UploadRegisters(slave, point, _input_registers);
+                            break;
+                        default:
+                            break;
+                    }
+                    _logger.LogInformation($"从{slave.Slave}执行{point.FunCode} 将地址{point.Address}的长度{point.Length}的数据存储到名称{point.DataName}类型{point.DataType}完成。 ");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning($"从{slave.Slave}执行{point.FunCode} 将地址{point.Address}的长度{point.Length}的数据存储到名称{point.DataName}类型{point.DataType}时遇到错误{ex.Message}。");
                 }
             }
         }
@@ -172,8 +184,11 @@ namespace IoTSharp.Gateways.Jobs
                     break;
 
                 case DataType.DateTime:
-                    break;
 
+                    break;
+                    case DataType.Boolean:
+                    await UploadData(slave, point, RegistersToBitVector32(_registers));
+                    break;
                 default:
                     _logger.LogWarning($"多寄存器读取方式不支持类型{point.DataType}");
                     break;
@@ -221,6 +236,19 @@ namespace IoTSharp.Gateways.Jobs
             var uint64 = BitConverter.ToDouble(buff);
             return uint64;
         }
+        private static BitVector32 RegistersToBitVector32(List<Register> _registers)
+        {
+            BitVector32 vector32=new BitVector32 (0);
+            if (_registers.Count == 1)//16位
+            {
+                vector32= new BitVector32( BitConverter.ToInt32(new byte[] { _registers[0].HiByte, _registers[0].LoByte,0,0 }));
+            }
+            else if (_registers.Count == 2)//32位 
+            {
+                vector32 = new BitVector32(BitConverter.ToInt32(new byte[] { _registers[0].HiByte, _registers[0].LoByte, _registers[1].HiByte, _registers[1].LoByte }));
+            }
+            return vector32;
+        }
 
         private async Task UploadData<T>(ModbusSlave slave, PointMapping point, T? value)
         {
@@ -243,6 +271,39 @@ namespace IoTSharp.Gateways.Jobs
                     default:
                         break;
                 }
+            }
+        }
+
+        private async Task UploadData(ModbusSlave slave, PointMapping point, BitVector32 value)
+        {
+            Dictionary<string, short> lst = new Dictionary<string, short>();
+            var _format = point.DateTimeFormat ?? $"{point.DataName}_unknow1:8;{point.DataName}_unknow2:8";
+            _format.Split(';').ToList().ForEach(s =>
+            {
+                var sk = s.Split(':');
+                lst.Add(sk[0], short.Parse(sk[1]));
+            });
+            var objx = value.ToDictionary(lst);
+            JObject jo = new()
+                {
+                    { point.DataName, new JValue(value.Data) }
+                };
+            objx.Keys.ToList().ForEach(s =>
+            {
+                jo.Add(s, objx[s]);
+            });
+            switch (point.DataCatalog)
+            {
+                case DataCatalog.AttributeData:
+                    await _client.UploadAttributeAsync(slave.DeviceName, jo);
+                    break;
+
+                case DataCatalog.TelemetryData:
+                    await _client.UploadTelemetryDataAsync(slave.DeviceName, jo);
+                    break;
+
+                default:
+                    break;
             }
         }
 

@@ -31,7 +31,9 @@ namespace IoTSharp.Gateways.Jobs
 
                 job = JobBuilder.Create<ModbusMasterJob>()
                 .WithIdentity(nameof( ModbusMasterJob))
+                .StoreDurably()
                 .Build();
+              await  _scheduler.AddJob(job,true, context.CancellationToken);
             }
             else
             {
@@ -39,6 +41,7 @@ namespace IoTSharp.Gateways.Jobs
             }
             var triggers = await _scheduler.GetTriggersOfJob(_modbuskeys, context.CancellationToken);
             var slaves = _dbContext.ModbusSlaves.ToList();
+            var tgs = new List<ITrigger>();
             foreach (var slave in slaves)
             {
 
@@ -49,11 +52,12 @@ namespace IoTSharp.Gateways.Jobs
                 {
                    var   trg = TriggerBuilder.Create()
                     .WithIdentity(slaveid)
+                    .ForJob(job)
                     .UsingJobData("slave_id",slaveid)
                     .UsingJobData("slave_name", slave.DeviceName)
                     .WithSimpleSchedule(x => x.WithIntervalInSeconds(interval).RepeatForever()).StartNow()
                     .Build();
-                    await _scheduler.ScheduleJob(job, trg, context.CancellationToken);
+                    await _scheduler.ScheduleJob(trg,context.CancellationToken);
                 }
             }
             _logger.LogInformation($"{_scheduler.IsStarted}");
