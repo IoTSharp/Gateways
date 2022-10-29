@@ -80,6 +80,7 @@ namespace IoTSharp.Gateways
        
            
             app.MapRazorPages();
+           
  
             app.Run();
         }
