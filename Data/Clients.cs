@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace IoTSharp.Gateways.Data
 {
-    public class ModbusSlave
+    public class Client
     {
 
         [Key]
@@ -21,7 +21,7 @@ namespace IoTSharp.Gateways.Data
         [Required]
         [DisplayName("从机地址")]
         [Description("Linux下串口格式 dtu://dev.ttyS0:115200  ， Windows下串口格式 dtu://COM1:115200 TCP格式 d2t://www.host.com:602")]
-        public Uri Slave { get; set; }
+        public Uri Address { get; set; }
 
         /// <summary>
         /// 连接超时和读取写入超时 按秒
@@ -46,6 +46,5 @@ namespace IoTSharp.Gateways.Data
         [DisplayName("采集间隔")]
         public float TimeInterval { get; set; }
 
-        public List<PointMapping>? PointMappings { get; set; } = new List<PointMapping>();
     }
 }

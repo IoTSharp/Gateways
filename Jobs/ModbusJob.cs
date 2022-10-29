@@ -8,17 +8,15 @@ using Newtonsoft.Json.Linq;
 using Quartz;
 using System.IO.Ports;
 using System.Web;
-using System.Numerics;
 using System.Collections.Specialized;
- 
 
 namespace IoTSharp.Gateways.Jobs
 {
 
-    public class ModbusMasterJob : IJob
+    public class ModbusJob : IJob
     {
 
-        private   ILogger _logger;
+        private ILogger _logger;
 
         private ApplicationDbContext _dbContext;
         private MQTTClient _client;
@@ -26,7 +24,7 @@ namespace IoTSharp.Gateways.Jobs
         private readonly ILoggerFactory _factory;
         private IServiceScope _serviceScope;
 
-        public ModbusMasterJob( ILoggerFactory factory, IServiceScopeFactory scopeFactor, MQTTClient client, IMemoryCache cache)
+        public ModbusJob(ILoggerFactory factory, IServiceScopeFactory scopeFactor, MQTTClient client, IMemoryCache cache)
         {
             _factory = factory;
             _serviceScope = scopeFactor.CreateScope();
@@ -37,16 +35,16 @@ namespace IoTSharp.Gateways.Jobs
 
         public async Task Execute(IJobExecutionContext context)
         {
-            var slave_id = new Guid( context.Trigger.JobDataMap.GetString("slave_id"));
-            var slave_name = context.Trigger.JobDataMap.GetString("slave_name");
-         
-            var slave = await _dbContext.ModbusSlaves.FirstOrDefaultAsync(m=>m.Id== slave_id);
+            var slave_id = new Guid(context.Trigger.JobDataMap.GetString(SchedulerJob.client_id));
+            var slave_name = context.Trigger.JobDataMap.GetString(SchedulerJob.client_name);
+
+            var slave = await _dbContext.Clients.FirstOrDefaultAsync(m => m.Id == slave_id);
             if (slave != null)
             {
-                _logger = _factory.CreateLogger($"Slaver:{slave_name}({slave.Slave})");
+                _logger = _factory.CreateLogger($"Slaver:{slave_name}({slave.Address})");
                 /// DTU:  dtu://dev.ttyS0/?BaudRate=115200
                 /// DTU:  dtu://COM1:115200
-                /// TCP:  tcp://www.host.com:602
+                /// rtu:  tcp://www.host.com:602
                 /// d2t:  d2t://www.host.com:602
                 var client = CreateModbusSlave(slave);
                 try
@@ -78,9 +76,9 @@ namespace IoTSharp.Gateways.Jobs
 
         }
 
-        private async Task ReadDatas(ModbusSlave slave, IModbusClient client, CancellationToken stoppingToken)
+        private async Task ReadDatas(Client slave, IModbusClient client, CancellationToken stoppingToken)
         {
-            var points = _dbContext.PointMappings.Include(p => p.Owner).Where(p => p.Owner == slave).ToList();
+            var points = await _dbContext.ModbusMappings.Include(p => p.Owner).Where(p => p.Owner == slave).ToListAsync();
             foreach (var point in points)
             {
                 try
@@ -88,7 +86,7 @@ namespace IoTSharp.Gateways.Jobs
                     switch (point.FunCode)
                     {
                         case FunCode.ReadCoils:
-                            var _coils = await client.ReadCoils(point.SlaveCode, point.Address, point.Length, stoppingToken);
+                            var _coils = await client.ReadCoils(point.Code, point.Address, point.Length, stoppingToken);
                             await UploadCoils(slave, point, _coils);
                             break;
                         case FunCode.ReadDiscreteInputs:
@@ -96,29 +94,29 @@ namespace IoTSharp.Gateways.Jobs
                             break;
 
                         case FunCode.ReadMultipleHoldingRegisters:
-                            var _registers = await client.ReadHoldingRegisters(point.SlaveCode, point.Address, point.Length, stoppingToken);
+                            var _registers = await client.ReadHoldingRegisters(point.Code, point.Address, point.Length, stoppingToken);
                             await UploadRegisters(slave, point, _registers);
                             break;
 
                         case FunCode.ReadInputRegisters:
-                            var _input_registers = await client.ReadInputRegisters(point.SlaveCode, point.Address, point.Length, stoppingToken);
+                            var _input_registers = await client.ReadInputRegisters(point.Code, point.Address, point.Length, stoppingToken);
                             await UploadRegisters(slave, point, _input_registers);
                             break;
                         default:
                             break;
                     }
-                    _logger.LogInformation($"从{slave.Slave}执行{point.FunCode} 将地址{point.Address}的长度{point.Length}的数据存储到名称{point.DataName}类型{point.DataType}完成。 ");
+                    _logger.LogInformation($"从{slave.Address}执行{point.FunCode} 将地址{point.Address}的长度{point.Length}的数据存储到名称{point.DataName}类型{point.DataType}完成。 ");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning($"从{slave.Slave}执行{point.FunCode} 将地址{point.Address}的长度{point.Length}的数据存储到名称{point.DataName}类型{point.DataType}时遇到错误{ex.Message}。");
+                    _logger.LogWarning($"从{slave.Address}执行{point.FunCode} 将地址{point.Address}的长度{point.Length}的数据存储到名称{point.DataName}类型{point.DataType}时遇到错误{ex.Message}。");
                 }
             }
         }
 
-        private async Task UploadDiscreteInputs(ModbusSlave slave, IModbusClient? client, PointMapping point, CancellationToken stoppingToken)
+        private async Task UploadDiscreteInputs(Client slave, IModbusClient? client, ModbusMapping point, CancellationToken stoppingToken)
         {
-            var _discreteInputs = await client.ReadDiscreteInputs(point.SlaveCode, point.Address, point.Length, stoppingToken);
+            var _discreteInputs = await client.ReadDiscreteInputs(point.Code, point.Address, point.Length, stoppingToken);
             switch (point.DataType)
             {
                 case DataType.Boolean:
@@ -133,7 +131,7 @@ namespace IoTSharp.Gateways.Jobs
             }
         }
 
-        private async Task UploadCoils(ModbusSlave slave, PointMapping point, List<Coil> _coils)
+        private async Task UploadCoils(Client slave, ModbusMapping point, List<Coil> _coils)
         {
             switch (point.DataType)
             {
@@ -149,7 +147,7 @@ namespace IoTSharp.Gateways.Jobs
             }
         }
 
-        private async Task UploadRegisters(ModbusSlave slave, PointMapping point, List<Register> _registers)
+        private async Task UploadRegisters(Client slave, ModbusMapping point, List<Register> _registers)
         {
             switch (point.DataType)
             {
@@ -186,7 +184,7 @@ namespace IoTSharp.Gateways.Jobs
                 case DataType.DateTime:
 
                     break;
-                    case DataType.Boolean:
+                case DataType.Boolean:
                     await UploadData(slave, point, RegistersToBitVector32(_registers));
                     break;
                 default:
@@ -195,7 +193,7 @@ namespace IoTSharp.Gateways.Jobs
             }
         }
 
-        private static string RegistersToString(PointMapping point, List<Register> _registers)
+        private static string RegistersToString(ModbusMapping point, List<Register> _registers)
         {
             var buffer = new List<byte>();
             _registers.ForEach(p =>
@@ -238,10 +236,10 @@ namespace IoTSharp.Gateways.Jobs
         }
         private static BitVector32 RegistersToBitVector32(List<Register> _registers)
         {
-            BitVector32 vector32=new BitVector32 (0);
+            BitVector32 vector32 = new BitVector32(0);
             if (_registers.Count == 1)//16位
             {
-                vector32= new BitVector32( BitConverter.ToInt32(new byte[] { _registers[0].HiByte, _registers[0].LoByte,0,0 }));
+                vector32 = new BitVector32(BitConverter.ToInt32(new byte[] { _registers[0].HiByte, _registers[0].LoByte, 0, 0 }));
             }
             else if (_registers.Count == 2)//32位 
             {
@@ -250,7 +248,7 @@ namespace IoTSharp.Gateways.Jobs
             return vector32;
         }
 
-        private async Task UploadData<T>(ModbusSlave slave, PointMapping point, T? value)
+        private async Task UploadData<T>(Client slave, ModbusMapping point, T? value)
         {
             if (value != null)
             {
@@ -274,7 +272,7 @@ namespace IoTSharp.Gateways.Jobs
             }
         }
 
-        private async Task UploadData(ModbusSlave slave, PointMapping point, BitVector32 value)
+        private async Task UploadData(Client slave, ModbusMapping point, BitVector32 value)
         {
             Dictionary<string, short> lst = new Dictionary<string, short>();
             var _format = point.DataFormat ?? $"{point.DataName}_unknow1:8;{point.DataName}_unknow2:8";
@@ -307,9 +305,9 @@ namespace IoTSharp.Gateways.Jobs
             }
         }
 
-        private IModbusClient? CreateModbusSlave(ModbusSlave slave)
+        private IModbusClient? CreateModbusSlave(Client slave)
         {
-            var url = slave.Slave;
+            var url = slave.Address;
             IModbusClient? client = null;
             switch (url.Scheme)
             {
@@ -319,7 +317,7 @@ namespace IoTSharp.Gateways.Jobs
                     ParseDtuParam(url, dtu);
                     client = dtu;
                     break;
-                case "tcp":
+                case "rtu":
                     client = new AMWD.Modbus.Tcp.Client.ModbusClient(url.Host, url.Port, _logger);
                     break;
                 case "d2t":
@@ -406,6 +404,6 @@ namespace IoTSharp.Gateways.Jobs
                 }
             }
         }
-      
+
     }
 }

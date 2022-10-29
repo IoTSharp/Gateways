@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace IoTSharp.Gateways.Migrations
+namespace IoTSharp.Gateways.Data.Migrations
 {
     public partial class CreateIdentitySchema : Migration
     {
@@ -46,6 +46,22 @@ namespace IoTSharp.Gateways.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUsers", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Clients",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Address = table.Column<string>(type: "TEXT", nullable: false),
+                    TimeOut = table.Column<int>(type: "INTEGER", nullable: false),
+                    DeviceName = table.Column<string>(type: "TEXT", nullable: false),
+                    DeviceNameFormat = table.Column<string>(type: "TEXT", nullable: true),
+                    TimeInterval = table.Column<float>(type: "REAL", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Clients", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -154,6 +170,55 @@ namespace IoTSharp.Gateways.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "ModbusMappings",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Code = table.Column<byte>(type: "INTEGER", nullable: false),
+                    DataName = table.Column<string>(type: "TEXT", nullable: false),
+                    DataType = table.Column<int>(type: "INTEGER", nullable: false),
+                    DataCatalog = table.Column<int>(type: "INTEGER", nullable: false),
+                    FunCode = table.Column<int>(type: "INTEGER", nullable: false),
+                    Address = table.Column<ushort>(type: "INTEGER", nullable: false),
+                    Length = table.Column<ushort>(type: "INTEGER", nullable: false),
+                    DataFormat = table.Column<string>(type: "TEXT", nullable: true),
+                    CodePage = table.Column<int>(type: "INTEGER", nullable: false),
+                    OwnerId = table.Column<Guid>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ModbusMappings", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ModbusMappings_Clients_OwnerId",
+                        column: x => x.OwnerId,
+                        principalTable: "Clients",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "OPCUAMappings",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    DataName = table.Column<string>(type: "TEXT", nullable: false),
+                    DataType = table.Column<int>(type: "INTEGER", nullable: false),
+                    DataCatalog = table.Column<int>(type: "INTEGER", nullable: false),
+                    NodeId = table.Column<string>(type: "TEXT", nullable: false),
+                    DataFormat = table.Column<string>(type: "TEXT", nullable: true),
+                    CodePage = table.Column<int>(type: "INTEGER", nullable: false),
+                    OwnerId = table.Column<Guid>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_OPCUAMappings", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_OPCUAMappings_Clients_OwnerId",
+                        column: x => x.OwnerId,
+                        principalTable: "Clients",
+                        principalColumn: "Id");
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_AspNetRoleClaims_RoleId",
                 table: "AspNetRoleClaims",
@@ -190,6 +255,16 @@ namespace IoTSharp.Gateways.Migrations
                 table: "AspNetUsers",
                 column: "NormalizedUserName",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ModbusMappings_OwnerId",
+                table: "ModbusMappings",
+                column: "OwnerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_OPCUAMappings_OwnerId",
+                table: "OPCUAMappings",
+                column: "OwnerId");
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
@@ -210,10 +285,19 @@ namespace IoTSharp.Gateways.Migrations
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
+                name: "ModbusMappings");
+
+            migrationBuilder.DropTable(
+                name: "OPCUAMappings");
+
+            migrationBuilder.DropTable(
                 name: "AspNetRoles");
 
             migrationBuilder.DropTable(
                 name: "AspNetUsers");
+
+            migrationBuilder.DropTable(
+                name: "Clients");
         }
     }
 }

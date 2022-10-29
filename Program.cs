@@ -33,7 +33,7 @@ namespace IoTSharp.Gateways
                 q.UseMicrosoftDependencyInjectionJobFactory();
 
                 var ModbusSchedulerJobKey = new JobKey("ModbusSchedulerJob");
-                q.AddJob<ModbusSchedulerJob>(opts => opts.WithIdentity(ModbusSchedulerJobKey));
+                q.AddJob<SchedulerJob>(opts => opts.WithIdentity(ModbusSchedulerJobKey));
                 q.AddTrigger(opts => opts
                     .ForJob(ModbusSchedulerJobKey)
                     .WithIdentity("ModbusSchedulerJob-trigger")

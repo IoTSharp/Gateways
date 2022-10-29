@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace IoTSharp.Gateways.Data
 {
-    public class PointMapping
+    public class ModbusMapping
     {
 
         [Key]
@@ -14,7 +14,7 @@ namespace IoTSharp.Gateways.Data
         /// 从机站代码
         /// </summary>
         [DisplayName("从站编号")]
-        public byte SlaveCode {get;set;}
+        public byte Code {get;set;}
         [Required]
         [DisplayName("采集项名称")]
         public string DataName { get; set; }
@@ -56,10 +56,7 @@ namespace IoTSharp.Gateways.Data
         [DisplayName("字符串编码")]
         [DefaultValue(936)]
         public int CodePage { get; set; } = 936;
-
- 
-
-       public ModbusSlave? Owner { get; set; }
+       public Client? Owner { get; set; }
 
     }
 }

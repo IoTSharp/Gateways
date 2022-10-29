@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace IoTSharp.Gateways.Migrations
+namespace IoTSharp.Gateways.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
     partial class ApplicationDbContextModelSnapshot : ModelSnapshot
@@ -15,12 +15,16 @@ namespace IoTSharp.Gateways.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "6.0.8");
+            modelBuilder.HasAnnotation("ProductVersion", "6.0.10");
 
-            modelBuilder.Entity("IoTSharp.Gateways.Data.ModbusSlave", b =>
+            modelBuilder.Entity("IoTSharp.Gateways.Data.Client", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("DeviceName")
@@ -28,10 +32,6 @@ namespace IoTSharp.Gateways.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("DeviceNameFormat")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Slave")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<float>("TimeInterval")
@@ -42,16 +42,19 @@ namespace IoTSharp.Gateways.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ModbusSlaves");
+                    b.ToTable("Clients");
                 });
 
-            modelBuilder.Entity("IoTSharp.Gateways.Data.PointMapping", b =>
+            modelBuilder.Entity("IoTSharp.Gateways.Data.ModbusMapping", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
                     b.Property<ushort>("Address")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte>("Code")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("CodePage")
@@ -79,14 +82,47 @@ namespace IoTSharp.Gateways.Migrations
                     b.Property<Guid?>("OwnerId")
                         .HasColumnType("TEXT");
 
-                    b.Property<byte>("SlaveCode")
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId");
+
+                    b.ToTable("ModbusMappings");
+                });
+
+            modelBuilder.Entity("IoTSharp.Gateways.Data.OPCUAMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CodePage")
                         .HasColumnType("INTEGER");
+
+                    b.Property<int>("DataCatalog")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DataFormat")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DataName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DataType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("NodeId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerId");
 
-                    b.ToTable("PointMappings");
+                    b.ToTable("OPCUAMappings");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -285,10 +321,19 @@ namespace IoTSharp.Gateways.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("IoTSharp.Gateways.Data.PointMapping", b =>
+            modelBuilder.Entity("IoTSharp.Gateways.Data.ModbusMapping", b =>
                 {
-                    b.HasOne("IoTSharp.Gateways.Data.ModbusSlave", "Owner")
-                        .WithMany("PointMappings")
+                    b.HasOne("IoTSharp.Gateways.Data.Client", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerId");
+
+                    b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("IoTSharp.Gateways.Data.OPCUAMapping", b =>
+                {
+                    b.HasOne("IoTSharp.Gateways.Data.Client", "Owner")
+                        .WithMany()
                         .HasForeignKey("OwnerId");
 
                     b.Navigation("Owner");
@@ -343,11 +388,6 @@ namespace IoTSharp.Gateways.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("IoTSharp.Gateways.Data.ModbusSlave", b =>
-                {
-                    b.Navigation("PointMappings");
                 });
 #pragma warning restore 612, 618
         }
