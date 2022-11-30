@@ -5,6 +5,8 @@ VisualStudioVersion = 17.2.32616.157
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IoTSharp.Gateways", "IoTSharp.Gateways.csproj", "{370BE0CE-5DFF-4C4D-8C87-0EA097E55447}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IoTSharp.MQTTSdk", "IoTSharpSdk\IoTSharp.MQTTSdk.csproj", "{F488E869-5EE4-4B3E-A27B-2D997D674473}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{370BE0CE-5DFF-4C4D-8C87-0EA097E55447}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{370BE0CE-5DFF-4C4D-8C87-0EA097E55447}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{370BE0CE-5DFF-4C4D-8C87-0EA097E55447}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F488E869-5EE4-4B3E-A27B-2D997D674473}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F488E869-5EE4-4B3E-A27B-2D997D674473}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F488E869-5EE4-4B3E-A27B-2D997D674473}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F488E869-5EE4-4B3E-A27B-2D997D674473}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

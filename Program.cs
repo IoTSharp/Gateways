@@ -1,8 +1,10 @@
 using IoTSharp.Gateways.Data;
 using IoTSharp.Gateways.Jobs;
+using IoTSharp.MqttSdk;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Quartz;
+using System.Configuration;
 
 namespace IoTSharp.Gateways
 {
@@ -26,7 +28,9 @@ namespace IoTSharp.Gateways
             builder.Services.AddRazorPages();
             builder.Services.AddMemoryCache();
 
-       builder.Services.AddIoTSharpMqttSdk(builder.Configuration);
+            builder.Services.AddSingleton<MQTTClient>()
+                     .Configure<MqttSettings>(builder.Configuration)
+             .AddHostedService<MqttClientHost>();
 
             builder.Services.AddQuartz(q =>
             {

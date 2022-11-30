@@ -2,11 +2,8 @@
 # 此 .gitignore 文件已由 Microsoft(R) Visual Studio 自动创建。
 ################################################################################
 
-/.vs/IoTSharp.Gateway.Modbus
-/bin/Debug/net6.0
 /obj
 /SQlLiteDatabase.db
-/IoTSharp.Gateway.Modbus.csproj.user
-/.vs/ProjectEvaluation
-/.vs/IoTSharp.Gateways
-/bin/Debug/net7.0
+/*.user
+/.vs
+/bin
