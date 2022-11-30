@@ -8,6 +8,10 @@ namespace IoTSharp.Gateways.Data
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options)
         {
+            if (Database.GetPendingMigrations().Count() > 0)
+            {
+                Database.Migrate();
+            }
         }
 
         public DbSet<Client> Clients { get; set; }

@@ -29,6 +29,7 @@
     <PackageReference Include="AMWD.Modbus.Proxy" Version="1.2.0" />
     <PackageReference Include="AMWD.Modbus.Serial" Version="1.2.0" />
     <PackageReference Include="AMWD.Modbus.Tcp" Version="1.2.0" />
+    <PackageReference Include="CZGL.SystemInfo" Version="2.0.0" />
 	  <PackageReference Include="Modbus.SerialOverTCP" Version="1.2.1-1" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="7.0.*" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="7.0.*" />

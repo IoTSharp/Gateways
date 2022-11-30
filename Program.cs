@@ -35,6 +35,15 @@ namespace IoTSharp.Gateways
             builder.Services.AddQuartz(q =>
             {
                 q.UseMicrosoftDependencyInjectionJobFactory();
+                var SystemInfoJobKey = new JobKey("SystemInfoJob");
+                q.AddJob<SystemInfoJob>(SystemInfoJobKey);
+                q.AddTrigger(opts => opts
+                 .ForJob(SystemInfoJobKey)
+                 .WithIdentity("SystemInfoJob-trigger")
+                 .WithSimpleSchedule(x => x
+                     .WithIntervalInMinutes(1)
+                     .RepeatForever()).StartNow());
+
 
                 var ModbusSchedulerJobKey = new JobKey("ModbusSchedulerJob");
                 q.AddJob<SchedulerJob>(opts => opts.WithIdentity(ModbusSchedulerJobKey));
