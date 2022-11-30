@@ -10,16 +10,14 @@ namespace IoTSharp.Gateways.Jobs
     {
 
         private ILogger _logger;
-
         private ApplicationDbContext _dbContext;
         private MQTTClient _client;
         private IMemoryCache _cache;
-        private readonly ILoggerFactory _factory;
         private IServiceScope _serviceScope;
 
-        public SystemInfoJob(ILoggerFactory factory, IServiceScopeFactory scopeFactor, MQTTClient client, IMemoryCache cache)
+        public SystemInfoJob(ILogger<SystemInfoJob> logger, IServiceScopeFactory scopeFactor, MQTTClient client, IMemoryCache cache)
         {
-            _factory = factory;
+            _logger = logger;
             _serviceScope = scopeFactor.CreateScope();
             _dbContext = _serviceScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             _client = client;
@@ -52,23 +50,23 @@ namespace IoTSharp.Gateways.Jobs
                 SystemPlatformInfo.FrameworkDescription,
                 SystemPlatformInfo.GetLogicalDrives,
                 SystemPlatformInfo.UserName,
-                network.NetworkType ,
-                NetworkName =network.Name, 
-               NetworkId= network.Id,
-                NetworkTrademark= network.Trademark,
+                network.NetworkType,
+                NetworkName = network.Name,
+                NetworkId = network.Id,
+                NetworkTrademark = network.Trademark,
                 memory.TotalPhysicalMemory,
                 memory.TotalVirtualMemory
             });
 
-         await   _client.UploadTelemetryDataAsync(new {
-                CPULoad=  GetCPULoad(),
+            await _client.UploadTelemetryDataAsync(new
+            {
+                CPULoad = GetCPULoad(),
                 memory.UsedPercentage,
                 memory.AvailableVirtualMemory,
                 memory.AvailablePhysicalMemory,
-                NetworkSend=network.GetIpv4Speed().SendLength,
-                NetworkReceived= network.GetIpv4Speed().ReceivedLength,
-                NetworkSpeed=network.Speed
-
+                NetworkSend = network.GetIpv4Speed().SendLength,
+                NetworkReceived = network.GetIpv4Speed().ReceivedLength,
+                NetworkSpeed = network.Speed
             });
         }
     }
