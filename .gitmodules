@@ -1,0 +1,4 @@
+[submodule "IoTSharpSdk"]
+	path = IoTSharpSdk
+	url = https://github.com/IoTSharp/GatewaySdks.MQTT.git
+	branch = main
