@@ -7,3 +7,5 @@
 /*.user
 /.vs
 /bin
+/IoTSharp.Gateways.csproj.user
+*.user
