@@ -1,21 +1,15 @@
 {
-  "iisSettings": {
-    "windowsAuthentication": false,
-    "anonymousAuthentication": true,
-    "iisExpress": {
-      "applicationUrl": "http://localhost:28213",
-      "sslPort": 44341
-    }
-  },
   "profiles": {
     "IoTSharp.Gateways": {
+      "applicationUrl": "https://localhost:7126;http://localhost:5126",
       "commandName": "Project",
-      "launchBrowser": true,
+      "devTunnelEnabled": true,
+      "devTunnelAccess": "Public",
+      "dotnetRunMessages": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "applicationUrl": "https://localhost:7126;http://localhost:5126",
-      "dotnetRunMessages": true
+      "launchBrowser": true
     },
     "IIS Express": {
       "commandName": "IISExpress",
@@ -30,6 +24,14 @@
       "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
       "publishAllPorts": true,
       "useSSL": true
+    }
+  },
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:28213",
+      "sslPort": 44341
     }
   }
 }
