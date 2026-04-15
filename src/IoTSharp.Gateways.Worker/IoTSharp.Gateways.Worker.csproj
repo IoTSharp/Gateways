@@ -10,4 +10,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IoTSharp.Gateways.Application\IoTSharp.Gateways.Application.csproj" />
+    <ProjectReference Include="..\IoTSharp.Gateways.Infrastructure\IoTSharp.Gateways.Infrastructure.csproj" />
+  </ItemGroup>
 </Project>

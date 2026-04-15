@@ -1,8 +1,29 @@
 {
   "version": 2,
-  "dgSpecHash": "ONCsnPX2h5c=",
+  "dgSpecHash": "55ewrkxhvhk=",
   "success": true,
   "projectFilePath": "/home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways.Api/IoTSharp.Gateways.Api.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "/home/runner/.nuget/packages/dapper/2.1.72/dapper.2.1.72.nupkg.sha512",
+    "/home/runner/.nuget/packages/iotclient/1.0.42/iotclient.1.0.42.nupkg.sha512",
+    "/home/runner/.nuget/packages/microsoft.data.sqlite/10.0.5/microsoft.data.sqlite.10.0.5.nupkg.sha512",
+    "/home/runner/.nuget/packages/microsoft.data.sqlite.core/10.0.5/microsoft.data.sqlite.core.10.0.5.nupkg.sha512",
+    "/home/runner/.nuget/packages/microsoft.netcore.platforms/3.0.0/microsoft.netcore.platforms.3.0.0.nupkg.sha512",
+    "/home/runner/.nuget/packages/microsoft.win32.registry/4.6.0/microsoft.win32.registry.4.6.0.nupkg.sha512",
+    "/home/runner/.nuget/packages/mqttnet/5.1.0.1559/mqttnet.5.1.0.1559.nupkg.sha512",
+    "/home/runner/.nuget/packages/runtime.linux-arm.runtime.native.system.io.ports/4.6.0-rc2.19462.14/runtime.linux-arm.runtime.native.system.io.ports.4.6.0-rc2.19462.14.nupkg.sha512",
+    "/home/runner/.nuget/packages/runtime.linux-arm64.runtime.native.system.io.ports/4.6.0-rc2.19462.14/runtime.linux-arm64.runtime.native.system.io.ports.4.6.0-rc2.19462.14.nupkg.sha512",
+    "/home/runner/.nuget/packages/runtime.linux-x64.runtime.native.system.io.ports/4.6.0-rc2.19462.14/runtime.linux-x64.runtime.native.system.io.ports.4.6.0-rc2.19462.14.nupkg.sha512",
+    "/home/runner/.nuget/packages/runtime.native.system.io.ports/4.6.0/runtime.native.system.io.ports.4.6.0.nupkg.sha512",
+    "/home/runner/.nuget/packages/runtime.osx-x64.runtime.native.system.io.ports/4.6.0-rc2.19462.14/runtime.osx-x64.runtime.native.system.io.ports.4.6.0-rc2.19462.14.nupkg.sha512",
+    "/home/runner/.nuget/packages/sqlitepclraw.bundle_e_sqlite3/2.1.11/sqlitepclraw.bundle_e_sqlite3.2.1.11.nupkg.sha512",
+    "/home/runner/.nuget/packages/sqlitepclraw.core/2.1.11/sqlitepclraw.core.2.1.11.nupkg.sha512",
+    "/home/runner/.nuget/packages/sqlitepclraw.lib.e_sqlite3/2.1.11/sqlitepclraw.lib.e_sqlite3.2.1.11.nupkg.sha512",
+    "/home/runner/.nuget/packages/sqlitepclraw.provider.e_sqlite3/2.1.11/sqlitepclraw.provider.e_sqlite3.2.1.11.nupkg.sha512",
+    "/home/runner/.nuget/packages/system.io.ports/4.6.0/system.io.ports.4.6.0.nupkg.sha512",
+    "/home/runner/.nuget/packages/system.memory/4.5.3/system.memory.4.5.3.nupkg.sha512",
+    "/home/runner/.nuget/packages/system.security.accesscontrol/4.6.0/system.security.accesscontrol.4.6.0.nupkg.sha512",
+    "/home/runner/.nuget/packages/system.security.principal.windows/4.6.0/system.security.principal.windows.4.6.0.nupkg.sha512"
+  ],
   "logs": []
 }

@@ -1,0 +1,12 @@
+/home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways.Domain/bin/Debug/net8.0/IoTSharp.Gateways.Domain.deps.json
+/home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways.Domain/bin/Debug/net8.0/IoTSharp.Gateways.Domain.dll
+/home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways.Domain/bin/Debug/net8.0/IoTSharp.Gateways.Domain.pdb
+/home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways.Domain/obj/Debug/net8.0/IoTSharp.Gateways.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways.Domain/obj/Debug/net8.0/IoTSharp.Gateways.Domain.AssemblyInfoInputs.cache
+/home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways.Domain/obj/Debug/net8.0/IoTSharp.Gateways.Domain.AssemblyInfo.cs
+/home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways.Domain/obj/Debug/net8.0/IoTSharp.Gateways.Domain.csproj.CoreCompileInputs.cache
+/home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways.Domain/obj/Debug/net8.0/IoTSharp.Gateways.Domain.sourcelink.json
+/home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways.Domain/obj/Debug/net8.0/IoTSharp.Gateways.Domain.dll
+/home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways.Domain/obj/Debug/net8.0/refint/IoTSharp.Gateways.Domain.dll
+/home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways.Domain/obj/Debug/net8.0/IoTSharp.Gateways.Domain.pdb
+/home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways.Domain/obj/Debug/net8.0/ref/IoTSharp.Gateways.Domain.dll
