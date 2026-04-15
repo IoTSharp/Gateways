@@ -9,3 +9,8 @@
 /bin
 /IoTSharp.Gateways.csproj.user
 *.user
+
+**/bin/
+**/obj/
+src/gateway-web/node_modules/
+src/gateway-web/dist/
