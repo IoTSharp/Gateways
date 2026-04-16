@@ -18,6 +18,7 @@ public sealed class GatewayPollingWorker : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            DateTimeOffset soonest = DateTimeOffset.UtcNow.AddSeconds(30);
             try
             {
                 await using var scope = _scopeFactory.CreateAsyncScope();
@@ -25,16 +26,33 @@ public sealed class GatewayPollingWorker : BackgroundService
                 var runtimeService = scope.ServiceProvider.GetRequiredService<GatewayRuntimeService>();
                 var tasks = (await repository.GetPollingTasksAsync(stoppingToken)).Where(task => task.Enabled).ToArray();
                 var now = DateTimeOffset.UtcNow;
+
+                // Prune _nextRuns entries for tasks that no longer exist or are disabled.
+                var activeIds = tasks.Select(t => t.Id).ToHashSet();
+                foreach (var stale in _nextRuns.Keys.Where(id => !activeIds.Contains(id)).ToList())
+                {
+                    _nextRuns.Remove(stale);
+                }
+
                 foreach (var task in tasks)
                 {
                     if (_nextRuns.TryGetValue(task.Id, out var nextRun) && nextRun > now)
                     {
+                        if (nextRun < soonest)
+                        {
+                            soonest = nextRun;
+                        }
                         continue;
                     }
 
                     var report = await runtimeService.ExecutePollingTaskAsync(task.Id, stoppingToken);
                     _logger.LogInformation("Executed polling task {TaskName} with {SuccessCount} successes and {FailureCount} failures.", report.TaskName, report.SuccessCount, report.FailureCount);
-                    _nextRuns[task.Id] = now.AddSeconds(Math.Max(task.IntervalSeconds, 1));
+                    var taskNext = now.AddSeconds(Math.Max(task.IntervalSeconds, 1));
+                    _nextRuns[task.Id] = taskNext;
+                    if (taskNext < soonest)
+                    {
+                        soonest = taskNext;
+                    }
                 }
             }
             catch (Exception exception)
@@ -42,7 +60,11 @@ public sealed class GatewayPollingWorker : BackgroundService
                 _logger.LogError(exception, "Gateway polling iteration failed.");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            var delay = soonest - DateTimeOffset.UtcNow;
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, stoppingToken);
+            }
         }
     }
 }
