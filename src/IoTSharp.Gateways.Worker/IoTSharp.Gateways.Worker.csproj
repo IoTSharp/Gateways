@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-IoTSharp.Gateways.Worker-57ef228c-0fb5-4eff-a888-9e7b6fb96c64</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IoTSharp.Gateways.Application\IoTSharp.Gateways.Application.csproj" />
+    <ProjectReference Include="..\IoTSharp.Gateways.Infrastructure\IoTSharp.Gateways.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

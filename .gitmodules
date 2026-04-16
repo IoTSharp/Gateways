@@ -1,4 +1,0 @@
-[submodule "IoTSharpSdk"]
-	path = IoTSharpSdk
-	url = https://github.com/IoTSharp/MQTTSdk.git
-	branch = main
