@@ -42,6 +42,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ILogger<EdgeRuntimeReportingWorker> _logger;
     private readonly EdgeReportingOptions _options;
+    private readonly Process _currentProcess = Process.GetCurrentProcess();
     private readonly DateTimeOffset _startedAt = DateTimeOffset.UtcNow;
     private readonly string _version;
     private readonly Stopwatch _uptime = Stopwatch.StartNew();
@@ -225,7 +226,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
                 ipAddress,
                 metadata),
             new EdgeHeartbeatRequest(
-                DateTime.UtcNow,
+                DateTimeOffset.UtcNow.UtcDateTime,
                 "Running",
                 true,
                 uptimeSeconds,
@@ -287,22 +288,22 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             features.Add("iotsharp-mqtt-upload");
         }
 
-        var tasks = pollingTasks.Where(task => task.Enabled)
+        var pollingTaskNames = pollingTasks.Where(task => task.Enabled)
             .Select(task => task.Name.Trim())
             .Where(task => !string.IsNullOrWhiteSpace(task))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(task => task, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        if (tasks.Length == 0)
+        if (pollingTaskNames.Length == 0)
         {
-            tasks = ["polling"];
+            pollingTaskNames = ["polling"];
         }
 
         return new EdgeCapabilityReportRequest(
             protocols,
             features.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray(),
-            tasks,
+            pollingTaskNames,
             null);
     }
 
@@ -359,13 +360,13 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         IReadOnlyCollection<UploadChannel> uploadChannels,
         IReadOnlyCollection<UploadRoute> uploadRoutes)
     {
-        using var process = Process.GetCurrentProcess();
+        _currentProcess.Refresh();
 
         return new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
         {
-            ["workingSetBytes"] = process.WorkingSet64,
-            ["privateMemoryBytes"] = process.PrivateMemorySize64,
-            ["threadCount"] = process.Threads.Count,
+            ["workingSetBytes"] = _currentProcess.WorkingSet64,
+            ["privateMemoryBytes"] = _currentProcess.PrivateMemorySize64,
+            ["threadCount"] = _currentProcess.Threads.Count,
             ["gcHeapBytes"] = GC.GetTotalMemory(false),
             ["enabledChannelCount"] = channels.Count(channel => channel.Enabled),
             ["enabledDeviceCount"] = devices.Count(device => device.Enabled),
