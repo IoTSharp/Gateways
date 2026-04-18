@@ -43,6 +43,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IEdgeTaskReceiptReporter _receiptReporter;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ILogger<EdgeRuntimeReportingWorker> _logger;
     private readonly EdgeReportingOptions _options;
@@ -60,12 +61,14 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
     public EdgeRuntimeReportingWorker(
         IServiceScopeFactory scopeFactory,
         IHttpClientFactory httpClientFactory,
+        IEdgeTaskReceiptReporter receiptReporter,
         IHostEnvironment hostEnvironment,
         IOptions<EdgeReportingOptions> options,
         ILogger<EdgeRuntimeReportingWorker> logger)
     {
         _scopeFactory = scopeFactory;
         _httpClientFactory = httpClientFactory;
+        _receiptReporter = receiptReporter;
         _hostEnvironment = hostEnvironment;
         _logger = logger;
         _options = options.Value;
@@ -164,6 +167,16 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             await PostAsync(edgeTarget, "Heartbeat", snapshot.Heartbeat, cancellationToken);
             _lastHeartbeatAt = DateTimeOffset.UtcNow;
             _logger.LogDebug("Sent Gateway heartbeat to IoTSharp Edge.");
+
+            // Minimal automatic receipt example: once the runtime is healthy and connected,
+            // report a synthetic health-probe task completion so the platform receipt loop can be verified end-to-end.
+            await _receiptReporter.ReportAsync(
+                edgeTarget.BaseUrl,
+                Guid.Parse(channels.First().Id.ToString()),
+                _options.RuntimeType,
+                snapshot.Registration.InstanceId,
+                DeterministicProbeTaskId(snapshot.Registration.InstanceId),
+                cancellationToken);
         }
 
         return NextDelay();
@@ -456,6 +469,12 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         }
 
         return others.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+    }
+
+    private static Guid DeterministicProbeTaskId(string instanceId)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"edge-probe:{instanceId}"));
+        return new Guid(bytes[..16]);
     }
 
     private TimeSpan HeartbeatInterval()

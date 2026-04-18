@@ -22,6 +22,7 @@ builder.Services.AddScoped<GatewayConfigurationService>();
 builder.Services.AddScoped<DriverCatalogService>();
 builder.Services.AddScoped<GatewayRuntimeService>();
 builder.Services.AddGatewayInfrastructure(builder.Configuration);
+builder.Services.AddSingleton<IEdgeTaskReceiptReporter, EdgeTaskReceiptExample>();
 builder.Services.AddHostedService<GatewayPollingWorker>();
 builder.Services.AddHostedService<EdgeRuntimeReportingWorker>();
 
