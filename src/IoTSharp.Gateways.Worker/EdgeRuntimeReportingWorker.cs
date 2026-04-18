@@ -30,7 +30,11 @@ public sealed class EdgeReportingOptions
 
 public sealed class EdgeRuntimeReportingWorker : BackgroundService
 {
+    // IoTSharp ApiResult uses 10000 as the logical success code even when HTTP status is 200.
     private const int ApiSuccessCode = 10000;
+    private const string DefaultPollingTaskName = "gateway-polling";
+    private const int IPv4Priority = 0;
+    private const int IPv6Priority = 1;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -130,7 +134,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
 
         _missingConfigurationLogged = false;
 
-        var snapshot = BuildRuntimeSnapshot(edgeTarget.AccessToken, channels, devices, points, pollingTasks, uploadChannels, uploadRoutes);
+        var snapshot = BuildRuntimeSnapshot(channels, devices, points, pollingTasks, uploadChannels, uploadRoutes);
         var capabilities = BuildCapabilities(driverCatalog, channels, points, pollingTasks, transformRules, uploadChannels, uploadRoutes);
         var capabilitiesSignature = ComputeCapabilitiesSignature(capabilities);
 
@@ -199,7 +203,6 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
     }
 
     private EdgeRuntimeSnapshot BuildRuntimeSnapshot(
-        string accessToken,
         IReadOnlyCollection<GatewayChannel> channels,
         IReadOnlyCollection<Device> devices,
         IReadOnlyCollection<Point> points,
@@ -209,7 +212,9 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
     {
         var hostName = ResolveHostName();
         var runtimeName = string.IsNullOrWhiteSpace(_options.RuntimeName) ? hostName : _options.RuntimeName.Trim();
-        var instanceId = string.IsNullOrWhiteSpace(_options.InstanceId) ? CreateStableInstanceId(hostName, accessToken) : _options.InstanceId.Trim();
+        var instanceId = string.IsNullOrWhiteSpace(_options.InstanceId)
+            ? CreateStableInstanceId(hostName, _hostEnvironment.ApplicationName, _hostEnvironment.ContentRootPath)
+            : _options.InstanceId.Trim();
         var metadata = BuildMetadata();
         var metrics = BuildMetrics(channels, devices, points, pollingTasks, uploadChannels, uploadRoutes);
         var ipAddress = ResolveIpAddress();
@@ -298,7 +303,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
 
         if (pollingTaskNames.Length == 0)
         {
-            pollingTaskNames = ["gateway-polling"];
+            pollingTaskNames = [DefaultPollingTaskName];
         }
 
         return new EdgeCapabilityReportRequest(
@@ -410,15 +415,15 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             .Select(address => address.ToString())
             .Where(address => !string.IsNullOrWhiteSpace(address))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(address => address.Contains(':') ? 1 : 0)
+            .OrderBy(GetAddressPriority)
             .ToArray();
 
         return addresses.FirstOrDefault() ?? string.Empty;
     }
 
-    private static string CreateStableInstanceId(string hostName, string accessToken)
+    private static string CreateStableInstanceId(string hostName, string applicationName, string contentRootPath)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{hostName}:{accessToken}"));
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{hostName}:{applicationName}:{contentRootPath}"));
         return Convert.ToHexString(bytes[..16]).ToLowerInvariant();
     }
 
@@ -439,6 +444,9 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
 
     private static string NormalizeBaseUrl(string baseUrl)
         => baseUrl.Trim().TrimEnd('/') + "/";
+
+    private static int GetAddressPriority(string address)
+        => address.Contains(':') ? IPv6Priority : IPv4Priority;
 
     private static string? FirstNonEmpty(string? first, IEnumerable<string?> others)
     {
