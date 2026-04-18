@@ -214,6 +214,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         var metrics = BuildMetrics(channels, devices, points, pollingTasks, uploadChannels, uploadRoutes);
         var ipAddress = ResolveIpAddress();
         var uptimeSeconds = Math.Max(0L, (long)_uptime.Elapsed.TotalSeconds);
+        var heartbeatAt = DateTimeOffset.UtcNow;
 
         return new EdgeRuntimeSnapshot(
             new EdgeRegistrationRequest(
@@ -226,7 +227,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
                 ipAddress,
                 metadata),
             new EdgeHeartbeatRequest(
-                DateTimeOffset.UtcNow.UtcDateTime,
+                heartbeatAt.UtcDateTime,
                 "Running",
                 true,
                 uptimeSeconds,
@@ -297,7 +298,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
 
         if (pollingTaskNames.Length == 0)
         {
-            pollingTaskNames = ["polling"];
+            pollingTaskNames = ["gateway-polling"];
         }
 
         return new EdgeCapabilityReportRequest(
