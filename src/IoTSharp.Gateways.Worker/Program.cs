@@ -12,6 +12,7 @@ builder.Services.Configure<Microsoft.Extensions.Hosting.HostOptions>(options =>
 {
     options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
 });
+builder.Services.Configure<EdgeReportingOptions>(builder.Configuration.GetSection("EdgeReporting"));
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -22,6 +23,7 @@ builder.Services.AddScoped<DriverCatalogService>();
 builder.Services.AddScoped<GatewayRuntimeService>();
 builder.Services.AddGatewayInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<GatewayPollingWorker>();
+builder.Services.AddHostedService<EdgeRuntimeReportingWorker>();
 
 var host = builder.Build();
 using (var scope = host.Services.CreateScope())
