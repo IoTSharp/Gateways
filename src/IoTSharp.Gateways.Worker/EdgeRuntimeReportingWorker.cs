@@ -56,6 +56,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
     private bool _capabilitiesPending = true;
     private string? _lastCapabilitiesSignature;
     private DateTimeOffset? _lastHeartbeatAt;
+    private Guid? _lastHandledTaskId;
     private bool _missingConfigurationLogged;
 
     public EdgeRuntimeReportingWorker(
@@ -115,6 +116,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         await using var scope = _scopeFactory.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IGatewayRepository>();
         var driverCatalog = scope.ServiceProvider.GetRequiredService<DriverCatalogService>();
+        var runtimeService = scope.ServiceProvider.GetRequiredService<GatewayRuntimeService>();
 
         var channels = await repository.GetChannelsAsync(cancellationToken);
         var devices = await repository.GetDevicesAsync(cancellationToken);
@@ -167,19 +169,111 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             await PostAsync(edgeTarget, "Heartbeat", snapshot.Heartbeat, cancellationToken);
             _lastHeartbeatAt = DateTimeOffset.UtcNow;
             _logger.LogDebug("Sent Gateway heartbeat to IoTSharp Edge.");
-
-            // Minimal automatic receipt example: once the runtime is healthy and connected,
-            // report a synthetic health-probe task completion so the platform receipt loop can be verified end-to-end.
-            await _receiptReporter.ReportAsync(
-                edgeTarget.BaseUrl,
-                Guid.Parse(channels.First().Id.ToString()),
-                _options.RuntimeType,
-                snapshot.Registration.InstanceId,
-                DeterministicProbeTaskId(snapshot.Registration.InstanceId),
-                cancellationToken);
         }
 
+        await ExecutePendingDispatchAsync(runtimeService, edgeTarget, snapshot, points, cancellationToken);
+
         return NextDelay();
+    }
+
+    private async Task ExecutePendingDispatchAsync(
+        GatewayRuntimeService runtimeService,
+        EdgeTarget edgeTarget,
+        EdgeRuntimeSnapshot snapshot,
+        IReadOnlyCollection<Point> points,
+        CancellationToken cancellationToken)
+    {
+        var request = await PullPendingDispatchAsync(edgeTarget, cancellationToken);
+        if (request is null || request.TaskId == Guid.Empty || _lastHandledTaskId == request.TaskId)
+        {
+            return;
+        }
+
+        var deviceId = ResolveDeviceId(request.Address.TargetKey);
+        if (deviceId == Guid.Empty)
+        {
+            await _receiptReporter.ReportCompletedAsync(edgeTarget.BaseUrl, Guid.Empty, _options.RuntimeType, snapshot.Registration.InstanceId, request.TaskId, "Failed", "Gateway worker failed to resolve device id from dispatch target.", null, cancellationToken);
+            _lastHandledTaskId = request.TaskId;
+            return;
+        }
+
+        await _receiptReporter.ReportAcceptedAsync(edgeTarget.BaseUrl, edgeTarget.AccessToken, deviceId, _options.RuntimeType, snapshot.Registration.InstanceId, request.TaskId, cancellationToken);
+
+        try
+        {
+            var result = await ExecuteDispatchAsync(runtimeService, request, deviceId, points, cancellationToken);
+            await _receiptReporter.ReportCompletedAsync(edgeTarget.BaseUrl, deviceId, _options.RuntimeType, snapshot.Registration.InstanceId, request.TaskId, "Succeeded", result.Message, result.Payload, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            await _receiptReporter.ReportCompletedAsync(edgeTarget.BaseUrl, deviceId, _options.RuntimeType, snapshot.Registration.InstanceId, request.TaskId, "Failed", exception.Message, new Dictionary<string, object> { ["exception"] = exception.GetType().Name }, cancellationToken);
+        }
+
+        _lastHandledTaskId = request.TaskId;
+    }
+
+    private async Task<EdgeTaskRequestPayload?> PullPendingDispatchAsync(EdgeTarget edgeTarget, CancellationToken cancellationToken)
+    {
+        var client = _httpClientFactory.CreateClient(nameof(EdgeRuntimeReportingWorker));
+        client.BaseAddress = new Uri(edgeTarget.BaseUrl, UriKind.Absolute);
+        using var response = await client.GetAsync($"api/EdgeTask/Dispatch/{Uri.EscapeDataString(edgeTarget.AccessToken)}", cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var apiResult = await response.Content.ReadFromJsonAsync<EdgeApiResult<EdgeTaskRequestPayload>>(JsonOptions, cancellationToken);
+        return apiResult is { Code: ApiSuccessCode } ? apiResult.Data : null;
+    }
+
+    private static Guid ResolveDeviceId(string targetKey)
+    {
+        var deviceIdSegment = targetKey.Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+        return Guid.TryParse(deviceIdSegment, out var deviceId) ? deviceId : Guid.Empty;
+    }
+
+    private static async Task<DispatchExecutionResult> ExecuteDispatchAsync(
+        GatewayRuntimeService runtimeService,
+        EdgeTaskRequestPayload request,
+        Guid deviceId,
+        IReadOnlyCollection<Point> points,
+        CancellationToken cancellationToken)
+    {
+        return request.TaskType switch
+        {
+            "HealthProbe" => new DispatchExecutionResult("Gateway runtime health probe completed.", new Dictionary<string, object>
+            {
+                ["checkedAtUtc"] = DateTime.UtcNow,
+                ["taskType"] = request.TaskType
+            }),
+            "ConfigPush" => await ExecuteConfigPushAsync(runtimeService, request, deviceId, points, cancellationToken),
+            _ => throw new InvalidOperationException($"Unsupported task type: {request.TaskType}")
+        };
+    }
+
+    private static async Task<DispatchExecutionResult> ExecuteConfigPushAsync(
+        GatewayRuntimeService runtimeService,
+        EdgeTaskRequestPayload request,
+        Guid deviceId,
+        IReadOnlyCollection<Point> points,
+        CancellationToken cancellationToken)
+    {
+        if (request.Payload is null || !request.Payload.TryGetValue("pointId", out var pointIdText) || !Guid.TryParse(pointIdText?.ToString(), out var pointId))
+        {
+            throw new InvalidOperationException("ConfigPush requires payload.pointId.");
+        }
+
+        var point = points.FirstOrDefault(item => item.Id == pointId && item.DeviceId == deviceId)
+            ?? throw new InvalidOperationException($"Point '{pointId}' was not found on device '{deviceId}'.");
+
+        request.Payload.TryGetValue("value", out var value);
+        var writeResult = await runtimeService.ExecutePointWriteAsync(deviceId, point.Id, value, cancellationToken);
+        return new DispatchExecutionResult(
+            writeResult.Quality == QualityStatus.Good ? "Config push completed." : "Config push finished with degraded quality.",
+            new Dictionary<string, object>
+            {
+                ["pointId"] = point.Id,
+                ["address"] = point.Address,
+                ["quality"] = writeResult.Quality.ToString(),
+                ["errorMessage"] = writeResult.ErrorMessage ?? string.Empty
+            });
     }
 
     private async Task PostAsync<TPayload>(EdgeTarget edgeTarget, string action, TPayload payload, CancellationToken cancellationToken)
@@ -471,12 +565,6 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         return others.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
-    private static Guid DeterministicProbeTaskId(string instanceId)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"edge-probe:{instanceId}"));
-        return new Guid(bytes[..16]);
-    }
-
     private TimeSpan HeartbeatInterval()
         => TimeSpan.FromSeconds(Math.Max(_options.HeartbeatIntervalSeconds, 1));
 
@@ -496,6 +584,8 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
     }
 
     private sealed record EdgeTarget(string AccessToken, string BaseUrl);
+
+    private sealed record DispatchExecutionResult(string Message, Dictionary<string, object> Payload);
 
     private sealed record EdgeRuntimeSnapshot(EdgeRegistrationRequest Registration, EdgeHeartbeatRequest Heartbeat);
 
@@ -528,4 +618,28 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         public int Code { get; set; }
         public string Msg { get; set; } = string.Empty;
     }
+
+    private sealed class EdgeApiResult<T>
+    {
+        public int Code { get; set; }
+        public string Msg { get; set; } = string.Empty;
+        public T? Data { get; set; }
+    }
+
+    private sealed record EdgeTaskRequestPayload(
+        string ContractVersion,
+        Guid TaskId,
+        string TaskType,
+        EdgeTaskAddressPayload Address,
+        Dictionary<string, object>? Payload,
+        DateTime CreatedAt,
+        DateTime? ExpiredAt);
+
+    private sealed record EdgeTaskAddressPayload(
+        string TargetType,
+        string TargetKey,
+        Guid? DeviceId,
+        string RuntimeType,
+        string InstanceId,
+        string RuntimeName);
 }
