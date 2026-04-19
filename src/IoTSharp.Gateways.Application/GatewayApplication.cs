@@ -46,6 +46,7 @@ public interface IGatewayRepository
 
     Task SaveWriteCommandAsync(WriteCommand command, CancellationToken cancellationToken);
     Task<IReadOnlyCollection<WriteCommand>> GetWriteCommandsAsync(CancellationToken cancellationToken);
+    Task ReplaceConfigurationAsync(GatewayConfigurationSnapshot snapshot, CancellationToken cancellationToken);
 }
 
 public static class GatewayJson
@@ -75,7 +76,34 @@ public static class GatewayJson
 
     public static string? Get(IReadOnlyDictionary<string, string?> values, string key)
         => values.TryGetValue(key, out var value) ? value : null;
+
+    public static IReadOnlyCollection<Guid> ParseGuidArray(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return Array.Empty<Guid>();
+        }
+
+        try
+        {
+            var values = JsonSerializer.Deserialize<Guid[]>(json);
+            return values?.Where(value => value != Guid.Empty).Distinct().ToArray() ?? Array.Empty<Guid>();
+        }
+        catch (JsonException)
+        {
+            return Array.Empty<Guid>();
+        }
+    }
 }
+
+public sealed record GatewayConfigurationSnapshot(
+    IReadOnlyCollection<GatewayChannel> Channels,
+    IReadOnlyCollection<Device> Devices,
+    IReadOnlyCollection<Point> Points,
+    IReadOnlyCollection<PollingTask> PollingTasks,
+    IReadOnlyCollection<TransformRule> TransformRules,
+    IReadOnlyCollection<UploadChannel> UploadChannels,
+    IReadOnlyCollection<UploadRoute> UploadRoutes);
 
 public sealed class GatewayConfigurationService
 {
@@ -286,8 +314,10 @@ public sealed class GatewayRuntimeService
         var task = await _repository.GetPollingTaskAsync(taskId, cancellationToken) ?? throw new InvalidOperationException($"Polling task '{taskId}' was not found.");
         var device = await _repository.GetDeviceAsync(task.DeviceId, cancellationToken) ?? throw new InvalidOperationException($"Device '{task.DeviceId}' was not found.");
         var channel = await _repository.GetChannelAsync(device.ChannelId, cancellationToken) ?? throw new InvalidOperationException($"Channel '{device.ChannelId}' was not found.");
+        var configuredPointIds = GatewayJson.ParseGuidArray(task.PointIdsJson).ToHashSet();
         var points = (await _repository.GetPointsByDeviceAsync(device.Id, cancellationToken))
             .Where(point => point.Enabled && point.AccessMode is PointAccessMode.Read or PointAccessMode.ReadWrite)
+            .Where(point => configuredPointIds.Count == 0 || configuredPointIds.Contains(point.Id))
             .ToArray();
 
         if (points.Length == 0)

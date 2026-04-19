@@ -44,7 +44,8 @@ public enum PointAccessMode
 public enum UploadProtocol
 {
     Http,
-    IotSharpMqtt
+    IotSharpMqtt,
+    IotSharpDeviceHttp
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -148,6 +149,7 @@ public sealed class PollingTask
     public Guid DeviceId { get; set; }
     public string Name { get; set; } = string.Empty;
     public int IntervalSeconds { get; set; } = 30;
+    public string PointIdsJson { get; set; } = "[]";
     public bool TriggerOnChange { get; set; }
     public bool BatchRead { get; set; } = true;
     public bool Enabled { get; set; } = true;

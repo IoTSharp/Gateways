@@ -89,6 +89,7 @@ public sealed class SqliteGatewaySchemaInitializer : IGatewaySchemaInitializer
             DeviceId TEXT NOT NULL,
             Name TEXT NOT NULL,
             IntervalSeconds INTEGER NOT NULL,
+            PointIdsJson TEXT NOT NULL DEFAULT '[]',
             TriggerOnChange INTEGER NOT NULL,
             BatchRead INTEGER NOT NULL,
             Enabled INTEGER NOT NULL
@@ -144,6 +145,18 @@ public sealed class SqliteGatewaySchemaInitializer : IGatewaySchemaInitializer
 
         using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
         await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: cancellationToken));
+        await EnsurePollingTaskColumnsAsync(connection, cancellationToken);
+    }
+
+    private static async Task EnsurePollingTaskColumnsAsync(IDbConnection connection, CancellationToken cancellationToken)
+    {
+        var pointIdsColumnExists = await connection.ExecuteScalarAsync<long>(
+            new CommandDefinition("SELECT COUNT(*) FROM pragma_table_info('PollingTasks') WHERE name = 'PointIdsJson';", cancellationToken: cancellationToken));
+        if (pointIdsColumnExists == 0)
+        {
+            await connection.ExecuteAsync(
+                new CommandDefinition("ALTER TABLE PollingTasks ADD COLUMN PointIdsJson TEXT NOT NULL DEFAULT '[]';", cancellationToken: cancellationToken));
+        }
     }
 }
 
@@ -218,7 +231,7 @@ public sealed class SqliteGatewayRepository : IGatewayRepository
 
     public Task SavePollingTaskAsync(PollingTask task, CancellationToken cancellationToken)
         => ExecuteAsync(
-            "REPLACE INTO PollingTasks (Id, DeviceId, Name, IntervalSeconds, TriggerOnChange, BatchRead, Enabled) VALUES (@Id, @DeviceId, @Name, @IntervalSeconds, @TriggerOnChange, @BatchRead, @Enabled);",
+            "REPLACE INTO PollingTasks (Id, DeviceId, Name, IntervalSeconds, PointIdsJson, TriggerOnChange, BatchRead, Enabled) VALUES (@Id, @DeviceId, @Name, @IntervalSeconds, @PointIdsJson, @TriggerOnChange, @BatchRead, @Enabled);",
             task,
             cancellationToken);
 
@@ -279,6 +292,65 @@ public sealed class SqliteGatewayRepository : IGatewayRepository
     public Task<IReadOnlyCollection<WriteCommand>> GetWriteCommandsAsync(CancellationToken cancellationToken)
         => QueryListAsync<WriteCommand>("SELECT * FROM WriteCommands ORDER BY RequestedAtUtc DESC;", cancellationToken);
 
+    public async Task ReplaceConfigurationAsync(GatewayConfigurationSnapshot snapshot, CancellationToken cancellationToken)
+    {
+        using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction();
+
+        await connection.ExecuteAsync(new CommandDefinition("DELETE FROM UploadRoutes;", transaction: transaction, cancellationToken: cancellationToken));
+        await connection.ExecuteAsync(new CommandDefinition("DELETE FROM UploadChannels;", transaction: transaction, cancellationToken: cancellationToken));
+        await connection.ExecuteAsync(new CommandDefinition("DELETE FROM TransformRules;", transaction: transaction, cancellationToken: cancellationToken));
+        await connection.ExecuteAsync(new CommandDefinition("DELETE FROM PollingTasks;", transaction: transaction, cancellationToken: cancellationToken));
+        await connection.ExecuteAsync(new CommandDefinition("DELETE FROM Points;", transaction: transaction, cancellationToken: cancellationToken));
+        await connection.ExecuteAsync(new CommandDefinition("DELETE FROM Devices;", transaction: transaction, cancellationToken: cancellationToken));
+        await connection.ExecuteAsync(new CommandDefinition("DELETE FROM GatewayChannels;", transaction: transaction, cancellationToken: cancellationToken));
+
+        await InsertAsync(
+            connection,
+            transaction,
+            "INSERT INTO GatewayChannels (Id, DriverCode, Name, Description, ConnectionJson, Enabled) VALUES (@Id, @DriverCode, @Name, @Description, @ConnectionJson, @Enabled);",
+            snapshot.Channels,
+            cancellationToken);
+        await InsertAsync(
+            connection,
+            transaction,
+            "INSERT INTO Devices (Id, ChannelId, Name, ExternalId, PollingIntervalSeconds, SettingsJson, Enabled) VALUES (@Id, @ChannelId, @Name, @ExternalId, @PollingIntervalSeconds, @SettingsJson, @Enabled);",
+            snapshot.Devices,
+            cancellationToken);
+        await InsertAsync(
+            connection,
+            transaction,
+            "INSERT INTO Points (Id, DeviceId, Name, Address, DataType, AccessMode, Length, SettingsJson, Enabled) VALUES (@Id, @DeviceId, @Name, @Address, @DataType, @AccessMode, @Length, @SettingsJson, @Enabled);",
+            snapshot.Points,
+            cancellationToken);
+        await InsertAsync(
+            connection,
+            transaction,
+            "INSERT INTO PollingTasks (Id, DeviceId, Name, IntervalSeconds, PointIdsJson, TriggerOnChange, BatchRead, Enabled) VALUES (@Id, @DeviceId, @Name, @IntervalSeconds, @PointIdsJson, @TriggerOnChange, @BatchRead, @Enabled);",
+            snapshot.PollingTasks,
+            cancellationToken);
+        await InsertAsync(
+            connection,
+            transaction,
+            "INSERT INTO TransformRules (Id, PointId, Name, Kind, SortOrder, ArgumentsJson, Enabled) VALUES (@Id, @PointId, @Name, @Kind, @SortOrder, @ArgumentsJson, @Enabled);",
+            snapshot.TransformRules,
+            cancellationToken);
+        await InsertAsync(
+            connection,
+            transaction,
+            "INSERT INTO UploadChannels (Id, Name, Protocol, Endpoint, SettingsJson, BatchSize, BufferingEnabled, Enabled) VALUES (@Id, @Name, @Protocol, @Endpoint, @SettingsJson, @BatchSize, @BufferingEnabled, @Enabled);",
+            snapshot.UploadChannels,
+            cancellationToken);
+        await InsertAsync(
+            connection,
+            transaction,
+            "INSERT INTO UploadRoutes (Id, PointId, UploadChannelId, PayloadTemplate, Target, Enabled) VALUES (@Id, @PointId, @UploadChannelId, @PayloadTemplate, @Target, @Enabled);",
+            snapshot.UploadRoutes,
+            cancellationToken);
+
+        transaction.Commit();
+    }
+
     private async Task ExecuteAsync(string sql, object? parameters, CancellationToken cancellationToken)
     {
         using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
@@ -303,5 +375,20 @@ public sealed class SqliteGatewayRepository : IGatewayRepository
     {
         using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
         return await connection.QuerySingleOrDefaultAsync<T>(new CommandDefinition(sql, parameters, cancellationToken: cancellationToken));
+    }
+
+    private static async Task InsertAsync<T>(
+        IDbConnection connection,
+        IDbTransaction transaction,
+        string sql,
+        IReadOnlyCollection<T> items,
+        CancellationToken cancellationToken)
+    {
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(sql, items, transaction: transaction, cancellationToken: cancellationToken));
     }
 }

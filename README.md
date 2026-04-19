@@ -1,17 +1,92 @@
 # IoTSharp.Gateways
 
-统一工业采集网关宿主，当前已经收敛为**单进程**运行时：
+统一的 Gateway 单宿主程序。
 
-- 一个 `IoTSharp.Gateways` 程序同时负责本地配置接口、采集轮询、向 IoTSharp 注册/心跳/能力上报、拉取平台任务并执行
-- 不再拆分 `Api`、`Worker`、`gateway-web` 三套宿主
-- 本地只保留一个内置 bootstrap 和诊断页，用于填写平台下发的对接 JSON，并查看运行状态
+当前模式已经收口为一个可执行程序 `IoTSharp.Gateways`，不再拆分 `IoTSharp.Gateways.Api`、`IoTSharp.Gateways.Worker`、`gateway-web`。Gateway 的职责也收口为：
+
+- 读取本地 `bootstrap.json`
+- 向 IoTSharp 平台注册、心跳、上报能力
+- 从 IoTSharp 平台拉取采集配置
+- 将平台侧采集模型映射为本地执行缓存并执行轮询
+- 将采集结果直接回传 IoTSharp
+
+## 职责边界
+
+IoTSharp 平台侧负责：
+
+- 采集模型设计
+- 边缘节点管理
+- 配置版本管理
+- 任务下发与运行观察
+
+Gateway 侧负责：
+
+- 南向协议执行
+- 本地执行缓存
+- 采集轮询与数据回传
+- 最小化 bootstrap / 诊断页面
+
+Gateway 不再提供本地 CRUD 采集配置接口。
+
+## 本地页面
+
+启动后访问 `/`，只保留两个本地能力：
+
+- Bootstrap 配置
+  - 读取和保存本地 `bootstrap.json`
+  - 主要填写 `EdgeReporting.BaseUrl` 和 `EdgeReporting.AccessToken`
+- 诊断页
+  - 查看进程状态
+  - 查看 bootstrap 状态
+  - 查看平台配置同步状态
+  - 查看本地执行缓存统计
+
+本地接口只保留：
+
+- `GET /api/bootstrap/config`
+- `POST /api/bootstrap/config`
+- `GET /api/diagnostics/summary`
+- `GET /api/health`
+
+## 配置同步
+
+Gateway 会周期性调用：
+
+- `GET /api/Edge/{access_token}/CollectionConfig`
+
+拉取 IoTSharp 平台维护的采集配置，然后将其转换为本地运行时缓存：
+
+- `GatewayChannels`
+- `Devices`
+- `Points`
+- `PollingTasks`
+- `TransformRules`
+- `UploadChannels`
+- `UploadRoutes`
+
+本地 SQLite 现在只是执行缓存，不再是配置主数据源。
+
+如果本次拉取或映射失败，Gateway 会保留上一版本地缓存继续运行，不会清空现有执行配置。
+
+## 上传链路
+
+平台配置映射后，Gateway 会自动派生回传通道：
+
+- 遥测上报到 `POST /api/Devices/{access_token}/Telemetry`
+- 属性上报到 `POST /api/Devices/{access_token}/Attributes`
+
+这样采集模型完全归 IoTSharp 平台侧管理，Gateway 只负责执行。
 
 ## 目录结构
 
-- `src/IoTSharp.Gateways.Domain`：领域模型与统一驱动接口
-- `src/IoTSharp.Gateways.Application`：配置服务、运行编排、转换服务
-- `src/IoTSharp.Gateways.Infrastructure`：SQLite 持久化、驱动适配器、HTTP/MQTT 上传
-- `src/IoTSharp.Gateways`：单宿主程序，包含后台采集服务、平台对接、静态 bootstrap/诊断页
+- `src/IoTSharp.Gateways.Domain`
+  - 领域模型与统一驱动接口
+- `src/IoTSharp.Gateways.Application`
+  - 运行服务、配置快照、转换服务
+- `src/IoTSharp.Gateways.Infrastructure`
+  - SQLite 持久化、驱动适配、上传通道
+- `src/IoTSharp.Gateways`
+  - 单宿主程序、bootstrap/诊断页、平台同步 worker
 
 ## 当前驱动
 
@@ -23,30 +98,23 @@
 - Omron FINS
 - Allen-Bradley
 
-已预留统一契约，暂未启用：
+已保留统一契约但暂未启用完整实现：
 
 - OPC UA
 - OPC DA
 - MT CNC
 - Fanuc CNC
 
-## 本地页面
-
-程序启动后直接打开根地址 `/` 即可访问内置页面：
-
-- Bootstrap 配置：读取/保存本地 `bootstrap.json`
-- 运行诊断：查看当前进程、bootstrap 文件状态、边缘上报参数、本地采集配置统计
-
 ## 本地运行
 
 ```bash
-cd /home/runner/work/Gateways/Gateways
-dotnet run --project /home/runner/work/Gateways/Gateways/src/IoTSharp.Gateways/IoTSharp.Gateways.csproj
+cd gateways/Gateways
+dotnet run --project src/IoTSharp.Gateways/IoTSharp.Gateways.csproj
 ```
 
 ## 构建验证
 
 ```bash
-cd /home/runner/work/Gateways/Gateways
+cd gateways/Gateways
 dotnet build IoTSharp.Gateways.sln
 ```

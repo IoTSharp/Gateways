@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using MQTTnet;
@@ -101,6 +102,40 @@ public sealed class IotSharpMqttUploadTransport : IUploadTransport
 
     private static string Sanitize(string value)
         => value.Replace(' ', '_').ToLowerInvariant();
+}
+
+public sealed class IotSharpDeviceHttpUploadTransport : IUploadTransport
+{
+    private readonly IHttpClientFactory _httpClientFactory;
+
+    public IotSharpDeviceHttpUploadTransport(IHttpClientFactory httpClientFactory)
+    {
+        _httpClientFactory = httpClientFactory;
+    }
+
+    public UploadProtocol Protocol => UploadProtocol.IotSharpDeviceHttp;
+
+    public async Task UploadAsync(UploadChannel channel, UploadEnvelope envelope, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(channel.Endpoint))
+        {
+            throw new InvalidOperationException("IoTSharp device HTTP upload endpoint is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(envelope.Target))
+        {
+            throw new InvalidOperationException("IoTSharp device HTTP upload target is required.");
+        }
+
+        var client = _httpClientFactory.CreateClient(nameof(IotSharpDeviceHttpUploadTransport));
+        var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            [envelope.Target] = envelope.Value ?? envelope.RawValue
+        };
+
+        using var response = await client.PostAsJsonAsync(channel.Endpoint, payload, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
 }
 
 public sealed class UploadTransportRegistry : IUploadTransportRegistry
