@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 
-namespace IoTSharp.Gateways.Worker;
+namespace IoTSharp.Gateways;
 
 public interface IEdgeTaskReceiptReporter
 {

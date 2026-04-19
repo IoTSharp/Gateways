@@ -14,7 +14,7 @@ using IoTSharp.Gateways.Application;
 using IoTSharp.Gateways.Domain;
 using Microsoft.Extensions.Options;
 
-namespace IoTSharp.Gateways.Worker;
+namespace IoTSharp.Gateways;
 
 public sealed class EdgeReportingOptions
 {
@@ -47,7 +47,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
     private readonly IEdgeTaskReceiptReporter _receiptReporter;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ILogger<EdgeRuntimeReportingWorker> _logger;
-    private readonly EdgeReportingOptions _options;
+    private readonly IOptionsMonitor<EdgeReportingOptions> _optionsMonitor;
     private readonly Process _currentProcess = Process.GetCurrentProcess();
     private readonly DateTimeOffset _startedAt = DateTimeOffset.UtcNow;
     private readonly string _version;
@@ -55,18 +55,20 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
 
     private bool _registrationPending = true;
     private bool _capabilitiesPending = true;
+    private string? _lastRegistrationSignature;
     private string? _lastCapabilitiesSignature;
     private DateTimeOffset? _lastHeartbeatAt;
     private readonly Channel<EdgeTaskRequestPayload> _dispatchQueue = Channel.CreateUnbounded<EdgeTaskRequestPayload>();
     private readonly HashSet<Guid> _queuedTaskIds = [];
     private bool _missingConfigurationLogged;
+    private bool _reportingDisabledLogged;
 
     public EdgeRuntimeReportingWorker(
         IServiceScopeFactory scopeFactory,
         IHttpClientFactory httpClientFactory,
         IEdgeTaskReceiptReporter receiptReporter,
         IHostEnvironment hostEnvironment,
-        IOptions<EdgeReportingOptions> options,
+        IOptionsMonitor<EdgeReportingOptions> optionsMonitor,
         ILogger<EdgeRuntimeReportingWorker> logger)
     {
         _scopeFactory = scopeFactory;
@@ -74,21 +76,15 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         _receiptReporter = receiptReporter;
         _hostEnvironment = hostEnvironment;
         _logger = logger;
-        _options = options.Value;
+        _optionsMonitor = optionsMonitor;
         _version = ResolveVersion();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!_options.Enabled)
-        {
-            _logger.LogInformation("IoTSharp Edge reporting is disabled.");
-            return;
-        }
-
         while (!stoppingToken.IsCancellationRequested)
         {
-            var delay = TimeSpan.FromSeconds(Math.Max(_options.HeartbeatIntervalSeconds, 1));
+            var delay = RetryDelay(_optionsMonitor.CurrentValue);
 
             try
             {
@@ -102,7 +98,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             {
                 _registrationPending = true;
                 _capabilitiesPending = true;
-                delay = RetryDelay();
+                delay = RetryDelay(_optionsMonitor.CurrentValue);
                 _logger.LogError(exception, "IoTSharp Edge reporting iteration failed.");
             }
 
@@ -127,8 +123,27 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         var transformRules = await repository.GetTransformRulesAsync(cancellationToken);
         var uploadChannels = await repository.GetUploadChannelsAsync(cancellationToken);
         var uploadRoutes = await repository.GetUploadRoutesAsync(cancellationToken);
+        var options = _optionsMonitor.CurrentValue;
 
-        var edgeTarget = ResolveEdgeTarget(uploadChannels);
+        if (!options.Enabled)
+        {
+            if (!_reportingDisabledLogged)
+            {
+                _logger.LogInformation("IoTSharp Edge reporting is disabled.");
+                _reportingDisabledLogged = true;
+            }
+
+            _registrationPending = true;
+            _capabilitiesPending = true;
+            _lastRegistrationSignature = null;
+            _lastCapabilitiesSignature = null;
+            _lastHeartbeatAt = null;
+            return RetryDelay(options);
+        }
+
+        _reportingDisabledLogged = false;
+
+        var edgeTarget = ResolveEdgeTarget(options, uploadChannels);
         if (edgeTarget is null)
         {
             if (!_missingConfigurationLogged)
@@ -136,14 +151,26 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
                 _missingConfigurationLogged = true;
                 _logger.LogWarning("IoTSharp Edge reporting skipped because base URL or access token is not configured.");
             }
-            return RetryDelay();
+            _registrationPending = true;
+            _capabilitiesPending = true;
+            _lastRegistrationSignature = null;
+            _lastHeartbeatAt = null;
+            return RetryDelay(options);
         }
 
         _missingConfigurationLogged = false;
 
-        var snapshot = BuildRuntimeSnapshot(channels, devices, points, pollingTasks, uploadChannels, uploadRoutes);
+        var snapshot = BuildRuntimeSnapshot(options, channels, devices, points, pollingTasks, uploadChannels, uploadRoutes);
         var capabilities = BuildCapabilities(driverCatalog, channels, points, pollingTasks, transformRules, uploadChannels, uploadRoutes);
+        var registrationSignature = ComputeRegistrationSignature(edgeTarget, snapshot.Registration);
         var capabilitiesSignature = ComputeCapabilitiesSignature(capabilities);
+
+        if (!string.Equals(_lastRegistrationSignature, registrationSignature, StringComparison.Ordinal))
+        {
+            _registrationPending = true;
+            _capabilitiesPending = true;
+            _lastHeartbeatAt = null;
+        }
 
         if (!string.Equals(_lastCapabilitiesSignature, capabilitiesSignature, StringComparison.Ordinal))
         {
@@ -155,6 +182,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             await PostAsync(edgeTarget, "Register", snapshot.Registration, cancellationToken);
             _registrationPending = false;
             _capabilitiesPending = true;
+            _lastRegistrationSignature = registrationSignature;
             _logger.LogInformation("Registered Gateway runtime to IoTSharp Edge with instance {InstanceId}.", snapshot.Registration.InstanceId);
         }
 
@@ -166,7 +194,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             _logger.LogInformation("Reported Gateway capabilities to IoTSharp Edge.");
         }
 
-        if (!_lastHeartbeatAt.HasValue || DateTimeOffset.UtcNow - _lastHeartbeatAt.Value >= HeartbeatInterval())
+        if (!_lastHeartbeatAt.HasValue || DateTimeOffset.UtcNow - _lastHeartbeatAt.Value >= HeartbeatInterval(options))
         {
             await PostAsync(edgeTarget, "Heartbeat", snapshot.Heartbeat, cancellationToken);
             _lastHeartbeatAt = DateTimeOffset.UtcNow;
@@ -174,9 +202,9 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         }
 
         await EnqueuePendingDispatchesAsync(edgeTarget, cancellationToken);
-        await DrainDispatchQueueAsync(runtimeService, edgeTarget, snapshot, points, cancellationToken);
+        await DrainDispatchQueueAsync(runtimeService, edgeTarget, options.RuntimeType, snapshot, points, cancellationToken);
 
-        return NextDelay();
+        return NextDelay(options);
     }
 
     private async Task EnqueuePendingDispatchesAsync(
@@ -203,6 +231,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
     private async Task DrainDispatchQueueAsync(
         GatewayRuntimeService runtimeService,
         EdgeTarget edgeTarget,
+        string runtimeType,
         EdgeRuntimeSnapshot snapshot,
         IReadOnlyCollection<Point> points,
         CancellationToken cancellationToken)
@@ -214,17 +243,17 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
                 var deviceId = ResolveDeviceId(request.Address.TargetKey);
                 if (deviceId == Guid.Empty)
                 {
-                    await _receiptReporter.ReportCompletedAsync(edgeTarget.BaseUrl, Guid.Empty, _options.RuntimeType, snapshot.Registration.InstanceId, request.TaskId, "Failed", "Gateway worker failed to resolve device id from dispatch target.", null, cancellationToken);
+                    await _receiptReporter.ReportCompletedAsync(edgeTarget.BaseUrl, Guid.Empty, runtimeType, snapshot.Registration.InstanceId, request.TaskId, "Failed", "Gateway worker failed to resolve device id from dispatch target.", null, cancellationToken);
                     continue;
                 }
 
-                await _receiptReporter.ReportAcceptedAsync(edgeTarget.BaseUrl, edgeTarget.AccessToken, deviceId, _options.RuntimeType, snapshot.Registration.InstanceId, request.TaskId, cancellationToken);
+                await _receiptReporter.ReportAcceptedAsync(edgeTarget.BaseUrl, edgeTarget.AccessToken, deviceId, runtimeType, snapshot.Registration.InstanceId, request.TaskId, cancellationToken);
                 var result = await ExecuteDispatchAsync(runtimeService, request, deviceId, points, cancellationToken);
-                await _receiptReporter.ReportCompletedAsync(edgeTarget.BaseUrl, deviceId, _options.RuntimeType, snapshot.Registration.InstanceId, request.TaskId, "Succeeded", result.Message, result.Payload, cancellationToken);
+                await _receiptReporter.ReportCompletedAsync(edgeTarget.BaseUrl, deviceId, runtimeType, snapshot.Registration.InstanceId, request.TaskId, "Succeeded", result.Message, result.Payload, cancellationToken);
             }
             catch (Exception exception)
             {
-                await _receiptReporter.ReportCompletedAsync(edgeTarget.BaseUrl, Guid.Empty, _options.RuntimeType, snapshot.Registration.InstanceId, request.TaskId, "Failed", exception.Message, new Dictionary<string, object> { ["exception"] = exception.GetType().Name }, cancellationToken);
+                await _receiptReporter.ReportCompletedAsync(edgeTarget.BaseUrl, Guid.Empty, runtimeType, snapshot.Registration.InstanceId, request.TaskId, "Failed", exception.Message, new Dictionary<string, object> { ["exception"] = exception.GetType().Name }, cancellationToken);
             }
             finally
             {
@@ -331,6 +360,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
     }
 
     private EdgeRuntimeSnapshot BuildRuntimeSnapshot(
+        EdgeReportingOptions options,
         IReadOnlyCollection<GatewayChannel> channels,
         IReadOnlyCollection<Device> devices,
         IReadOnlyCollection<Point> points,
@@ -339,11 +369,11 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         IReadOnlyCollection<UploadRoute> uploadRoutes)
     {
         var hostName = ResolveHostName();
-        var runtimeName = string.IsNullOrWhiteSpace(_options.RuntimeName) ? hostName : _options.RuntimeName.Trim();
-        var instanceId = string.IsNullOrWhiteSpace(_options.InstanceId)
+        var runtimeName = string.IsNullOrWhiteSpace(options.RuntimeName) ? hostName : options.RuntimeName.Trim();
+        var instanceId = string.IsNullOrWhiteSpace(options.InstanceId)
             ? CreateStableInstanceId(hostName, _hostEnvironment.ApplicationName, _hostEnvironment.ContentRootPath)
-            : _options.InstanceId.Trim();
-        var metadata = BuildMetadata();
+            : options.InstanceId.Trim();
+        var metadata = BuildMetadata(options);
         var metrics = BuildMetrics(channels, devices, points, pollingTasks, uploadChannels, uploadRoutes);
         var ipAddress = ResolveIpAddress();
         var uptimeSeconds = Math.Max(0L, (long)_uptime.Elapsed.TotalSeconds);
@@ -351,7 +381,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
 
         return new EdgeRuntimeSnapshot(
             new EdgeRegistrationRequest(
-                _options.RuntimeType,
+                options.RuntimeType,
                 runtimeName,
                 _version,
                 instanceId,
@@ -441,10 +471,10 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             null);
     }
 
-    private EdgeTarget? ResolveEdgeTarget(IReadOnlyCollection<UploadChannel> uploadChannels)
+    private EdgeTarget? ResolveEdgeTarget(EdgeReportingOptions options, IReadOnlyCollection<UploadChannel> uploadChannels)
     {
         var accessToken = FirstNonEmpty(
-            _options.AccessToken,
+            options.AccessToken,
             uploadChannels.Where(channel => channel.Enabled).SelectMany(channel =>
             {
                 var settings = GatewayJson.Parse(channel.SettingsJson);
@@ -457,7 +487,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             }));
 
         var baseUrl = FirstNonEmpty(
-            _options.BaseUrl,
+            options.BaseUrl,
             uploadChannels.Where(channel => channel.Enabled).SelectMany(channel =>
             {
                 var settings = GatewayJson.Parse(channel.SettingsJson);
@@ -474,9 +504,9 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         return new EdgeTarget(accessToken.Trim(), NormalizeBaseUrl(baseUrl));
     }
 
-    private Dictionary<string, string> BuildMetadata()
+    private Dictionary<string, string> BuildMetadata(EdgeReportingOptions options)
     {
-        var metadata = new Dictionary<string, string>(_options.Metadata, StringComparer.OrdinalIgnoreCase)
+        var metadata = new Dictionary<string, string>(options.Metadata, StringComparer.OrdinalIgnoreCase)
         {
             ["applicationName"] = _hostEnvironment.ApplicationName,
             ["environment"] = _hostEnvironment.EnvironmentName,
@@ -558,6 +588,23 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
     private static string ComputeCapabilitiesSignature(EdgeCapabilityReportRequest capabilities)
         => JsonSerializer.Serialize(capabilities, JsonOptions);
 
+    private static string ComputeRegistrationSignature(EdgeTarget edgeTarget, EdgeRegistrationRequest registration)
+        => JsonSerializer.Serialize(
+            new
+            {
+                edgeTarget.BaseUrl,
+                edgeTarget.AccessToken,
+                registration.RuntimeType,
+                registration.RuntimeName,
+                registration.InstanceId,
+                registration.Version,
+                registration.Platform,
+                registration.HostName,
+                registration.IpAddress,
+                registration.Metadata
+            },
+            JsonOptions);
+
     private static string? TryGetHttpBaseUrl(string endpoint)
     {
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
@@ -586,20 +633,20 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         return others.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
-    private TimeSpan HeartbeatInterval()
-        => TimeSpan.FromSeconds(Math.Max(_options.HeartbeatIntervalSeconds, 1));
+    private static TimeSpan HeartbeatInterval(EdgeReportingOptions options)
+        => TimeSpan.FromSeconds(Math.Max(options.HeartbeatIntervalSeconds, 1));
 
-    private TimeSpan RetryDelay()
-        => TimeSpan.FromSeconds(Math.Max(_options.RetryDelaySeconds, 1));
+    private static TimeSpan RetryDelay(EdgeReportingOptions options)
+        => TimeSpan.FromSeconds(Math.Max(options.RetryDelaySeconds, 1));
 
-    private TimeSpan NextDelay()
+    private TimeSpan NextDelay(EdgeReportingOptions options)
     {
         if (_registrationPending || _capabilitiesPending || !_lastHeartbeatAt.HasValue)
         {
-            return RetryDelay();
+            return RetryDelay(options);
         }
 
-        var nextHeartbeatAt = _lastHeartbeatAt.Value + HeartbeatInterval();
+        var nextHeartbeatAt = _lastHeartbeatAt.Value + HeartbeatInterval(options);
         var delay = nextHeartbeatAt - DateTimeOffset.UtcNow;
         return delay > TimeSpan.Zero ? delay : TimeSpan.Zero;
     }

@@ -12,6 +12,8 @@
 
 **/bin/
 **/obj/
+**/gateways.db
+src/IoTSharp.Gateways/bootstrap.json
 src/gateway-web/node_modules/
 src/gateway-web/dist/
 /src/gateway-web/package-lock.json

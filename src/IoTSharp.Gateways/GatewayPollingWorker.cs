@@ -1,6 +1,6 @@
 using IoTSharp.Gateways.Application;
 
-namespace IoTSharp.Gateways.Worker;
+namespace IoTSharp.Gateways;
 
 public sealed class GatewayPollingWorker : BackgroundService
 {
