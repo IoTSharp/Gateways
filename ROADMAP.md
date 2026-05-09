@@ -53,7 +53,7 @@
 | --- | --- | --- | --- |
 | C1 | ⏳ | [依赖: B1] | BasicRuntime 接口注册表 C# 实现 |
 | C2 | ⏳ | [依赖: C1] | 脚本加载、签名校验、版本槽 |
-| C3 | ⏳ | [依赖: C1] | 与 `external/IoTEmBASIC` 接口签名对齐 |
+| C3 | ⏳ | [依赖: C1] | 与 `external/IoTSharp.Edge.Stm32` 接口签名对齐 |
 | C4 | ⏳ | [依赖: C2] | 沙箱与运行预算 |
 
 ## 5. Phase D — 协议与诊断　⏳
@@ -68,5 +68,5 @@
 ## 6. 接口稳定性公约
 
 - 与 `IoTSharp.SaaS` 端 `IoTSharp.CodeGen.CSharpAot` 之间的接口为公开契约；破坏性变更需 6 个月废弃期。
-- 与 `external/IoTEmBASIC`、`external/Pixiu` 共同维护 BasicRuntime 接口签名表。
+- 与 `external/IoTSharp.Edge.Stm32`、`external/IoTSharp.Edge.Linux` 共同维护 BasicRuntime 接口签名表。
 - 本仓库不感知租户 / 计费 / License。
