@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using IoTSharp.Gateways;
 using IoTSharp.Gateways.Application;
+using IoTSharp.Gateways.BasicRuntime;
 using IoTSharp.Gateways.Domain;
 using IoTSharp.Gateways.Infrastructure;
 using IoTSharp.Gateways.Infrastructure.Persistence;
@@ -28,6 +29,7 @@ builder.Services.AddCors(options =>
 });
 builder.Services.AddSingleton<BootstrapConfigurationService>();
 builder.Services.AddSingleton<CollectionConfigurationSyncState>();
+builder.Services.AddSingleton<BasicRuntime>();
 builder.Services.AddSingleton<ValueTransformationService>();
 builder.Services.AddScoped<DriverCatalogService>();
 builder.Services.AddScoped<GatewayRuntimeService>();

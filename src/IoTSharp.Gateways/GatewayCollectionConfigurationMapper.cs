@@ -355,7 +355,7 @@ internal static class GatewayCollectionConfigurationMapper
             {
                 ["index"] = RequireInteger(transform.Parameters, "index", "bitOffset", "offset")
             },
-            GatewayCollectionTransformType.Expression => throw new NotSupportedException("Gateway sync does not support Expression transforms yet."),
+            GatewayCollectionTransformType.Expression => BuildExpressionArguments(transform.Parameters),
             GatewayCollectionTransformType.WordSwap => throw new NotSupportedException("Gateway sync does not support WordSwap transforms yet."),
             GatewayCollectionTransformType.ByteSwap => throw new NotSupportedException("Gateway sync does not support ByteSwap transforms yet."),
             GatewayCollectionTransformType.Clamp => throw new NotSupportedException("Gateway sync does not support Clamp transforms yet."),
@@ -395,6 +395,57 @@ internal static class GatewayCollectionConfigurationMapper
             throw new InvalidOperationException("EnumMap transform requires at least one mapping item.");
         }
 
+        return arguments;
+    }
+
+    private static Dictionary<string, string?> BuildExpressionArguments(JsonElement? parameters)
+    {
+        if (!parameters.HasValue)
+        {
+            throw new InvalidOperationException("Expression transform requires parameters.");
+        }
+
+        if (parameters.Value.ValueKind == JsonValueKind.String)
+        {
+            var expression = parameters.Value.GetString();
+            if (string.IsNullOrWhiteSpace(expression))
+            {
+                throw new InvalidOperationException("Expression transform requires a non-empty expression.");
+            }
+
+            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["expression"] = expression
+            };
+        }
+
+        if (parameters.Value.ValueKind != JsonValueKind.Object)
+        {
+            var expression = ToStringValue(parameters.Value);
+            if (string.IsNullOrWhiteSpace(expression))
+            {
+                throw new InvalidOperationException("Expression transform requires a non-empty expression.");
+            }
+
+            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["expression"] = expression
+            };
+        }
+
+        var arguments = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in parameters.Value.EnumerateObject())
+        {
+            arguments[property.Name] = ToStringValue(property.Value);
+        }
+
+        var code = FirstNonEmpty(arguments, "expression", "script", "code", "value");
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            throw new InvalidOperationException("Expression transform requires 'expression', 'script', or 'code'.");
+        }
+
+        arguments["expression"] = code;
         return arguments;
     }
 
@@ -466,6 +517,7 @@ internal static class GatewayCollectionConfigurationMapper
             GatewayCollectionTransformType.Offset => TransformationKind.Offset,
             GatewayCollectionTransformType.EnumMap => TransformationKind.EnumMap,
             GatewayCollectionTransformType.BitExtract => TransformationKind.BitExtract,
+            GatewayCollectionTransformType.Expression => TransformationKind.Expression,
             _ => throw new NotSupportedException($"Gateway sync does not support transform '{transformType}'.")
         };
     }
@@ -566,6 +618,19 @@ internal static class GatewayCollectionConfigurationMapper
             if (TryGetProperty(element.Value, key, out var value))
             {
                 return ToStringValue(value);
+            }
+        }
+
+        return null;
+    }
+
+    private static string? FirstNonEmpty(IReadOnlyDictionary<string, string?> values, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return value;
             }
         }
 

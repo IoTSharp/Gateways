@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Text.Json;
+using IoTSharp.Gateways.BasicRuntime;
 using IoTSharp.Gateways.Domain;
+using MyBasicRuntime = IoTSharp.Gateways.BasicRuntime.BasicRuntime;
 
 namespace IoTSharp.Gateways.Application;
 
@@ -172,6 +174,18 @@ public sealed class DriverCatalogService
 
 public sealed class ValueTransformationService
 {
+    private readonly MyBasicRuntime _basicRuntime;
+
+    public ValueTransformationService()
+        : this(new MyBasicRuntime())
+    {
+    }
+
+    public ValueTransformationService(MyBasicRuntime basicRuntime)
+    {
+        _basicRuntime = basicRuntime;
+    }
+
     public object? Apply(object? rawValue, IReadOnlyCollection<TransformRule> rules)
     {
         object? current = rawValue;
@@ -183,7 +197,7 @@ public sealed class ValueTransformationService
         return current;
     }
 
-    private static object? ApplyRule(object? value, TransformRule rule)
+    private object? ApplyRule(object? value, TransformRule rule)
     {
         if (value is null)
         {
@@ -198,8 +212,59 @@ public sealed class ValueTransformationService
             TransformationKind.Cast => Cast(value, GatewayJson.Get(arguments, "type")),
             TransformationKind.BitExtract => BitExtract(value, GatewayJson.GetInt32(arguments, "index") ?? 0),
             TransformationKind.EnumMap => arguments.TryGetValue(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty, out var mapped) ? mapped : value,
+            TransformationKind.Expression => ApplyExpression(value, arguments),
             _ => value
         };
+    }
+
+    private object? ApplyExpression(object value, IReadOnlyDictionary<string, string?> arguments)
+    {
+        var code = GatewayJson.Get(arguments, "expression")
+            ?? GatewayJson.Get(arguments, "script")
+            ?? GatewayJson.Get(arguments, "code");
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return value;
+        }
+
+        var variables = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["value"] = value,
+            ["raw"] = value,
+            ["x"] = value
+        };
+
+        foreach (var pair in arguments)
+        {
+            if (!IsExpressionKey(pair.Key))
+            {
+                variables[pair.Key] = pair.Value;
+            }
+        }
+
+        var options = new BasicRuntimeOptions
+        {
+            MaxStatements = 10_000,
+            MaxLoopIterations = 10_000
+        };
+
+        if (LooksLikeScript(code))
+        {
+            var result = _basicRuntime.Execute(code, variables, options);
+            if (result.ReturnValue is not null)
+            {
+                return result.ReturnValue;
+            }
+
+            if (result.Variables.TryGetValue("result", out var transformed))
+            {
+                return transformed;
+            }
+
+            return result.Variables.TryGetValue("value", out var updatedValue) ? updatedValue : value;
+        }
+
+        return _basicRuntime.Evaluate(code, variables, options);
     }
 
     private static object? Scale(object value, decimal factor)
@@ -235,6 +300,37 @@ public sealed class ValueTransformationService
             "double" => Convert.ToDouble(value, CultureInfo.InvariantCulture),
             _ => value
         };
+
+    private static bool IsExpressionKey(string key)
+        => string.Equals(key, "expression", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "script", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "code", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "value", StringComparison.OrdinalIgnoreCase);
+
+    private static bool LooksLikeScript(string code)
+    {
+        if (code.Contains('\n') || code.Contains('\r'))
+        {
+            return true;
+        }
+
+        var trimmed = code.TrimStart();
+        var firstSpace = trimmed.IndexOfAny([' ', '\t', '(']);
+        var firstWord = firstSpace >= 0 ? trimmed[..firstSpace] : trimmed;
+        return firstWord.Equals("LET", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("IF", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("FOR", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("WHILE", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("DO", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("DEF", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("DIM", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("RETURN", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("PRINT", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("INPUT", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("GOTO", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("GOSUB", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("END", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool TryGetDecimal(object value, out decimal decimalValue)
     {

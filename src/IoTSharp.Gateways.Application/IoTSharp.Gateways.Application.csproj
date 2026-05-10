@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\IoTSharp.Gateways.Domain\IoTSharp.Gateways.Domain.csproj" />
+    <ProjectReference Include="..\IoTSharp.Gateways.BasicRuntime\IoTSharp.Gateways.BasicRuntime.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

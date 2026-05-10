@@ -51,12 +51,13 @@ public enum UploadProtocol
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum TransformationKind
 {
-    Passthrough,
-    Scale,
-    Offset,
-    Cast,
-    BitExtract,
-    EnumMap
+    Passthrough = 0,
+    Scale = 1,
+    Offset = 2,
+    Cast = 3,
+    BitExtract = 4,
+    EnumMap = 5,
+    Expression = 6
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IoTSharp.Gateways.Infrastru
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IoTSharp.Gateways", "src\IoTSharp.Gateways\IoTSharp.Gateways.csproj", "{E1E748CA-693E-4675-BC3C-AF19C479AEC1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IoTSharp.Gateways.BasicRuntime", "src\IoTSharp.Gateways.BasicRuntime\IoTSharp.Gateways.BasicRuntime.csproj", "{2480AAE9-6F57-4D21-9C05-08776EC4DF63}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -71,6 +73,18 @@ Global
 		{E1E748CA-693E-4675-BC3C-AF19C479AEC1}.Release|x64.Build.0 = Release|Any CPU
 		{E1E748CA-693E-4675-BC3C-AF19C479AEC1}.Release|x86.ActiveCfg = Release|Any CPU
 		{E1E748CA-693E-4675-BC3C-AF19C479AEC1}.Release|x86.Build.0 = Release|Any CPU
+		{2480AAE9-6F57-4D21-9C05-08776EC4DF63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2480AAE9-6F57-4D21-9C05-08776EC4DF63}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2480AAE9-6F57-4D21-9C05-08776EC4DF63}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2480AAE9-6F57-4D21-9C05-08776EC4DF63}.Debug|x64.Build.0 = Debug|Any CPU
+		{2480AAE9-6F57-4D21-9C05-08776EC4DF63}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2480AAE9-6F57-4D21-9C05-08776EC4DF63}.Debug|x86.Build.0 = Debug|Any CPU
+		{2480AAE9-6F57-4D21-9C05-08776EC4DF63}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2480AAE9-6F57-4D21-9C05-08776EC4DF63}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2480AAE9-6F57-4D21-9C05-08776EC4DF63}.Release|x64.ActiveCfg = Release|Any CPU
+		{2480AAE9-6F57-4D21-9C05-08776EC4DF63}.Release|x64.Build.0 = Release|Any CPU
+		{2480AAE9-6F57-4D21-9C05-08776EC4DF63}.Release|x86.ActiveCfg = Release|Any CPU
+		{2480AAE9-6F57-4D21-9C05-08776EC4DF63}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -80,5 +94,6 @@ Global
 		{300C8979-DEB6-41F9-84FA-FE9AA2969A41} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{A11466A5-8DC6-4F9B-82E2-A8AE697F2C90} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{E1E748CA-693E-4675-BC3C-AF19C479AEC1} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{2480AAE9-6F57-4D21-9C05-08776EC4DF63} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal
