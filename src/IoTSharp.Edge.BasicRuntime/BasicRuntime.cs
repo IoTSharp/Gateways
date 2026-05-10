@@ -10,10 +10,14 @@ public sealed class BasicRuntime : IDisposable
     private readonly Dictionary<string, InternalBasicFunction> _functions = new(StringComparer.OrdinalIgnoreCase);
     private bool _disposed;
 
-    public BasicRuntime(IBasicSerialPortFactory? serialPortFactory = null, IBasicModbusClientFactory? modbusClientFactory = null)
+    public BasicRuntime(
+        IBasicSerialPortFactory? serialPortFactory = null,
+        IBasicModbusClientFactory? modbusClientFactory = null,
+        IBasicPlcClientFactory? plcClientFactory = null)
     {
         SerialPortFactory = serialPortFactory ?? new SystemBasicSerialPortFactory();
         ModbusClientFactory = modbusClientFactory ?? new SystemBasicModbusClientFactory();
+        PlcClientFactory = plcClientFactory ?? new SystemBasicPlcClientFactory();
         BuiltInFunctions.Register(this);
     }
 
@@ -23,9 +27,19 @@ public sealed class BasicRuntime : IDisposable
 
     internal ModbusRuntimeState ModbusState { get; } = new();
 
+    internal PlcRuntimeState SiemensState { get; } = new();
+
+    internal PlcRuntimeState MitsubishiState { get; } = new();
+
+    internal PlcRuntimeState OmronFinsState { get; } = new();
+
+    internal PlcRuntimeState AllenBradleyState { get; } = new();
+
     public IBasicSerialPortFactory SerialPortFactory { get; }
 
     public IBasicModbusClientFactory ModbusClientFactory { get; }
+
+    public IBasicPlcClientFactory PlcClientFactory { get; }
 
     public void RegisterFunction(string name, BasicNativeFunction function)
     {
@@ -118,6 +132,10 @@ public sealed class BasicRuntime : IDisposable
         MqttState.Dispose();
         SerialState.Dispose();
         ModbusState.Dispose();
+        SiemensState.Dispose();
+        MitsubishiState.Dispose();
+        OmronFinsState.Dispose();
+        AllenBradleyState.Dispose();
     }
 
     internal void RegisterInternalFunction(string name, InternalBasicFunction function)

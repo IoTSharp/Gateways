@@ -48,6 +48,7 @@ internal static class BuiltInFunctions
         MqttBuiltInFunctions.Register(runtime);
         SerialBuiltInFunctions.Register(runtime);
         ModbusBuiltInFunctions.Register(runtime);
+        PlcBuiltInFunctions.Register(runtime);
     }
 
     private static BasicValue Mid(IReadOnlyList<BasicValue> args)
