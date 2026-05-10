@@ -10,6 +10,8 @@
     <PackageReference Include="IoTClient" Version="1.0.42" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5" />
     <PackageReference Include="MQTTnet" Version="5.1.0.1559" />
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Client" Version="1.5.378.134" />
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Configuration" Version="1.5.378.134" />
   </ItemGroup>
 
   <PropertyGroup>

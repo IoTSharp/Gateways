@@ -12,6 +12,9 @@ internal enum GatewayCollectionProtocolType
     Bacnet = 3,
     IEC104 = 4,
     Mqtt = 5,
+    OpcDa = 6,
+    MtCnc = 7,
+    FanucCnc = 8,
     Custom = 99
 }
 
@@ -151,4 +154,3 @@ internal sealed record ReportPolicyContract
     public bool IncludeQuality { get; init; } = true;
     public bool IncludeTimestamp { get; init; } = true;
 }
-

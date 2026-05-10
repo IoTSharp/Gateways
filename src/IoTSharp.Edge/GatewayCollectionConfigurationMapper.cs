@@ -284,6 +284,31 @@ internal static class GatewayCollectionConfigurationMapper
                     settings["port"] = task.Connection.Port.Value.ToString(CultureInfo.InvariantCulture);
                 }
                 break;
+            case GatewayCollectionProtocolType.OpcDa:
+                settings["progId"] = FirstString(task.Connection.ProtocolOptions, "progId", "programId")
+                    ?? throw new InvalidOperationException($"task '{task.TaskKey}' requires protocolOptions.progId for OPC DA.");
+                if (!string.IsNullOrWhiteSpace(task.Connection.Host))
+                {
+                    settings["host"] = task.Connection.Host;
+                }
+                break;
+            case GatewayCollectionProtocolType.MtCnc:
+                settings["baseUrl"] = ResolveMtConnectBaseUrl(task.Connection);
+                if (!string.IsNullOrWhiteSpace(task.Connection.Host))
+                {
+                    settings["host"] = task.Connection.Host;
+                }
+                if (task.Connection.Port.HasValue)
+                {
+                    settings["port"] = task.Connection.Port.Value.ToString(CultureInfo.InvariantCulture);
+                }
+                settings["timeout"] = Math.Max(task.Connection.TimeoutMs, 1).ToString(CultureInfo.InvariantCulture);
+                break;
+            case GatewayCollectionProtocolType.FanucCnc:
+                settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Fanuc CNC.");
+                settings["port"] = (task.Connection.Port ?? 8193).ToString(CultureInfo.InvariantCulture);
+                settings["timeout"] = Math.Max((int)Math.Ceiling(task.Connection.TimeoutMs / 1000d), 1).ToString(CultureInfo.InvariantCulture);
+                break;
             default:
                 throw new NotSupportedException($"Collection protocol '{task.Protocol}' is not supported by Gateway sync.");
         }
@@ -548,6 +573,9 @@ internal static class GatewayCollectionConfigurationMapper
         {
             GatewayCollectionProtocolType.Modbus => "modbus",
             GatewayCollectionProtocolType.OpcUa => "opc-ua",
+            GatewayCollectionProtocolType.OpcDa => "opc-da",
+            GatewayCollectionProtocolType.MtCnc => "mt-cnc",
+            GatewayCollectionProtocolType.FanucCnc => "fanuc-cnc",
             _ => throw new NotSupportedException($"Gateway sync does not support collection protocol '{protocol}'.")
         };
     }
@@ -568,6 +596,24 @@ internal static class GatewayCollectionConfigurationMapper
 
         var port = connection.Port ?? 4840;
         return $"opc.tcp://{connection.Host}:{port}";
+    }
+
+    private static string ResolveMtConnectBaseUrl(CollectionConnectionContract connection)
+    {
+        var baseUrl = FirstString(connection.ProtocolOptions, "baseUrl", "agentUrl", "endpoint");
+        if (!string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return baseUrl;
+        }
+
+        if (string.IsNullOrWhiteSpace(connection.Host))
+        {
+            throw new InvalidOperationException("MTConnect connection requires protocolOptions.baseUrl or connection.host.");
+        }
+
+        var scheme = FirstString(connection.ProtocolOptions, "scheme", "protocol") ?? "http";
+        var port = connection.Port.HasValue ? $":{connection.Port.Value}" : string.Empty;
+        return $"{scheme}://{connection.Host}{port}";
     }
 
     private static string NormalizeModbusTransport(string? transport)

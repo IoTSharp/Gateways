@@ -23,35 +23,27 @@ public static class GatewayInfrastructureServiceCollectionExtensions
         services.AddSingleton<IDeviceDriver, MitsubishiDriver>();
         services.AddSingleton<IDeviceDriver, OmronFinsDriver>();
         services.AddSingleton<IDeviceDriver, AllenBradleyDriver>();
+        services.AddSingleton<IDeviceDriver, OpcUaDriver>();
+        services.AddSingleton<IDeviceDriver, MtConnectDriver>();
         services.AddSingleton<IDeviceDriver>(_ => new UnsupportedDriver(
-            new DriverMetadata(
-                "opc-ua",
-                DriverType.OpcUa,
-                "OPC UA",
-                "Reserved contract for OPC UA integration behind the unified driver interface.",
-                true,
-                true,
-                true,
-                true,
+            new DriverMetadata("opc-da", DriverType.OpcDa, "OPC DA", "Windows-only OPC DA Classic COM/DCOM driver contract.", true, true, true, true,
                 new[]
                 {
-                    new ConnectionSettingDefinition("endpoint", "Endpoint", "text", true, "OPC UA endpoint URL."),
-                    new ConnectionSettingDefinition("username", "Username", "text", false, "Username for authenticated sessions."),
-                    new ConnectionSettingDefinition("password", "Password", "password", false, "Password for authenticated sessions.")
-                }),
-            "OPC UA implementation is intentionally isolated and will be added as a dedicated adapter in a later increment."));
+                    new ConnectionSettingDefinition("progId", "ProgId", "text", true, "OPC DA server ProgId, for example Matrikon.OPC.Simulation.1."),
+                    new ConnectionSettingDefinition("host", "Host", "text", false, "Optional remote OPC DA host."),
+                    new ConnectionSettingDefinition("clsid", "CLSID", "text", false, "Optional COM CLSID when ProgId is not enough.")
+                }, "high"),
+            "OPC DA depends on Windows COM/DCOM. Use a Windows-only adapter package such as TitaniumAS.Opc.Client or bridge OPC DA to OPC UA before enabling it in the cross-platform gateway."));
         services.AddSingleton<IDeviceDriver>(_ => new UnsupportedDriver(
-            new DriverMetadata("opc-da", DriverType.OpcDa, "OPC DA", "Windows-only OPC DA driver contract.", true, true, true, true,
-                new[] { new ConnectionSettingDefinition("progId", "ProgId", "text", true, "OPC DA ProgId.") }, "high"),
-            "OPC DA depends on Windows COM and is intentionally isolated from the cross-platform AOT path."));
-        services.AddSingleton<IDeviceDriver>(_ => new UnsupportedDriver(
-            new DriverMetadata("mt-cnc", DriverType.MtCnc, "MT CNC", "Reserved MT machine driver contract.", true, true, true, true,
-                new[] { new ConnectionSettingDefinition("host", "Host", "text", true, "Machine host or endpoint.") }, "high"),
-            "MT CNC support requires vendor-specific protocol validation and is not enabled in this scaffold."));
-        services.AddSingleton<IDeviceDriver>(_ => new UnsupportedDriver(
-            new DriverMetadata("fanuc-cnc", DriverType.FanucCnc, "Fanuc CNC", "Reserved Fanuc CNC driver contract.", true, true, true, true,
-                new[] { new ConnectionSettingDefinition("host", "Host", "text", true, "Machine host or endpoint.") }, "high"),
-            "Fanuc CNC support requires vendor SDK validation and is not enabled in this scaffold."));
+            new DriverMetadata("fanuc-cnc", DriverType.FanucCnc, "Fanuc CNC", "Fanuc FOCAS native SDK driver contract.", true, true, true, true,
+                new[]
+                {
+                    new ConnectionSettingDefinition("host", "Host", "text", true, "CNC IP address or host name."),
+                    new ConnectionSettingDefinition("port", "Port", "number", false, "FOCAS TCP port, commonly 8193."),
+                    new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "FOCAS timeout in seconds."),
+                    new ConnectionSettingDefinition("libraryPath", "FOCAS Library", "text", false, "Optional path to fwlib32/fwlib64 native library.")
+                }, "high"),
+            "Fanuc CNC support requires the licensed Fanuc FOCAS runtime (fwlib32/fwlib64) and architecture-specific native loading. Keep it as an optional adapter boundary."));
         services.AddSingleton<IDeviceDriverRegistry, DeviceDriverRegistry>();
 
         services.AddSingleton<IUploadTransport, HttpUploadTransport>();
