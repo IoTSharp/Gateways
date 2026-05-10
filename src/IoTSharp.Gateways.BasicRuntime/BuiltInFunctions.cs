@@ -7,7 +7,7 @@ internal static class BuiltInFunctions
     public static void Register(BasicRuntime runtime)
     {
         runtime.RegisterInternalFunction("VAL", (_, args) => BasicValue.FromNumber(ParseNumber(Arg(args, 0).AsString())));
-        runtime.RegisterInternalFunction("STR", (_, args) => BasicValue.FromString(Arg(args, 0).AsString()));
+        runtime.RegisterInternalFunction("STR", (context, args) => BasicValue.FromString(BasicValueFormatter.ToDisplayString(context, Arg(args, 0))));
         runtime.RegisterInternalFunction("LEN", (_, args) => BasicValue.FromNumber(Length(Arg(args, 0))));
         runtime.RegisterInternalFunction("MID", (_, args) => Mid(args));
         runtime.RegisterInternalFunction("LEFT", (_, args) => Left(args));
@@ -31,11 +31,19 @@ internal static class BuiltInFunctions
         runtime.RegisterInternalFunction("MAX", (_, args) => BasicValue.FromNumber(args.Select(arg => arg.AsNumber()).DefaultIfEmpty(0).Max()));
         runtime.RegisterInternalFunction("RND", (_, _) => BasicValue.FromNumber(Random.Shared.NextDouble()));
         runtime.RegisterInternalFunction("LIST", (_, args) => BasicValue.FromList(new BasicList(args)));
+        runtime.RegisterInternalFunction("DICT", (_, _) => BasicValue.FromDictionary(new BasicDictionary()));
         runtime.RegisterInternalFunction("PUSH", (_, args) => Push(args));
         runtime.RegisterInternalFunction("POP", (_, args) => Pop(args));
         runtime.RegisterInternalFunction("INSERT", (_, args) => Insert(args));
         runtime.RegisterInternalFunction("REMOVE", (_, args) => Remove(args));
         runtime.RegisterInternalFunction("COUNT", (_, args) => BasicValue.FromNumber(Length(Arg(args, 0))));
+        runtime.RegisterInternalFunction("EXISTS", (_, args) => BasicValue.FromBoolean(Exists(args)));
+        runtime.RegisterInternalFunction("CLEAR", (_, args) => Clear(args));
+        runtime.RegisterInternalFunction("ITERATOR", (_, args) => BasicValue.FromIterator(CreateIterator(Arg(args, 0))));
+        runtime.RegisterInternalFunction("MOVE_NEXT", (_, args) => BasicValue.FromBoolean(MoveNext(Arg(args, 0))));
+        runtime.RegisterInternalFunction("GET", (_, args) => GetIteratorValue(Arg(args, 0)));
+        runtime.RegisterInternalFunction("OS", (_, _) => BasicValue.FromString(GetOsName()));
+        runtime.RegisterInternalFunction("SYS", (_, args) => Sys(args));
         runtime.RegisterInternalFunction("TYPE", (_, args) => BasicValue.FromString(TypeName(Arg(args, 0))));
     }
 
@@ -63,7 +71,7 @@ internal static class BuiltInFunctions
     {
         var text = Arg(args, 0).AsString();
         var count = Math.Clamp((int)Arg(args, 1).AsNumber(), 0, text.Length);
-        return BasicValue.FromString(text[^count..]);
+        return count == 0 ? BasicValue.FromString(string.Empty) : BasicValue.FromString(text[^count..]);
     }
 
     private static BasicValue Push(IReadOnlyList<BasicValue> args)
@@ -109,6 +117,80 @@ internal static class BuiltInFunctions
         return value;
     }
 
+    private static bool Exists(IReadOnlyList<BasicValue> args)
+    {
+        var collection = Arg(args, 0);
+        var needle = Arg(args, 1);
+        return collection.Kind switch
+        {
+            BasicValueKind.List => collection.List.Items.Any(item => item.Equals(needle)),
+            BasicValueKind.Array => collection.Array.ToObjectArray().Select(BasicValue.FromObject).Any(item => item.Equals(needle)),
+            BasicValueKind.Dictionary => collection.Dictionary.Exists(needle.AsString()),
+            BasicValueKind.Instance or BasicValueKind.Class => collection.ObjectValue.HasMember(needle.AsString()),
+            _ => false
+        };
+    }
+
+    private static BasicValue Clear(IReadOnlyList<BasicValue> args)
+    {
+        var value = Arg(args, 0);
+        switch (value.Kind)
+        {
+            case BasicValueKind.List:
+                value.List.Items.Clear();
+                return BasicValue.Nil;
+            case BasicValueKind.Dictionary:
+                value.Dictionary.Clear();
+                return BasicValue.Nil;
+            case BasicValueKind.Iterator:
+                value.Iterator.Reset();
+                return BasicValue.Nil;
+            default:
+                return BasicValue.Nil;
+        }
+    }
+
+    private static BasicIterator CreateIterator(BasicValue value)
+    {
+        return value.Kind switch
+        {
+            BasicValueKind.List => new BasicIterator(value.List.Items),
+            BasicValueKind.Array => new BasicIterator(value.Array.ToObjectArray().Select(BasicValue.FromObject)),
+            BasicValueKind.Dictionary => new BasicIterator(value.Dictionary.Keys.Select(key => BasicValue.FromString(key))),
+            _ => new BasicIterator(Array.Empty<BasicValue>())
+        };
+    }
+
+    private static bool MoveNext(BasicValue iteratorValue)
+        => iteratorValue.Kind == BasicValueKind.Iterator && iteratorValue.Iterator.MoveNext();
+
+    private static BasicValue GetIteratorValue(BasicValue iteratorValue)
+        => iteratorValue.Kind == BasicValueKind.Iterator ? iteratorValue.Iterator.Current : BasicValue.Nil;
+
+    private static BasicValue Sys(IReadOnlyList<BasicValue> args)
+    {
+        if (args.Count == 0)
+        {
+            return BasicValue.Nil;
+        }
+
+        var command = Arg(args, 0).AsString();
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            return BasicValue.Nil;
+        }
+
+        var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = OperatingSystem.IsWindows() ? (Environment.GetEnvironmentVariable("COMSPEC") ?? "cmd.exe") : "/bin/sh",
+            Arguments = OperatingSystem.IsWindows() ? "/c " + command : "-c \"" + command.Replace("\"", "\\\"") + "\"",
+            UseShellExecute = false,
+            CreateNoWindow = true
+        });
+        process?.WaitForExit();
+        return BasicValue.FromNumber(process?.ExitCode ?? -1);
+    }
+
     private static BasicValue Arg(IReadOnlyList<BasicValue> args, int index)
         => index >= 0 && index < args.Count ? args[index] : BasicValue.Nil;
 
@@ -135,6 +217,8 @@ internal static class BuiltInFunctions
             BasicValueKind.String => value.Text.Length,
             BasicValueKind.List => value.List.Items.Count,
             BasicValueKind.Array => value.Array.Length,
+            BasicValueKind.Dictionary => value.Dictionary.Count,
+            BasicValueKind.Iterator => value.Iterator.Index + 1,
             _ => 0
         };
     }
@@ -151,7 +235,15 @@ internal static class BuiltInFunctions
             BasicValueKind.String => "STRING",
             BasicValueKind.List => "LIST",
             BasicValueKind.Array => "ARRAY",
+            BasicValueKind.Dictionary => "DICT",
+            BasicValueKind.Iterator => "ITERATOR",
+            BasicValueKind.Class => value.ObjectValue.DisplayName,
+            BasicValueKind.Instance => value.ObjectValue.DisplayName,
+            BasicValueKind.Callable => "CALLABLE",
             _ => "UNKNOWN"
         };
     }
+
+    private static string GetOsName()
+        => OperatingSystem.IsWindows() ? "WINDOWS" : OperatingSystem.IsLinux() ? "LINUX" : OperatingSystem.IsMacOS() ? "MACOS" : "UNKNOWN";
 }

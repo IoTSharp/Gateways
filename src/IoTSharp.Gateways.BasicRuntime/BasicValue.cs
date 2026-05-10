@@ -8,7 +8,12 @@ internal enum BasicValueKind
     Number,
     String,
     List,
-    Array
+    Array,
+    Dictionary,
+    Iterator,
+    Class,
+    Instance,
+    Callable
 }
 
 internal readonly struct BasicValue : IEquatable<BasicValue>
@@ -17,34 +22,52 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
     private readonly string? _string;
     private readonly BasicList? _list;
     private readonly BasicArray? _array;
+    private readonly object? _reference;
 
-    private BasicValue(BasicValueKind kind, double number = 0, string? text = null, BasicList? list = null, BasicArray? array = null)
+    private BasicValue(BasicValueKind kind, double number = 0, string? text = null, BasicList? list = null, BasicArray? array = null, object? reference = null)
     {
         Kind = kind;
         _number = number;
         _string = text;
         _list = list;
         _array = array;
+        _reference = reference;
     }
 
     public static BasicValue Nil { get; } = new(BasicValueKind.Nil);
 
     public BasicValueKind Kind { get; }
 
-    public double Number => Kind == BasicValueKind.Number ? _number : AsNumber();
-
-    public string Text => Kind == BasicValueKind.String ? _string ?? string.Empty : AsString();
-
     public BasicList List => Kind == BasicValueKind.List && _list is not null
         ? _list
         : throw new InvalidOperationException("Value is not a LIST.");
+
+    public double Number => Kind == BasicValueKind.Number ? _number : AsNumber();
+
+    public string Text => Kind == BasicValueKind.String ? _string ?? string.Empty : AsString();
 
     public BasicArray Array => Kind == BasicValueKind.Array && _array is not null
         ? _array
         : throw new InvalidOperationException("Value is not an ARRAY.");
 
+    public BasicDictionary Dictionary => Kind == BasicValueKind.Dictionary && _reference is BasicDictionary dictionary
+        ? dictionary
+        : throw new InvalidOperationException("Value is not a DICTIONARY.");
+
+    public BasicIterator Iterator => Kind == BasicValueKind.Iterator && _reference is BasicIterator iterator
+        ? iterator
+        : throw new InvalidOperationException("Value is not an ITERATOR.");
+
+    public BasicObjectValue ObjectValue => Kind is BasicValueKind.Class or BasicValueKind.Instance && _reference is BasicObjectValue value
+        ? value
+        : throw new InvalidOperationException("Value is not an object.");
+
+    public IBasicCallable Callable => Kind == BasicValueKind.Callable && _reference is IBasicCallable callable
+        ? callable
+        : throw new InvalidOperationException("Value is not callable.");
+
     public static BasicValue FromNumber(double value)
-        => new(BasicValueKind.Number, value);
+        => new(BasicValueKind.Number, number: value);
 
     public static BasicValue FromBoolean(bool value)
         => FromNumber(value ? 1 : 0);
@@ -57,6 +80,21 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
 
     public static BasicValue FromArray(BasicArray value)
         => new(BasicValueKind.Array, array: value);
+
+    public static BasicValue FromDictionary(BasicDictionary value)
+        => new(BasicValueKind.Dictionary, reference: value);
+
+    public static BasicValue FromIterator(BasicIterator value)
+        => new(BasicValueKind.Iterator, reference: value);
+
+    public static BasicValue FromClass(BasicObjectValue value)
+        => new(BasicValueKind.Class, reference: value);
+
+    public static BasicValue FromInstance(BasicObjectValue value)
+        => new(BasicValueKind.Instance, reference: value);
+
+    public static BasicValue FromCallable(IBasicCallable value)
+        => new(BasicValueKind.Callable, reference: value);
 
     public static BasicValue FromObject(object? value)
     {
@@ -83,6 +121,10 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
             string stringValue => FromString(stringValue),
             BasicList list => FromList(list),
             BasicArray array => FromArray(array),
+            BasicDictionary dictionary => FromDictionary(dictionary),
+            BasicIterator iterator => FromIterator(iterator),
+            BasicObjectValue obj => obj.IsPrototype ? FromClass(obj) : FromInstance(obj),
+            IBasicCallable callable => FromCallable(callable),
             IReadOnlyList<object?> values => FromList(new BasicList(values.Select(FromObject))),
             IEnumerable<object?> values => FromList(new BasicList(values.Select(FromObject))),
             _ => FromString(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty)
@@ -98,7 +140,10 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
             BasicValueKind.String => _string ?? string.Empty,
             BasicValueKind.List => _list!.Items.Select(item => item.ToObject()).ToArray(),
             BasicValueKind.Array => _array!.ToObjectArray(),
-            _ => null
+            BasicValueKind.Dictionary => _reference,
+            BasicValueKind.Iterator => _reference,
+            BasicValueKind.Class or BasicValueKind.Instance or BasicValueKind.Callable => _reference,
+            _ => _reference
         };
     }
 
@@ -111,7 +156,10 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
             BasicValueKind.String => !string.IsNullOrEmpty(_string),
             BasicValueKind.List => _list?.Items.Count > 0,
             BasicValueKind.Array => _array?.Length > 0,
-            _ => false
+            BasicValueKind.Dictionary => _reference is BasicDictionary dictionary && dictionary.Count > 0,
+            BasicValueKind.Iterator => _reference is BasicIterator iterator && !iterator.IsExhausted,
+            BasicValueKind.Class or BasicValueKind.Instance or BasicValueKind.Callable => true,
+            _ => _reference is not null
         };
     }
 
@@ -122,10 +170,12 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
             BasicValueKind.Nil => 0,
             BasicValueKind.Number => _number,
             BasicValueKind.String when double.TryParse(_string, NumberStyles.Any, CultureInfo.InvariantCulture, out var value) => value,
-            BasicValueKind.String when bool.TryParse(_string, out var value) => value ? 1 : 0,
+            BasicValueKind.String when bool.TryParse(_string, out var boolValue) => boolValue ? 1 : 0,
             BasicValueKind.String => 0,
             BasicValueKind.List => _list?.Items.Count ?? 0,
             BasicValueKind.Array => _array?.Length ?? 0,
+            BasicValueKind.Dictionary when _reference is BasicDictionary dictionary => dictionary.Count,
+            BasicValueKind.Iterator => _reference is BasicIterator iterator ? iterator.Index + 1 : 0,
             _ => 0
         };
     }
@@ -139,7 +189,25 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
             BasicValueKind.String => _string ?? string.Empty,
             BasicValueKind.List => "[" + string.Join(", ", _list!.Items.Select(item => item.AsString())) + "]",
             BasicValueKind.Array => "[array]",
-            _ => string.Empty
+            BasicValueKind.Dictionary => "[dict]",
+            BasicValueKind.Iterator => "[iterator]",
+            BasicValueKind.Class or BasicValueKind.Instance => _reference is BasicObjectValue obj ? obj.DisplayName : string.Empty,
+            BasicValueKind.Callable => _reference?.ToString() ?? string.Empty,
+            _ => _reference?.ToString() ?? string.Empty
+        };
+    }
+
+    public BasicValue CloneDeep()
+    {
+        return Kind switch
+        {
+            BasicValueKind.List => FromList(new BasicList(_list!.Items.Select(item => item.CloneDeep()))),
+            BasicValueKind.Array => FromArray(_array!.CloneDeep()),
+            BasicValueKind.Dictionary => FromDictionary(Dictionary.CloneDeep()),
+            BasicValueKind.Iterator => FromIterator(Iterator.CloneDeep()),
+            BasicValueKind.Class => FromClass(ObjectValue.CloneDeepPrototype()),
+            BasicValueKind.Instance => FromInstance(ObjectValue.CloneDeepInstance()),
+            _ => this
         };
     }
 
@@ -148,6 +216,12 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
         if (Kind is BasicValueKind.Number || other.Kind is BasicValueKind.Number)
         {
             return Math.Abs(AsNumber() - other.AsNumber()) < 0.0000000001d;
+        }
+
+        if (Kind is BasicValueKind.Class or BasicValueKind.Instance or BasicValueKind.Callable or BasicValueKind.Dictionary or BasicValueKind.Iterator
+            || other.Kind is BasicValueKind.Class or BasicValueKind.Instance or BasicValueKind.Callable or BasicValueKind.Dictionary or BasicValueKind.Iterator)
+        {
+            return ReferenceEquals(_reference, other._reference);
         }
 
         return string.Equals(AsString(), other.AsString(), StringComparison.Ordinal);
@@ -160,6 +234,7 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
         => Kind switch
         {
             BasicValueKind.Number => AsNumber().GetHashCode(),
+            BasicValueKind.Class or BasicValueKind.Instance or BasicValueKind.Callable or BasicValueKind.Dictionary or BasicValueKind.Iterator => _reference?.GetHashCode() ?? 0,
             _ => AsString().GetHashCode(StringComparison.Ordinal)
         };
 
@@ -176,7 +251,7 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
             return ((long)value).ToString(CultureInfo.InvariantCulture);
         }
 
-        return value.ToString("G15", CultureInfo.InvariantCulture);
+        return value.ToString("G6", CultureInfo.InvariantCulture);
     }
 }
 
@@ -211,6 +286,12 @@ internal sealed class BasicArray
         _items = Enumerable.Repeat(BasicValue.Nil, length).ToArray();
     }
 
+    private BasicArray(int[] dimensions, BasicValue[] items)
+    {
+        _dimensions = dimensions;
+        _items = items;
+    }
+
     public int Length => _items.Length;
 
     public BasicValue Get(IReadOnlyList<int> indexes)
@@ -221,6 +302,9 @@ internal sealed class BasicArray
 
     public object?[] ToObjectArray()
         => _items.Select(item => item.ToObject()).ToArray();
+
+    public BasicArray CloneDeep()
+        => new((int[])_dimensions.Clone(), _items.Select(item => item.CloneDeep()).ToArray());
 
     private int Offset(IReadOnlyList<int> indexes)
     {

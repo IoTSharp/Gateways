@@ -100,7 +100,7 @@ internal sealed class ExpressionParser
             }
             else if (MatchKeyword("IS"))
             {
-                left = BasicValue.FromBoolean(left.Kind == ParseTerm().Kind);
+                left = BasicValue.FromBoolean(IsTypeMatch(left, ParseTerm()));
             }
             else
             {
@@ -191,11 +191,55 @@ internal sealed class ExpressionParser
             return BasicValue.FromNumber(ParseUnary().AsNumber());
         }
 
-        return ParsePrimary();
+        return ParsePostfix();
     }
 
-    private BasicValue ParsePrimary()
+    private BasicValue ParsePostfix()
     {
+        var value = ParsePrimary(out var baseIdentifier, out var isIdentifierBase);
+        while (!IsAtEnd)
+        {
+            if (Match(TokenKind.Dot, out var dot))
+            {
+                var member = Expect(TokenKind.Identifier, "Member name expected.", dot);
+                value = GetMember(value, member);
+                baseIdentifier = null;
+                isIdentifierBase = false;
+                continue;
+            }
+
+            if (Match(TokenKind.OpenParen, out var open))
+            {
+                if (isIdentifierBase && baseIdentifier is not null && string.Equals(baseIdentifier, "len", StringComparison.OrdinalIgnoreCase)
+                    && _position + 1 < _tokens.Count
+                    && _tokens[_position].Kind == TokenKind.Ellipsis
+                    && _tokens[_position + 1].Kind == TokenKind.CloseParen)
+                {
+                    _position += 2;
+                    value = BasicValue.FromNumber(_context.RemainingVarArgsCount);
+                    baseIdentifier = null;
+                    isIdentifierBase = false;
+                    continue;
+                }
+
+                var arguments = ParseArgumentList(open);
+                value = InvokeOrIndex(value, baseIdentifier, isIdentifierBase, arguments, open);
+                baseIdentifier = null;
+                isIdentifierBase = false;
+                continue;
+            }
+
+            break;
+        }
+
+        return value;
+    }
+
+    private BasicValue ParsePrimary(out string? baseIdentifier, out bool isIdentifierBase)
+    {
+        baseIdentifier = null;
+        isIdentifierBase = false;
+
         if (Match(TokenKind.Number, out var numberToken))
         {
             return double.TryParse(numberToken.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out var number)
@@ -215,86 +259,142 @@ internal sealed class ExpressionParser
             return value;
         }
 
+        if (Match(TokenKind.Ellipsis, out _))
+        {
+            return _context.PopVarArg();
+        }
+
         if (Match(TokenKind.Identifier, out var identifier))
         {
-            if (string.Equals(identifier.Text, "CALL", StringComparison.OrdinalIgnoreCase))
+            if (identifier.IsKeyword("CALL"))
             {
                 var target = Expect(TokenKind.Identifier, "CALL expects a function name.", identifier);
-                return Invoke(target.Text, Match(TokenKind.OpenParen, out _) ? ParseArgumentList() : []);
+                var arguments = Match(TokenKind.OpenParen, out var callOpen) ? ParseArgumentList(callOpen) : [];
+                return InvokeByName(target.Text, arguments, target);
             }
 
-            if (string.Equals(identifier.Text, "TRUE", StringComparison.OrdinalIgnoreCase))
+            if (identifier.IsKeyword("NEW"))
+            {
+                return ParseNew(identifier);
+            }
+
+            if (identifier.IsKeyword("TRUE"))
             {
                 return BasicValue.FromBoolean(true);
             }
 
-            if (string.Equals(identifier.Text, "FALSE", StringComparison.OrdinalIgnoreCase))
+            if (identifier.IsKeyword("FALSE"))
             {
                 return BasicValue.FromBoolean(false);
             }
 
-            if (string.Equals(identifier.Text, "NIL", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(identifier.Text, "NULL", StringComparison.OrdinalIgnoreCase))
+            if (identifier.IsKeyword("NIL") || identifier.IsKeyword("NULL"))
             {
                 return BasicValue.Nil;
             }
 
-            if (Match(TokenKind.OpenParen, out _))
-            {
-                var arguments = ParseArgumentList();
-                if (_context.Execution.Runtime.TryGetFunction(identifier.Text, out _)
-                    || _context.Program.TryGetFunction(identifier.Text, out _))
-                {
-                    return Invoke(identifier.Text, arguments);
-                }
-
-                return GetIndexedValue(identifier, arguments);
-            }
-
+            baseIdentifier = identifier.Text;
+            isIdentifierBase = true;
             return _context.GetVariable(identifier.Text);
         }
 
         throw Error(Current, "Expression expected.");
     }
 
-    private BasicValue GetIndexedValue(Token identifier, IReadOnlyList<BasicValue> arguments)
+    private BasicValue ParseNew(Token anchor)
     {
-        var value = _context.GetVariable(identifier.Text);
-        var indexes = arguments.Select(argument => (int)argument.AsNumber()).ToArray();
-        if (indexes.Length == 0)
+        var open = Expect(TokenKind.OpenParen, "NEW expects '(' after class name.", anchor);
+        var arguments = ParseArgumentList(open);
+        if (arguments.Count != 1)
         {
-            return value;
+            throw Error(anchor, "NEW expects exactly one class or object value.");
         }
 
-        return value.Kind switch
+        var source = arguments[0];
+        if (source.Kind is not (BasicValueKind.Class or BasicValueKind.Instance))
         {
-            BasicValueKind.Array => value.Array.Get(indexes),
-            BasicValueKind.List when indexes.Length == 1 => indexes[0] >= 0 && indexes[0] < value.List.Items.Count
-                ? value.List.Items[indexes[0]]
-                : throw Error(identifier, "LIST index is out of bounds."),
-            BasicValueKind.String when indexes.Length == 1 => indexes[0] >= 0 && indexes[0] < value.Text.Length
-                ? BasicValue.FromString(value.Text[indexes[0]].ToString())
-                : BasicValue.FromString(string.Empty),
-            _ => throw Error(identifier, $"'{identifier.Text}' is not indexable.")
-        };
+            throw Error(anchor, "NEW expects a class or object value.");
+        }
+
+        return BasicValue.FromInstance(source.ObjectValue.CreateInstance());
     }
 
-    private BasicValue Invoke(string name, IReadOnlyList<BasicValue> arguments)
+    private BasicValue GetMember(BasicValue target, Token member)
+    {
+        if (target.Kind is not (BasicValueKind.Class or BasicValueKind.Instance))
+        {
+            throw Error(member, $"Value '{target.AsString()}' has no members.");
+        }
+
+        return target.ObjectValue.TryGetMember(member.Text, _context, out var value)
+            ? value
+            : BasicValue.Nil;
+    }
+
+    private BasicValue InvokeOrIndex(BasicValue target, string? baseIdentifier, bool isIdentifierBase, IReadOnlyList<BasicValue> arguments, Token anchor)
+    {
+        if (target.Kind == BasicValueKind.Callable)
+        {
+            return target.Callable.Invoke(_context, arguments);
+        }
+
+        if (target.Kind is BasicValueKind.Array or BasicValueKind.List or BasicValueKind.Dictionary or BasicValueKind.String)
+        {
+            return GetIndexedValue(target, arguments, anchor);
+        }
+
+        if (isIdentifierBase && baseIdentifier is not null && TryInvokeByName(baseIdentifier, arguments, anchor, out var result))
+        {
+            return result;
+        }
+
+        throw Error(anchor, "Value is neither callable nor indexable.");
+    }
+
+    private bool TryInvokeByName(string name, IReadOnlyList<BasicValue> arguments, Token anchor, out BasicValue result)
     {
         if (_context.Execution.Runtime.TryGetFunction(name, out var native))
         {
-            return native(_context, arguments);
+            result = native(_context, arguments);
+            return true;
         }
 
         if (_context.Program.TryGetFunction(name, out var definition))
         {
-            return BasicProgramRunner.ExecuteFunction(_context, definition, arguments);
+            result = BasicProgramRunner.ExecuteFunction(_context, definition, arguments);
+            return true;
         }
 
-        throw Error(Current, $"Function '{name}' was not found.");
+        result = BasicValue.Nil;
+        return false;
     }
 
-    private IReadOnlyList<BasicValue> ParseArgumentList()
+    private BasicValue InvokeByName(string name, IReadOnlyList<BasicValue> arguments, Token anchor)
+    {
+        return TryInvokeByName(name, arguments, anchor, out var result)
+            ? result
+            : throw Error(anchor, $"Function '{name}' was not found.");
+    }
+
+    private static BasicValue GetIndexedValue(BasicValue target, IReadOnlyList<BasicValue> arguments, Token anchor)
+    {
+        return target.Kind switch
+        {
+            BasicValueKind.Array => target.Array.Get(arguments.Select(argument => (int)argument.AsNumber()).ToArray()),
+            BasicValueKind.List when arguments.Count == 1 => GetListValue(target.List, (int)arguments[0].AsNumber()),
+            BasicValueKind.Dictionary when arguments.Count == 1 => target.Dictionary.Get(arguments[0].AsString()),
+            BasicValueKind.String when arguments.Count == 1 => GetStringValue(target.Text, (int)arguments[0].AsNumber()),
+            _ => throw Error(anchor, "Value is not indexable.")
+        };
+    }
+
+    private static BasicValue GetListValue(BasicList list, int index)
+        => index >= 0 && index < list.Items.Count ? list.Items[index] : BasicValue.Nil;
+
+    private static BasicValue GetStringValue(string text, int index)
+        => index >= 0 && index < text.Length ? BasicValue.FromString(text[index].ToString()) : BasicValue.FromString(string.Empty);
+
+    private IReadOnlyList<BasicValue> ParseArgumentList(Token openToken)
     {
         var values = new List<BasicValue>();
         if (Match(TokenKind.CloseParen, out _))
@@ -310,7 +410,7 @@ internal sealed class ExpressionParser
                 continue;
             }
 
-            Expect(TokenKind.CloseParen, "Expected ')' after argument list.", Current);
+            Expect(TokenKind.CloseParen, "Expected ')' after argument list.", openToken);
             return values;
         }
     }
@@ -368,6 +468,35 @@ internal sealed class ExpressionParser
         }
 
         return string.Compare(left.AsString(), right.AsString(), StringComparison.Ordinal);
+    }
+
+    private static bool IsTypeMatch(BasicValue value, BasicValue expected)
+    {
+        if (expected.Kind is BasicValueKind.Class or BasicValueKind.Instance
+            && value.Kind is BasicValueKind.Class or BasicValueKind.Instance)
+        {
+            return IsSameOrDerived(value.ObjectValue.Definition, expected.ObjectValue.Definition);
+        }
+
+        if (expected.Kind is BasicValueKind.Class or BasicValueKind.Instance)
+        {
+            return false;
+        }
+
+        return value.Kind == expected.Kind;
+    }
+
+    private static bool IsSameOrDerived(ClassDefinition candidate, ClassDefinition expected)
+    {
+        for (ClassDefinition? current = candidate; current is not null; current = current.ParentDefinition)
+        {
+            if (ReferenceEquals(current, expected) || string.Equals(current.Name, expected.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static BasicRuntimeException Error(Token token, string message)

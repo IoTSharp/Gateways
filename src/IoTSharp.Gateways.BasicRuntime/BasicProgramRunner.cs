@@ -2,6 +2,19 @@ namespace IoTSharp.Gateways.BasicRuntime;
 
 internal static class BasicProgramRunner
 {
+    public static void InitializeClasses(ExecutionContext context)
+    {
+        foreach (var classDefinition in context.Program.Classes.Values.OrderBy(item => item.StartIndex))
+        {
+            var prototype = new BasicObjectValue(classDefinition, true);
+            var classValue = BasicValue.FromClass(prototype);
+            context.SetVariable(classDefinition.Name, classValue);
+
+            var evaluationContext = context.CreateLambdaScope(Array.Empty<string>(), false, Array.Empty<BasicValue>(), classValue);
+            prototype.InitializeFields(evaluationContext);
+        }
+    }
+
     public static BasicValue Execute(ExecutionContext context, int startIndex, int endIndex)
     {
         var pc = startIndex;
@@ -27,6 +40,32 @@ internal static class BasicProgramRunner
         return result;
     }
 
+    public static BasicValue ExecuteMethod(ExecutionContext caller, BasicObjectValue target, MethodDefinition method, IReadOnlyList<BasicValue> arguments)
+    {
+        var function = new FunctionDefinition(method.Name, method.Parameters, method.IsVariadic, method.BodyStart, method.BodyEnd);
+        var meValue = target.IsPrototype ? BasicValue.FromClass(target) : BasicValue.FromInstance(target);
+        var context = caller.CreateFunctionScope(function, arguments, meValue);
+        var result = Execute(context, method.BodyStart, method.BodyEnd);
+        if (context.Stopped)
+        {
+            caller.Stopped = true;
+        }
+
+        return result;
+    }
+
+    public static BasicValue ExecuteLambda(ExecutionContext caller, BasicLambdaValue lambda, IReadOnlyList<BasicValue> arguments)
+    {
+        var context = lambda.Closure.CreateLambdaScope(lambda.Parameters, lambda.IsVariadic, arguments, lambda.Closure.Me);
+        var result = Execute(context, lambda.BodyStart, lambda.BodyEnd);
+        if (context.Stopped)
+        {
+            caller.Stopped = true;
+        }
+
+        return result;
+    }
+
     private static int ExecuteStatement(ExecutionContext context, Statement statement, int currentIndex, int endIndex)
     {
         if (statement.Tokens.Count == 0)
@@ -42,10 +81,14 @@ internal static class BasicProgramRunner
                 return currentIndex + 1;
             }
 
+            if (first.IsKeyword("CLASS"))
+            {
+                return FindMatchingEndClass(context.Program.Statements, currentIndex + 1) + 1;
+            }
+
             if (first.IsKeyword("LET"))
             {
-                ExecuteAssignment(context, statement.Tokens.Skip(1).ToArray());
-                return currentIndex + 1;
+                return ExecuteAssignment(context, statement.Tokens.Skip(1).ToArray(), currentIndex);
             }
 
             if (first.IsKeyword("DIM"))
@@ -152,6 +195,11 @@ internal static class BasicProgramRunner
                 return currentIndex + 1;
             }
 
+            if (first.IsKeyword("IMPORT"))
+            {
+                return currentIndex + 1;
+            }
+
             if (first.IsKeyword("END"))
             {
                 context.Stopped = true;
@@ -161,7 +209,7 @@ internal static class BasicProgramRunner
 
         if (FindAssignmentOperator(statement.Tokens) >= 0)
         {
-            ExecuteAssignment(context, statement.Tokens);
+            return ExecuteAssignment(context, statement.Tokens, currentIndex);
         }
         else
         {
@@ -431,7 +479,7 @@ internal static class BasicProgramRunner
         context.SetVariable(statement.Tokens[1].Text, BasicValue.FromArray(new BasicArray(dimensions)));
     }
 
-    private static void ExecuteAssignment(ExecutionContext context, IReadOnlyList<Token> tokens)
+    private static int ExecuteAssignment(ExecutionContext context, IReadOnlyList<Token> tokens, int currentIndex)
     {
         var equalsIndex = FindAssignmentOperator(tokens);
         if (equalsIndex < 0)
@@ -441,8 +489,15 @@ internal static class BasicProgramRunner
 
         var left = Slice(tokens, 0, equalsIndex);
         var right = Slice(tokens, equalsIndex + 1, tokens.Count);
+        if (TryParseLambdaLiteral(context, currentIndex, right, out var lambdaValue, out var nextIndex))
+        {
+            SetTarget(context, left, lambdaValue);
+            return nextIndex;
+        }
+
         var value = ExpressionParser.Evaluate(right, context);
         SetTarget(context, left, value);
+        return currentIndex + 1;
     }
 
     private static void SetTarget(ExecutionContext context, IReadOnlyList<Token> left, BasicValue value)
@@ -456,9 +511,10 @@ internal static class BasicProgramRunner
         if (left.Count >= 4 && left[0].Kind == TokenKind.Identifier && left[1].Kind == TokenKind.OpenParen && left[^1].Kind == TokenKind.CloseParen)
         {
             var name = left[0].Text;
-            var indexes = SplitTopLevel(Slice(left, 2, left.Count - 1), TokenKind.Comma)
-                .Select(tokens => (int)ExpressionParser.Evaluate(tokens, context).AsNumber())
+            var indexValues = SplitTopLevel(Slice(left, 2, left.Count - 1), TokenKind.Comma)
+                .Select(tokens => ExpressionParser.Evaluate(tokens, context))
                 .ToArray();
+            var indexes = indexValues.Select(value => (int)value.AsNumber()).ToArray();
             var target = context.GetVariable(name);
 
             if (target.Kind == BasicValueKind.Array)
@@ -483,9 +539,130 @@ internal static class BasicProgramRunner
                 target.List.Items[index] = value;
                 return;
             }
+
+            if (target.Kind == BasicValueKind.Dictionary && indexValues.Length == 1)
+            {
+                target.Dictionary.Set(indexValues[0].AsString(), value);
+                return;
+            }
+        }
+
+        if (TrySetMemberPath(context, left, value))
+        {
+            return;
         }
 
         throw new BasicRuntimeException("Invalid assignment target.", left[0].Line, left[0].Column);
+    }
+
+    private static bool TrySetMemberPath(ExecutionContext context, IReadOnlyList<Token> tokens, BasicValue value)
+    {
+        if (tokens.Count < 3 || tokens[0].Kind != TokenKind.Identifier)
+        {
+            return false;
+        }
+
+        var current = context.GetVariable(tokens[0].Text);
+        if (current.Kind is not (BasicValueKind.Class or BasicValueKind.Instance))
+        {
+            return false;
+        }
+
+        var index = 1;
+        while (index < tokens.Count)
+        {
+            if (tokens[index].Kind == TokenKind.Dot)
+            {
+                if (index + 1 >= tokens.Count || tokens[index + 1].Kind != TokenKind.Identifier)
+                {
+                    throw new BasicRuntimeException("Member name expected.", tokens[index].Line, tokens[index].Column);
+                }
+
+                var memberName = tokens[index + 1].Text;
+                var isFinal = index + 2 >= tokens.Count;
+                if (isFinal)
+                {
+                    current.ObjectValue.SetMember(memberName, value);
+                    return true;
+                }
+
+                if (!current.ObjectValue.TryGetMember(memberName, context, out var memberValue))
+                {
+                    throw new BasicRuntimeException($"Member '{memberName}' was not found.", tokens[index + 1].Line, tokens[index + 1].Column);
+                }
+
+                current = memberValue;
+                index += 2;
+                continue;
+            }
+
+            if (tokens[index].Kind == TokenKind.OpenParen)
+            {
+                var closeIndex = FindMatchingCloseParen(tokens, index);
+                var indexValues = SplitTopLevel(Slice(tokens, index + 1, closeIndex), TokenKind.Comma)
+                    .Select(item => ExpressionParser.Evaluate(item, context))
+                    .ToArray();
+
+                if (closeIndex + 1 >= tokens.Count)
+                {
+                    SetIndexedValue(current, indexValues, value, tokens[index]);
+                    return true;
+                }
+
+                current = GetIndexedValue(current, indexValues, tokens[index]);
+                index = closeIndex + 1;
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    private static void SetIndexedValue(BasicValue target, IReadOnlyList<BasicValue> indexValues, BasicValue value, Token anchor)
+    {
+        switch (target.Kind)
+        {
+            case BasicValueKind.Array:
+                target.Array.Set(indexValues.Select(item => (int)item.AsNumber()).ToArray(), value);
+                return;
+            case BasicValueKind.List when indexValues.Count == 1:
+                var index = (int)indexValues[0].AsNumber();
+                if (index < 0)
+                {
+                    throw new BasicRuntimeException("LIST index is out of bounds.", anchor.Line, anchor.Column);
+                }
+
+                while (target.List.Items.Count <= index)
+                {
+                    target.List.Items.Add(BasicValue.Nil);
+                }
+
+                target.List.Items[index] = value;
+                return;
+            case BasicValueKind.Dictionary when indexValues.Count == 1:
+                target.Dictionary.Set(indexValues[0].AsString(), value);
+                return;
+            default:
+                throw new BasicRuntimeException("Invalid indexed assignment target.", anchor.Line, anchor.Column);
+        }
+    }
+
+    private static BasicValue GetIndexedValue(BasicValue target, IReadOnlyList<BasicValue> indexValues, Token anchor)
+    {
+        switch (target.Kind)
+        {
+            case BasicValueKind.Array:
+                return target.Array.Get(indexValues.Select(item => (int)item.AsNumber()).ToArray());
+            case BasicValueKind.List when indexValues.Count == 1:
+                var index = (int)indexValues[0].AsNumber();
+                return index >= 0 && index < target.List.Items.Count ? target.List.Items[index] : BasicValue.Nil;
+            case BasicValueKind.Dictionary when indexValues.Count == 1:
+                return target.Dictionary.Get(indexValues[0].AsString());
+            default:
+                throw new BasicRuntimeException("Invalid indexed value access.", anchor.Line, anchor.Column);
+        }
     }
 
     private static void ExecutePrint(ExecutionContext context, Statement statement)
@@ -503,12 +680,12 @@ internal static class BasicProgramRunner
         {
             if (part.Tokens.Count > 0)
             {
-                builder.Append(ExpressionParser.Evaluate(part.Tokens, context).AsString());
+                builder.Append(BasicValueFormatter.ToDisplayString(context, ExpressionParser.Evaluate(part.Tokens, context)));
             }
 
-            if (part.Separator == TokenKind.Comma)
+            if (part.Separator == TokenKind.Semicolon)
             {
-                builder.Append(' ');
+                builder.Append(Environment.NewLine);
             }
         }
 
@@ -542,8 +719,75 @@ internal static class BasicProgramRunner
             throw Error(statement, "INPUT expects a target variable.");
         }
 
+        if (!string.IsNullOrEmpty(prompt))
+        {
+            context.Execution.Write(prompt);
+        }
+
         var input = context.Execution.Options.InputProvider?.Invoke(prompt) ?? string.Empty;
         context.SetVariable(target[0].Text, BasicValue.FromString(input));
+    }
+
+    private static bool TryParseLambdaLiteral(ExecutionContext context, int currentIndex, IReadOnlyList<Token> tokens, out BasicValue value, out int nextIndex)
+    {
+        value = BasicValue.Nil;
+        nextIndex = currentIndex + 1;
+        if (tokens.Count == 0 || !tokens[0].IsKeyword("LAMBDA"))
+        {
+            return false;
+        }
+
+        var openIndex = FindMatchingOpenParen(tokens, 1);
+        var closeIndex = openIndex >= 0 ? FindMatchingCloseParen(tokens, openIndex) : -1;
+        if (openIndex < 0 || closeIndex < 0)
+        {
+            throw new BasicRuntimeException("LAMBDA requires a parameter list.", tokens[0].Line, tokens[0].Column);
+        }
+
+        var parameters = new List<string>();
+        var isVariadic = false;
+        var parameterTokens = Slice(tokens, openIndex + 1, closeIndex);
+        for (var index = 0; index < parameterTokens.Count; index++)
+        {
+            var token = parameterTokens[index];
+            if (token.Kind == TokenKind.Comma)
+            {
+                continue;
+            }
+
+            if (token.Kind == TokenKind.Ellipsis)
+            {
+                isVariadic = true;
+                for (var tail = index + 1; tail < parameterTokens.Count; tail++)
+                {
+                    if (parameterTokens[tail].Kind != TokenKind.Comma)
+                    {
+                        throw new BasicRuntimeException("LAMBDA variadic marker must be the last parameter.", token.Line, token.Column);
+                    }
+                }
+
+                break;
+            }
+
+            if (token.Kind == TokenKind.Identifier)
+            {
+                parameters.Add(token.Text);
+            }
+        }
+
+        var bodyOpenIndex = currentIndex + 1;
+        if (bodyOpenIndex >= context.Program.Statements.Count
+            || context.Program.Statements[bodyOpenIndex].Tokens.Count != 1
+            || context.Program.Statements[bodyOpenIndex].Tokens[0].Kind != TokenKind.OpenParen)
+        {
+            throw new BasicRuntimeException("LAMBDA body must start on the next line with '('.", tokens[0].Line, tokens[0].Column);
+        }
+
+        var bodyCloseIndex = FindMatchingStandaloneBlock(context.Program.Statements, bodyOpenIndex, TokenKind.OpenParen, TokenKind.CloseParen);
+        var lambda = new BasicLambdaValue(parameters, isVariadic, bodyOpenIndex + 1, bodyCloseIndex, context);
+        value = BasicValue.FromCallable(lambda);
+        nextIndex = bodyCloseIndex + 1;
+        return true;
     }
 
     private static int ExecuteInline(ExecutionContext context, IReadOnlyList<Token> tokens, int currentIndex, int endIndex)
@@ -677,6 +921,69 @@ internal static class BasicProgramRunner
         }
 
         throw new BasicRuntimeException("Missing ')'.", tokens[openIndex].Line, tokens[openIndex].Column);
+    }
+
+    private static int FindMatchingOpenParen(IReadOnlyList<Token> tokens, int startIndex)
+    {
+        for (var index = startIndex; index < tokens.Count; index++)
+        {
+            if (tokens[index].Kind == TokenKind.OpenParen)
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int FindMatchingStandaloneBlock(IReadOnlyList<Statement> statements, int startIndex, TokenKind openKind, TokenKind closeKind)
+    {
+        var depth = 0;
+        for (var index = startIndex; index < statements.Count; index++)
+        {
+            var tokens = statements[index].Tokens;
+            if (tokens.Count == 1 && tokens[0].Kind == openKind)
+            {
+                depth++;
+                continue;
+            }
+
+            if (tokens.Count == 1 && tokens[0].Kind == closeKind)
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return index;
+                }
+            }
+        }
+
+        throw new BasicRuntimeException("Lambda body is missing ')'.", statements[startIndex].FirstToken.Line, statements[startIndex].FirstToken.Column);
+    }
+
+    private static int FindMatchingEndClass(IReadOnlyList<Statement> statements, int startIndex)
+    {
+        var depth = 0;
+        for (var index = startIndex; index < statements.Count; index++)
+        {
+            if (statements[index].StartsWithKeyword("CLASS"))
+            {
+                depth++;
+                continue;
+            }
+
+            if (statements[index].StartsWithKeyword("ENDCLASS"))
+            {
+                if (depth == 0)
+                {
+                    return index;
+                }
+
+                depth--;
+            }
+        }
+
+        throw new BasicRuntimeException("CLASS block is missing ENDCLASS.");
     }
 
     private static int FindMatchingPair(IReadOnlyList<Statement> statements, int startIndex, int endIndex, string beginKeyword, string endKeyword)

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text;
 
 namespace IoTSharp.Gateways.BasicRuntime;
 
@@ -31,10 +32,33 @@ public sealed class BasicRuntime
         IReadOnlyDictionary<string, object?>? variables = null,
         BasicRuntimeOptions? options = null)
     {
+        return ExecuteCore(source, null, variables, options);
+    }
+
+    public BasicRuntimeResult ExecuteFile(
+        string path,
+        IReadOnlyDictionary<string, object?>? variables = null,
+        BasicRuntimeOptions? options = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        var fullPath = Path.GetFullPath(path);
+        var source = File.ReadAllText(fullPath);
+        return ExecuteCore(source, fullPath, variables, options);
+    }
+
+    private BasicRuntimeResult ExecuteCore(
+        string source,
+        string? sourcePath,
+        IReadOnlyDictionary<string, object?>? variables,
+        BasicRuntimeOptions? options)
+    {
         ArgumentNullException.ThrowIfNull(source);
 
-        var program = BasicProgram.Parse(source);
-        var execution = new BasicExecution(this, options ?? BasicRuntimeOptions.Default);
+        var effectiveOptions = options ?? BasicRuntimeOptions.Default;
+        var expandedSource = ExpandImports(source, sourcePath, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        var program = BasicProgram.Parse(expandedSource);
+        var execution = new BasicExecution(this, effectiveOptions);
         var globals = new Dictionary<string, BasicValue>(StringComparer.OrdinalIgnoreCase);
         if (variables is not null)
         {
@@ -45,6 +69,7 @@ public sealed class BasicRuntime
         }
 
         var context = ExecutionContext.CreateRoot(program, execution, globals);
+        BasicProgramRunner.InitializeClasses(context);
         var returnValue = BasicProgramRunner.Execute(context, 0, program.Statements.Count);
         var output = execution.Output.ToArray();
         var publicVariables = globals.ToDictionary(
@@ -75,6 +100,86 @@ public sealed class BasicRuntime
 
     internal bool TryGetFunction(string name, out InternalBasicFunction function)
         => _functions.TryGetValue(name, out function!);
+
+    private static string ExpandImports(string source, string? sourcePath, HashSet<string> importedPaths)
+    {
+        var normalizedSource = source.Replace("\r\n", "\n").Replace('\r', '\n');
+        var builder = new StringBuilder();
+        var baseDirectory = string.IsNullOrWhiteSpace(sourcePath)
+            ? Directory.GetCurrentDirectory()
+            : Path.GetDirectoryName(Path.GetFullPath(sourcePath)) ?? Directory.GetCurrentDirectory();
+
+        using var reader = new StringReader(normalizedSource);
+        string? line;
+        while ((line = reader.ReadLine()) is not null)
+        {
+            if (TryParseImport(line, out var importPath))
+            {
+                var resolvedPath = ResolveImportPath(baseDirectory, importPath);
+                if (resolvedPath is null)
+                {
+                    throw new BasicRuntimeException($"Unable to resolve import '{importPath}'.");
+                }
+
+                if (!importedPaths.Add(resolvedPath))
+                {
+                    continue;
+                }
+
+                if (!File.Exists(resolvedPath))
+                {
+                    throw new BasicRuntimeException($"Imported file '{resolvedPath}' does not exist.");
+                }
+
+                var importedSource = File.ReadAllText(resolvedPath);
+                builder.AppendLine($"' import {Path.GetFileName(resolvedPath)}");
+                builder.AppendLine(ExpandImports(importedSource, resolvedPath, importedPaths));
+                continue;
+            }
+
+            builder.AppendLine(line);
+        }
+
+        return builder.ToString();
+    }
+
+    private static bool TryParseImport(string line, out string path)
+    {
+        var trimmed = line.Trim();
+        const string keyword = "import";
+        if (!trimmed.StartsWith(keyword, StringComparison.OrdinalIgnoreCase))
+        {
+            path = string.Empty;
+            return false;
+        }
+
+        var remainder = trimmed[keyword.Length..].TrimStart();
+        if (remainder.Length < 2)
+        {
+            path = string.Empty;
+            return false;
+        }
+
+        if (remainder[0] == '"' && remainder[^1] == '"')
+        {
+            path = remainder[1..^1];
+            return true;
+        }
+
+        path = string.Empty;
+        return false;
+    }
+
+    private static string? ResolveImportPath(string baseDirectory, string importPath)
+    {
+        if (Path.IsPathRooted(importPath))
+        {
+            return Path.GetFullPath(importPath);
+        }
+
+        var combined = Path.Combine(baseDirectory, importPath);
+        return Path.GetFullPath(combined);
+    }
 }
 
 public sealed record BasicRuntimeResult(

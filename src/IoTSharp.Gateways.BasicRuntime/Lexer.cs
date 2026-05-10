@@ -7,6 +7,8 @@ internal enum TokenKind
     Colon,
     Comma,
     Semicolon,
+    Dot,
+    Ellipsis,
     OpenParen,
     CloseParen,
     Operator,
@@ -277,6 +279,13 @@ internal static class Lexer
         var startColumn = column;
         var ch = source[position];
         string text;
+        if (ch == '.' && position + 2 < source.Length && source[position + 1] == '.' && source[position + 2] == '.')
+        {
+            position += 3;
+            column += 3;
+            return new Token(TokenKind.Ellipsis, "...", line, startColumn);
+        }
+
         if (position + 1 < source.Length)
         {
             var next = source[position + 1];
@@ -300,6 +309,7 @@ internal static class Lexer
         column++;
         return ch switch
         {
+            '.' => new Token(TokenKind.Dot, ".", line, startColumn),
             '+' or '-' or '*' or '/' or '^' or '=' or '<' or '>' => new Token(TokenKind.Operator, ch.ToString(), line, startColumn),
             _ => throw new BasicRuntimeException($"Unexpected character '{ch}'.", line, startColumn)
         };
