@@ -5,17 +5,21 @@ namespace IoTSharp.Edge.BasicRuntime;
 
 public delegate object? BasicNativeFunction(BasicRuntimeContext context, IReadOnlyList<object?> arguments);
 
-public sealed class BasicRuntime
+public sealed class BasicRuntime : IDisposable
 {
     private readonly Dictionary<string, InternalBasicFunction> _functions = new(StringComparer.OrdinalIgnoreCase);
+    private bool _disposed;
 
     public BasicRuntime()
     {
         BuiltInFunctions.Register(this);
     }
 
+    internal MqttRuntimeState MqttState { get; } = new();
+
     public void RegisterFunction(string name, BasicNativeFunction function)
     {
+        ThrowIfDisposed();
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(function);
 
@@ -32,6 +36,7 @@ public sealed class BasicRuntime
         IReadOnlyDictionary<string, object?>? variables = null,
         BasicRuntimeOptions? options = null)
     {
+        ThrowIfDisposed();
         return ExecuteCore(source, null, variables, options);
     }
 
@@ -40,6 +45,7 @@ public sealed class BasicRuntime
         IReadOnlyDictionary<string, object?>? variables = null,
         BasicRuntimeOptions? options = null)
     {
+        ThrowIfDisposed();
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         var fullPath = Path.GetFullPath(path);
@@ -85,13 +91,26 @@ public sealed class BasicRuntime
         IReadOnlyDictionary<string, object?>? variables = null,
         BasicRuntimeOptions? options = null)
     {
+        ThrowIfDisposed();
         ArgumentException.ThrowIfNullOrWhiteSpace(expression);
 
         return Execute("RETURN " + expression, variables, options).ReturnValue;
     }
 
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        MqttState.Dispose();
+    }
+
     internal void RegisterInternalFunction(string name, InternalBasicFunction function)
     {
+        ThrowIfDisposed();
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(function);
 
@@ -179,6 +198,14 @@ public sealed class BasicRuntime
 
         var combined = Path.Combine(baseDirectory, importPath);
         return Path.GetFullPath(combined);
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(BasicRuntime));
+        }
     }
 }
 

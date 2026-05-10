@@ -45,6 +45,7 @@ internal static class BuiltInFunctions
         runtime.RegisterInternalFunction("OS", (_, _) => BasicValue.FromString(GetOsName()));
         runtime.RegisterInternalFunction("SYS", (_, args) => Sys(args));
         runtime.RegisterInternalFunction("TYPE", (_, args) => BasicValue.FromString(TypeName(Arg(args, 0))));
+        MqttBuiltInFunctions.Register(runtime);
     }
 
     private static BasicValue Mid(IReadOnlyList<BasicValue> args)

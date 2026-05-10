@@ -9,3 +9,10 @@ The C# BasicRuntime in this repository is a clean C# implementation guided by th
 - License: MIT
 
 The upstream repository was cloned for reference during the C# rewrite. Keep the upstream MIT copyright and license notice with redistributed substantial portions or derived ports.
+
+## MQTTnet
+
+MQTT support in this repository uses MQTTnet for client and test broker interactions.
+
+- Project: https://github.com/dotnet/MQTTnet
+- License: MIT
