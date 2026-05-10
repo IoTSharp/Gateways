@@ -28,3 +28,11 @@ This note records the driver component choices for the expanded southbound gatew
 - `timeout`: HTTP timeout in milliseconds
 
 `opc-da` and `fanuc-cnc` are intentionally explicit placeholders. Their metadata is visible in the driver catalog so the platform can model them, but runtime access returns a clear error until a Windows/native adapter is added.
+
+## BASIC Runtime AOT Split
+
+The BASIC runtime follows the same split:
+
+- core language, parser, evaluator, and BCL-backed helpers stay in `IoTSharp.Edge.BasicRuntime`
+- MQTT, serial, Modbus, and PLC helpers are optional extensions
+- `build.ps1 -MustAot` or `-p:EdgeAot=true` disables those extensions so they are neither compiled nor registered

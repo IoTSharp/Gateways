@@ -114,7 +114,7 @@ dotnet run --project src/IoTSharp.Edge/IoTSharp.Edge.csproj
 
 ## 构建验证
 
-```bash
-cd gateways/Gateways
-dotnet build IoTSharp.Edge.sln
+```powershell
+pwsh ./build.ps1 -Action Build
+pwsh ./build.ps1 -Action Publish -MustAot
 ```

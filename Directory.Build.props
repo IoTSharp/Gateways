@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <EdgeAot Condition="'$(EdgeAot)' == '' and '$(PublishAot)' == 'true'">true</EdgeAot>
+    <EdgeAot Condition="'$(EdgeAot)' == ''">false</EdgeAot>
+
+    <EdgeEnableBasicRuntimeExtensions Condition="'$(EdgeEnableBasicRuntimeExtensions)' == '' and '$(EdgeAot)' == 'true'">false</EdgeEnableBasicRuntimeExtensions>
+    <EdgeEnableBasicRuntimeExtensions Condition="'$(EdgeEnableBasicRuntimeExtensions)' == ''">true</EdgeEnableBasicRuntimeExtensions>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(EdgeEnableBasicRuntimeExtensions)' == 'true'">
+    <DefineConstants>$(DefineConstants);EDGE_BASIC_RUNTIME_EXTENSIONS</DefineConstants>
+  </PropertyGroup>
+</Project>

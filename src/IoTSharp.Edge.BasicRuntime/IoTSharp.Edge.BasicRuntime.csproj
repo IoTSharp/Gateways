@@ -6,10 +6,17 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="IoTClient" Version="1.0.42" />
-    <PackageReference Include="MQTTnet" Version="5.1.0.1559" />
-    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+  <ItemGroup Condition="'$(EdgeEnableBasicRuntimeExtensions)' == 'true'">
+    <PackageReference Include="IoTClient" />
+    <PackageReference Include="MQTTnet" />
+    <PackageReference Include="System.IO.Ports" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EdgeEnableBasicRuntimeExtensions)' != 'true'">
+    <Compile Remove="ModbusBuiltInFunctions.cs" />
+    <Compile Remove="MqttBuiltInFunctions.cs" />
+    <Compile Remove="PlcBuiltInFunctions.cs" />
+    <Compile Remove="SerialBuiltInFunctions.cs" />
   </ItemGroup>
 
 </Project>

@@ -10,11 +10,21 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="6.0.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-    <PackageReference Include="MQTTnet.Server" Version="5.1.0.1559" />
-    <PackageReference Include="xunit" Version="2.5.3" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EdgeEnableBasicRuntimeExtensions)' == 'true'">
+    <PackageReference Include="MQTTnet.Server" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EdgeEnableBasicRuntimeExtensions)' != 'true'">
+    <Compile Remove="ModbusBuiltInFunctionTests.cs" />
+    <Compile Remove="MqttBuiltInFunctionTests.cs" />
+    <Compile Remove="PlcBuiltInFunctionTests.cs" />
+    <Compile Remove="SerialBuiltInFunctionTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
