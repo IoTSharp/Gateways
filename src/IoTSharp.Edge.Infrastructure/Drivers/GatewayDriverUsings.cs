@@ -1,0 +1,12 @@
+global using System.Globalization;
+global using System.Text;
+global using System.Xml.Linq;
+global using IoTClient;
+global using IoTClient.Clients.Modbus;
+global using IoTClient.Clients.PLC;
+global using IoTClient.Common.Enums;
+global using IoTClient.Enums;
+global using IoTSharp.Edge.Domain;
+global using Opc.Ua;
+global using Opc.Ua.Client;
+global using Opc.Ua.Configuration;
