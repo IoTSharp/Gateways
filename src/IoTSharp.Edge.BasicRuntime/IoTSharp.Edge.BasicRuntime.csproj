@@ -7,7 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="IoTClient" Version="1.0.42" />
     <PackageReference Include="MQTTnet" Version="5.1.0.1559" />
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

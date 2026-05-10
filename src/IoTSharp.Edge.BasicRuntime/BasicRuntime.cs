@@ -10,12 +10,22 @@ public sealed class BasicRuntime : IDisposable
     private readonly Dictionary<string, InternalBasicFunction> _functions = new(StringComparer.OrdinalIgnoreCase);
     private bool _disposed;
 
-    public BasicRuntime()
+    public BasicRuntime(IBasicSerialPortFactory? serialPortFactory = null, IBasicModbusClientFactory? modbusClientFactory = null)
     {
+        SerialPortFactory = serialPortFactory ?? new SystemBasicSerialPortFactory();
+        ModbusClientFactory = modbusClientFactory ?? new SystemBasicModbusClientFactory();
         BuiltInFunctions.Register(this);
     }
 
     internal MqttRuntimeState MqttState { get; } = new();
+
+    internal SerialRuntimeState SerialState { get; } = new();
+
+    internal ModbusRuntimeState ModbusState { get; } = new();
+
+    public IBasicSerialPortFactory SerialPortFactory { get; }
+
+    public IBasicModbusClientFactory ModbusClientFactory { get; }
 
     public void RegisterFunction(string name, BasicNativeFunction function)
     {
@@ -106,6 +116,8 @@ public sealed class BasicRuntime : IDisposable
 
         _disposed = true;
         MqttState.Dispose();
+        SerialState.Dispose();
+        ModbusState.Dispose();
     }
 
     internal void RegisterInternalFunction(string name, InternalBasicFunction function)

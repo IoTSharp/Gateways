@@ -108,6 +108,7 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
             BasicValue basicValue => basicValue,
             bool boolValue => FromBoolean(boolValue),
             byte byteValue => FromNumber(byteValue),
+            byte[] byteArray => FromList(new BasicList(byteArray.Select(byteValue => FromNumber(byteValue)))),
             sbyte sbyteValue => FromNumber(sbyteValue),
             short shortValue => FromNumber(shortValue),
             ushort ushortValue => FromNumber(ushortValue),
@@ -126,6 +127,7 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
             BasicObjectValue obj => obj.IsPrototype ? FromClass(obj) : FromInstance(obj),
             IBasicCallable callable => FromCallable(callable),
             IReadOnlyList<object?> values => FromList(new BasicList(values.Select(FromObject))),
+            IEnumerable<byte> bytes => FromList(new BasicList(bytes.Select(byteValue => FromNumber(byteValue)))),
             IEnumerable<object?> values => FromList(new BasicList(values.Select(FromObject))),
             _ => FromString(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty)
         };

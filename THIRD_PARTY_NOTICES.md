@@ -16,3 +16,10 @@ MQTT support in this repository uses MQTTnet for client and test broker interact
 
 - Project: https://github.com/dotnet/MQTTnet
 - License: MIT
+
+## IoTClient
+
+Modbus and PLC protocol support in this repository uses IoTClient.
+
+- Project: https://github.com/zhaopeiym/IoTClient
+- License: MIT
