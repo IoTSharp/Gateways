@@ -1,4 +1,4 @@
-# IoTSharp.Gateways 路线图
+# IoTSharp.Edge 路线图
 
 > 状态：✅ 已完成 ｜ 🚧 进行中 ｜ ⏳ 计划中 ｜ ⬜ 未开始 ｜ 🔁 持续维护
 >
@@ -10,7 +10,7 @@
 
 本仓库提供：
 
-- 单宿主 Gateway（`IoTSharp.Gateways`）：bootstrap、注册、心跳、采集配置同步、采集执行、回传
+- 单宿主 Gateway（`IoTSharp.Edge`）：bootstrap、注册、心跳、采集配置同步、采集执行、回传
 - C# AOT 边缘基座（被 SaaS 端 `IoTSharp.CodeGen.CSharpAot` 作为生成目标使用）
 - BasicRuntime 宿主接口（C# 版），用于承载 IoTEmBASIC 风格脚本
 

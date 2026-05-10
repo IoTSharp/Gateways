@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IoTSharp.Edge Bootstrap</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4efe6;
+      --panel: #fffaf2;
+      --panel-border: #d9cdbb;
+      --text: #1f2a2c;
+      --muted: #5e6b6f;
+      --accent: #16636b;
+      --accent-strong: #0f4b51;
+      --warn: #9e5d00;
+      --ok: #1d6b39;
+      --shadow: 0 20px 40px rgba(38, 42, 45, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(22, 99, 107, 0.12), transparent 38%),
+        linear-gradient(180deg, #f8f3eb 0%, var(--bg) 100%);
+      min-height: 100vh;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 48px;
+    }
+
+    .hero {
+      margin-bottom: 20px;
+      padding: 24px;
+      border: 1px solid var(--panel-border);
+      border-radius: 24px;
+      background: rgba(255, 250, 242, 0.92);
+      box-shadow: var(--shadow);
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1.05;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 860px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .status {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: #eef5f4;
+      color: var(--accent-strong);
+      border: 1px solid rgba(22, 99, 107, 0.18);
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 20px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 24px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+
+    .panel p {
+      margin: 0 0 14px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .meta {
+      margin-bottom: 14px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--accent);
+      color: white;
+      transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
+    }
+
+    button.secondary {
+      background: #e3ddd2;
+      color: var(--text);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.65;
+      cursor: wait;
+      transform: none;
+    }
+
+    textarea,
+    pre {
+      width: 100%;
+      min-height: 420px;
+      margin: 0;
+      border-radius: 18px;
+      border: 1px solid #d7ccbc;
+      background: #fbf7f1;
+      color: var(--text);
+      padding: 16px;
+      font: 14px/1.6 Consolas, "SFMono-Regular", monospace;
+      resize: vertical;
+      overflow: auto;
+    }
+
+    .tips {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: #f2ece2;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .tips strong {
+      color: var(--text);
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      textarea,
+      pre {
+        min-height: 300px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <h1>IoTSharp.Edge Bootstrap</h1>
+      <p>这里就是 Gateway 本地唯一的启动页。把 IoTSharp 下发的对接 JSON 填进去并保存，程序会读取本地 <code>bootstrap.json</code>；右侧诊断页可以直接看到当前生效配置、运行进程信息和采集配置统计。</p>
+      <div class="status" id="statusBar">正在加载本地 bootstrap 配置和诊断信息...</div>
+    </section>
+
+    <section class="layout">
+      <article class="panel">
+        <h2>Bootstrap 配置</h2>
+        <p>编辑并保存完整 JSON 对象。程序会校验 JSON，并把它规范化写入本地配置文件。</p>
+        <div class="meta" id="configMeta">等待加载...</div>
+        <div class="actions">
+          <button id="reloadConfigButton" type="button">重新加载配置</button>
+          <button id="saveConfigButton" type="button">保存配置</button>
+        </div>
+        <textarea id="configEditor" spellcheck="false" aria-label="Bootstrap JSON"></textarea>
+        <div class="tips">
+          <strong>建议最少包含：</strong><br>
+          <code>EdgeReporting.Enabled</code>、<code>EdgeReporting.BaseUrl</code>、<code>EdgeReporting.AccessToken</code>。<br>
+          保存成功后，运行时会重新读取配置；如果平台地址或实例身份变化，程序会重新注册并继续拉取任务。
+        </div>
+      </article>
+
+      <article class="panel">
+        <h2>运行诊断</h2>
+        <p>这里展示当前进程、bootstrap 文件、边缘上报参数和本地采集配置统计，方便快速判断“有没有连上、有没有启用、有没有配置”。</p>
+        <div class="meta" id="diagnosticsMeta">等待加载...</div>
+        <div class="actions">
+          <button id="refreshDiagnosticsButton" type="button" class="secondary">刷新诊断</button>
+        </div>
+        <pre id="diagnosticsOutput">{}</pre>
+      </article>
+    </section>
+  </main>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

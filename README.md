@@ -1,8 +1,8 @@
-# IoTSharp.Gateways
+# IoTSharp.Edge
 
 统一的 Gateway 单宿主程序。
 
-当前模式已经收口为一个可执行程序 `IoTSharp.Gateways`，不再拆分 `IoTSharp.Gateways.Api`、`IoTSharp.Gateways.Worker`、`gateway-web`。Gateway 的职责也收口为：
+当前模式已经收口为一个可执行程序 `IoTSharp.Edge`，不再拆分 `IoTSharp.Edge.Api`、`IoTSharp.Edge.Worker`、`gateway-web`。Gateway 的职责也收口为：
 
 - 读取本地 `bootstrap.json`
 - 向 IoTSharp 平台注册、心跳、上报能力
@@ -79,13 +79,13 @@ Gateway 会周期性调用：
 
 ## 目录结构
 
-- `src/IoTSharp.Gateways.Domain`
+- `src/IoTSharp.Edge.Domain`
   - 领域模型与统一驱动接口
-- `src/IoTSharp.Gateways.Application`
+- `src/IoTSharp.Edge.Application`
   - 运行服务、配置快照、转换服务
-- `src/IoTSharp.Gateways.Infrastructure`
+- `src/IoTSharp.Edge.Infrastructure`
   - SQLite 持久化、驱动适配、上传通道
-- `src/IoTSharp.Gateways`
+- `src/IoTSharp.Edge`
   - 单宿主程序、bootstrap/诊断页、平台同步 worker
 
 ## 当前驱动
@@ -109,12 +109,12 @@ Gateway 会周期性调用：
 
 ```bash
 cd gateways/Gateways
-dotnet run --project src/IoTSharp.Gateways/IoTSharp.Gateways.csproj
+dotnet run --project src/IoTSharp.Edge/IoTSharp.Edge.csproj
 ```
 
 ## 构建验证
 
 ```bash
 cd gateways/Gateways
-dotnet build IoTSharp.Gateways.sln
+dotnet build IoTSharp.Edge.sln
 ```
