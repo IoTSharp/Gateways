@@ -16,15 +16,8 @@
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(EdgeEnableBasicRuntimeExtensions)' == 'true'">
+  <ItemGroup>
     <PackageReference Include="MQTTnet.Server" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(EdgeEnableBasicRuntimeExtensions)' != 'true'">
-    <Compile Remove="ModbusBuiltInFunctionTests.cs" />
-    <Compile Remove="MqttBuiltInFunctionTests.cs" />
-    <Compile Remove="PlcBuiltInFunctionTests.cs" />
-    <Compile Remove="SerialBuiltInFunctionTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,7 +25,7 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(EdgeEnableBasicRuntimeExtensions)' == 'true'">
+  <ItemGroup>
     <ProjectReference Include="..\..\src\IoTSharp.Edge.RuntimeExtensions\IoTSharp.Edge.RuntimeExtensions.csproj" />
   </ItemGroup>
 

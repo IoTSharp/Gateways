@@ -10,6 +10,7 @@ public sealed class GatewayRuntimeExtension : IBasicRuntimeExtension
 {
     private readonly IDeviceDriverRegistry _driverRegistry;
     private readonly IUploadTransportRegistry _uploadTransportRegistry;
+    private BasicRuntimeHost? _runtime;
 
     public GatewayRuntimeExtension(
         IDeviceDriverRegistry driverRegistry,
@@ -23,10 +24,12 @@ public sealed class GatewayRuntimeExtension : IBasicRuntimeExtension
 
     public void Register(BasicRuntimeHost runtime)
     {
+        _runtime = runtime;
         runtime.RegisterFunction("EDGE_DRIVER_CATALOG", (_, _) => BuildDriverCatalog());
         runtime.RegisterFunction("EDGE_DRIVER_METADATA", (_, arguments) => BuildDriverMetadata(RequiredString(arguments, 0, "driverCode")));
         runtime.RegisterFunction("EDGE_DRIVER_READ", (_, arguments) => ExecuteDriverRead(arguments));
         runtime.RegisterFunction("EDGE_DRIVER_WRITE", (_, arguments) => ExecuteDriverWrite(arguments));
+        runtime.RegisterFunction("EDGE_TRANSFORM_APPLY", (_, arguments) => ExecuteTransformApply(arguments));
         runtime.RegisterFunction("EDGE_UPLOAD", (_, arguments) => ExecuteUpload(arguments));
     }
 
@@ -112,6 +115,39 @@ public sealed class GatewayRuntimeExtension : IBasicRuntimeExtension
         }
     }
 
+    private Dictionary<string, object?> ExecuteTransformApply(IReadOnlyList<object?> arguments)
+    {
+        var value = ConvertValue(Argument(arguments, 0));
+        try
+        {
+            var transformed = value;
+            foreach (var rule in ToTransformRules(Argument(arguments, 1)).Where(rule => rule.Enabled).OrderBy(rule => rule.SortOrder))
+            {
+                transformed = ApplyTransform(transformed, rule);
+            }
+
+            return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["success"] = true,
+                ["action"] = "transform",
+                ["quality"] = QualityStatus.Good.ToString(),
+                ["value"] = transformed,
+                ["errorMessage"] = string.Empty
+            };
+        }
+        catch (Exception exception)
+        {
+            return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["success"] = false,
+                ["action"] = "transform",
+                ["quality"] = QualityStatus.Bad.ToString(),
+                ["value"] = value,
+                ["errorMessage"] = exception.Message
+            };
+        }
+    }
+
     private Dictionary<string, object?> ExecuteUpload(IReadOnlyList<object?> arguments)
     {
         try
@@ -152,6 +188,87 @@ public sealed class GatewayRuntimeExtension : IBasicRuntimeExtension
         catch (Exception exception)
         {
             return BuildFailureResult("upload", exception.Message);
+        }
+    }
+
+    private object? ApplyTransform(object? value, ScriptTransformRule rule)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        return rule.Kind switch
+        {
+            TransformationKind.Scale => Scale(value, GetDecimal(rule.Arguments, "factor") ?? 1m),
+            TransformationKind.Offset => Offset(value, GetDecimal(rule.Arguments, "offset") ?? 0m),
+            TransformationKind.Cast => Cast(value, GetString(rule.Arguments, "type")),
+            TransformationKind.BitExtract => BitExtract(value, GetInt32(rule.Arguments, "index") ?? 0),
+            TransformationKind.EnumMap => rule.Arguments.TryGetValue(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty, out var mapped) ? ConvertValue(mapped) : value,
+            TransformationKind.Expression => ApplyExpression(value, rule.Arguments),
+            _ => value
+        };
+    }
+
+    private object? ApplyExpression(object value, IReadOnlyDictionary<string, object?> arguments)
+    {
+        var code = GetString(arguments, "expression")
+            ?? GetString(arguments, "script")
+            ?? GetString(arguments, "code");
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return value;
+        }
+
+        var variables = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["value"] = value,
+            ["raw"] = value,
+            ["x"] = value
+        };
+
+        foreach (var pair in arguments)
+        {
+            if (!IsExpressionKey(pair.Key))
+            {
+                variables[pair.Key] = ConvertValue(pair.Value);
+            }
+        }
+
+        var ownsRuntime = _runtime is null;
+        var runtime = _runtime ?? new BasicRuntimeHost();
+        try
+        {
+            var options = new BasicRuntimeOptions
+            {
+                MaxStatements = 10_000,
+                MaxLoopIterations = 10_000
+            };
+
+            if (LooksLikeScript(code))
+            {
+                var result = runtime.Execute(code, variables, options);
+                if (result.ReturnValue is not null)
+                {
+                    return result.ReturnValue;
+                }
+
+                if (result.Variables.TryGetValue("result", out var transformed))
+                {
+                    return transformed;
+                }
+
+                return result.Variables.TryGetValue("value", out var updatedValue) ? updatedValue : value;
+            }
+
+            return runtime.Evaluate(code, variables, options);
+        }
+        finally
+        {
+            if (ownsRuntime)
+            {
+                runtime.Dispose();
+            }
         }
     }
 
@@ -216,6 +333,56 @@ public sealed class GatewayRuntimeExtension : IBasicRuntimeExtension
             target,
             payloadTemplate);
     }
+
+    private static IReadOnlyCollection<ScriptTransformRule> ToTransformRules(object? value)
+    {
+        var normalized = ConvertValue(value);
+        return normalized switch
+        {
+            null => Array.Empty<ScriptTransformRule>(),
+            IReadOnlyDictionary<string, object?> dictionary => [ParseTransformRule(dictionary)],
+            IDictionary<string, object?> dictionary => [ParseTransformRule(ToObjectDictionary(dictionary))],
+            IEnumerable<object?> values => values
+                .Select(item => item is null ? null : ParseTransformRule(ToObjectDictionary(item)))
+                .Where(rule => rule is not null)
+                .Select(rule => rule!)
+                .ToArray(),
+            _ => Array.Empty<ScriptTransformRule>()
+        };
+    }
+
+    private static ScriptTransformRule ParseTransformRule(IReadOnlyDictionary<string, object?> dictionary)
+    {
+        var kindText = GetString(dictionary, "kind")
+            ?? GetString(dictionary, "transformType")
+            ?? GetString(dictionary, "type")
+            ?? "Passthrough";
+        if (!Enum.TryParse<TransformationKind>(kindText, true, out var kind))
+        {
+            kind = TransformationKind.Passthrough;
+        }
+
+        var arguments = dictionary.TryGetValue("arguments", out var argumentValue) && argumentValue is not null
+            ? ToObjectDictionary(argumentValue)
+            : dictionary
+                .Where(pair => !IsTransformRuleMetadata(pair.Key))
+                .ToDictionary(pair => pair.Key, pair => ConvertValue(pair.Value), StringComparer.OrdinalIgnoreCase);
+
+        return new ScriptTransformRule(
+            kind,
+            GetInt32(dictionary, "sortOrder") ?? GetInt32(dictionary, "order") ?? 0,
+            GetBool(dictionary, "enabled", true),
+            arguments);
+    }
+
+    private static bool IsTransformRuleMetadata(string key)
+        => string.Equals(key, "kind", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "transformType", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "type", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "sortOrder", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "order", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "enabled", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "arguments", StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyDictionary<string, string?> ToStringDictionary(object? value)
     {
@@ -358,6 +525,24 @@ public sealed class GatewayRuntimeExtension : IBasicRuntimeExtension
     private static string? OptionalString(IReadOnlyDictionary<string, object?> values, string name)
         => values.TryGetValue(name, out var value) ? Convert.ToString(ConvertValue(value), CultureInfo.InvariantCulture)?.Trim() : null;
 
+    private static string? GetString(IReadOnlyDictionary<string, object?> values, string key)
+        => values.TryGetValue(key, out var value) ? Convert.ToString(ConvertValue(value), CultureInfo.InvariantCulture)?.Trim() : null;
+
+    private static int? GetInt32(IReadOnlyDictionary<string, object?> values, string key)
+        => values.TryGetValue(key, out var value) && int.TryParse(Convert.ToString(ConvertValue(value), CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : null;
+
+    private static decimal? GetDecimal(IReadOnlyDictionary<string, object?> values, string key)
+        => values.TryGetValue(key, out var value) && decimal.TryParse(Convert.ToString(ConvertValue(value), CultureInfo.InvariantCulture), NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : null;
+
+    private static bool GetBool(IReadOnlyDictionary<string, object?> values, string key, bool defaultValue)
+        => values.TryGetValue(key, out var value) && bool.TryParse(Convert.ToString(ConvertValue(value), CultureInfo.InvariantCulture), out var parsed)
+            ? parsed
+            : defaultValue;
+
     private static object? Argument(IReadOnlyList<object?> arguments, int index)
         => index < arguments.Count ? arguments[index] : null;
 
@@ -417,4 +602,114 @@ public sealed class GatewayRuntimeExtension : IBasicRuntimeExtension
             _ => DateTimeOffset.UtcNow
         };
     }
+
+    private static bool IsExpressionKey(string key)
+        => string.Equals(key, "expression", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "script", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "code", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(key, "value", StringComparison.OrdinalIgnoreCase);
+
+    private static bool LooksLikeScript(string code)
+    {
+        if (code.Contains('\n') || code.Contains('\r'))
+        {
+            return true;
+        }
+
+        var trimmed = code.TrimStart();
+        var firstSpace = trimmed.IndexOfAny([' ', '\t', '(']);
+        var firstWord = firstSpace >= 0 ? trimmed[..firstSpace] : trimmed;
+        return firstWord.Equals("LET", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("IF", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("FOR", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("WHILE", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("DO", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("DEF", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("DIM", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("RETURN", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("PRINT", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("INPUT", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("GOTO", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("GOSUB", StringComparison.OrdinalIgnoreCase)
+            || firstWord.Equals("END", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static object? Scale(object value, decimal factor)
+        => TryGetDecimal(value, out var decimalValue) ? decimalValue * factor : value;
+
+    private static object? Offset(object value, decimal offset)
+        => TryGetDecimal(value, out var decimalValue) ? decimalValue + offset : value;
+
+    private static object? BitExtract(object value, int index)
+    {
+        if (!TryGetDecimal(value, out var decimalValue))
+        {
+            return value;
+        }
+
+        var integerValue = (long)decimalValue;
+        return (integerValue & (1L << index)) != 0;
+    }
+
+    private static object? Cast(object value, string? targetType)
+        => targetType?.ToLowerInvariant() switch
+        {
+            "string" => Convert.ToString(value, CultureInfo.InvariantCulture),
+            "boolean" => Convert.ToBoolean(value, CultureInfo.InvariantCulture),
+            "byte" => Convert.ToByte(value, CultureInfo.InvariantCulture),
+            "int16" => Convert.ToInt16(value, CultureInfo.InvariantCulture),
+            "uint16" => Convert.ToUInt16(value, CultureInfo.InvariantCulture),
+            "int32" => Convert.ToInt32(value, CultureInfo.InvariantCulture),
+            "uint32" => Convert.ToUInt32(value, CultureInfo.InvariantCulture),
+            "int64" => Convert.ToInt64(value, CultureInfo.InvariantCulture),
+            "uint64" => Convert.ToUInt64(value, CultureInfo.InvariantCulture),
+            "float" => Convert.ToSingle(value, CultureInfo.InvariantCulture),
+            "double" => Convert.ToDouble(value, CultureInfo.InvariantCulture),
+            _ => value
+        };
+
+    private static bool TryGetDecimal(object value, out decimal decimalValue)
+    {
+        switch (value)
+        {
+            case byte byteValue:
+                decimalValue = byteValue;
+                return true;
+            case short shortValue:
+                decimalValue = shortValue;
+                return true;
+            case ushort ushortValue:
+                decimalValue = ushortValue;
+                return true;
+            case int intValue:
+                decimalValue = intValue;
+                return true;
+            case uint uintValue:
+                decimalValue = uintValue;
+                return true;
+            case long longValue:
+                decimalValue = longValue;
+                return true;
+            case ulong ulongValue:
+                decimalValue = ulongValue;
+                return true;
+            case float floatValue:
+                decimalValue = (decimal)floatValue;
+                return true;
+            case double doubleValue:
+                decimalValue = (decimal)doubleValue;
+                return true;
+            case decimal directValue:
+                decimalValue = directValue;
+                return true;
+            default:
+                return decimal.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Any, CultureInfo.InvariantCulture, out decimalValue);
+        }
+    }
+
+    private sealed record ScriptTransformRule(
+        TransformationKind Kind,
+        int SortOrder,
+        bool Enabled,
+        IReadOnlyDictionary<string, object?> Arguments);
 }

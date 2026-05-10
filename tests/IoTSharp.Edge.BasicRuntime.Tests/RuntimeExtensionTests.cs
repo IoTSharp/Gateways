@@ -50,6 +50,27 @@ public sealed class RuntimeExtensionTests
         Assert.Equal("yes", result.ReturnValue);
     }
 
+    [Fact]
+    public void Runtime_can_return_dictionary_values_to_the_host()
+    {
+        var runtime = new BasicRuntime();
+        var result = runtime.Execute("""
+            payload = dict()
+            payload("quality") = "Good"
+            payload("value") = 42
+            nested = dict()
+            nested("inner") = "yes"
+            payload("nested") = nested
+            return payload
+            """);
+
+        var payload = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(result.ReturnValue);
+        Assert.Equal("Good", payload["quality"]);
+        Assert.Equal(42L, payload["value"]);
+        var nested = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(payload["nested"]);
+        Assert.Equal("yes", nested["inner"]);
+    }
+
 #if EDGE_BASIC_RUNTIME_EXTENSIONS
     [Fact]
     public void Gateway_extension_can_bridge_driver_reads_and_uploads()
@@ -70,11 +91,24 @@ public sealed class RuntimeExtensionTests
               return read("errorMessage")
             endif
 
+            transform = dict()
+            transform("kind") = "Scale"
+            transform("sortOrder") = 0
+            transform("enabled") = 1
+            transformArgs = dict()
+            transformArgs("factor") = 2
+            transform("arguments") = transformArgs
+
+            transformed = EDGE_TRANSFORM_APPLY(read("rawValue"), list(transform))
+            if transformed("success") = 0 then
+              return transformed("errorMessage")
+            endif
+
             envelope = dict()
             envelope("deviceName") = "device-1"
             envelope("pointName") = "temperature"
             envelope("rawValue") = read("rawValue")
-            envelope("value") = read("value")
+            envelope("value") = transformed("value")
             envelope("quality") = read("quality")
             envelope("target") = "telemetry"
             envelope("payloadTemplate") = "{{device}}/{{point}}={{value}}"
@@ -93,6 +127,7 @@ public sealed class RuntimeExtensionTests
         Assert.Equal("device-1", uploadRegistry.Uploads[0].Envelope.DeviceName);
         Assert.Equal("temperature", uploadRegistry.Uploads[0].Envelope.PointName);
         Assert.Equal("sensor-1", driverRegistry.Drivers[0].LastReadAddress);
+        Assert.Equal(25L, Assert.IsType<long>(uploadRegistry.Uploads[0].Envelope.Value));
     }
 
     private sealed class LoopbackDriverRegistry : IDeviceDriverRegistry

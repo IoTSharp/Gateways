@@ -144,7 +144,7 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
             BasicValueKind.String => _string ?? string.Empty,
             BasicValueKind.List => _list!.Items.Select(item => item.ToObject()).ToArray(),
             BasicValueKind.Array => _array!.ToObjectArray(),
-            BasicValueKind.Dictionary => _reference,
+            BasicValueKind.Dictionary => DictionaryToObject(Dictionary),
             BasicValueKind.Iterator => _reference,
             BasicValueKind.Class or BasicValueKind.Instance or BasicValueKind.Callable => _reference,
             _ => _reference
@@ -258,6 +258,12 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
 
         return dictionary;
     }
+
+    private static Dictionary<string, object?> DictionaryToObject(BasicDictionary dictionary)
+        => dictionary.Keys.ToDictionary(
+            key => key,
+            key => dictionary.Get(key).ToObject(),
+            StringComparer.OrdinalIgnoreCase);
 
     private static string FormatNumber(double value)
     {

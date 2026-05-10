@@ -33,6 +33,6 @@ This note records the driver component choices for the expanded southbound gatew
 
 The BASIC runtime follows the same split:
 
-- core language, parser, evaluator, and BCL-backed helpers stay in `IoTSharp.Edge.BasicRuntime`
-- MQTT, serial, Modbus, and PLC helpers are optional extensions
-- `build.ps1 -MustAot` or `-p:EdgeAot=true` disables those extensions so they are neither compiled nor registered
+- core language, parser, evaluator, BCL-backed helpers, and MQTT/serial/Modbus/PLC helpers stay in `IoTSharp.Edge.BasicRuntime`
+- gateway-specific bridges such as driver read/write, transform apply, and upload live in `IoTSharp.Edge.RuntimeExtensions`
+- `build.ps1 -MustAot` or `-p:EdgeAot=true` disables the gateway bridge project so it is not referenced or injected

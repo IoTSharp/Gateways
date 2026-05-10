@@ -28,7 +28,7 @@ Gateway 侧负责：
 
 Gateway 不再提供本地 CRUD 采集配置接口。
 
-当 `EdgeEnableBasicRuntimeExtensions=true` 时，宿主会在启动时注入 `IoTSharp.Edge.RuntimeExtensions`，把驱动读取、驱动写入和上传桥接能力暴露给 BASIC 脚本；AOT 发布会自动跳过这一层扩展。
+当 `EdgeEnableBasicRuntimeExtensions=true` 时，宿主会在启动时注入 `IoTSharp.Edge.RuntimeExtensions`，把驱动读取、驱动写入、变换应用和上传桥接能力暴露给 BASIC 脚本；AOT 发布会自动跳过这一层扩展。基础运行时里的 MQTT、串口、Modbus、PLC 能力始终可用。
 
 ## 本地页面
 
