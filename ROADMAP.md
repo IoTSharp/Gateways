@@ -13,6 +13,7 @@
 - 单宿主 Gateway（`IoTSharp.Edge`）：bootstrap、注册、心跳、采集配置同步、采集执行、回传
 - C# AOT 边缘基座（被 SaaS 端 `IoTSharp.CodeGen.CSharpAot` 作为生成目标使用）
 - BasicRuntime 宿主接口（C# 版），用于承载 IoTEmBASIC 风格脚本
+- 采集、合成、上传逻辑优先由 BASIC 脚本承载；C# 侧提供宿主、可注入能力和 AOT/非 AOT 边界
 
 不承载：多租户、Copilot、计费、License。
 
@@ -23,7 +24,7 @@
 | G0 | ✅ | 单宿主收口（替代 Api/Worker/Web 拆分） |
 | G1 | 🚧 | bootstrap / 注册 / 心跳 / 配置同步 / 回传 完整链路稳定 |
 | G2 | ⏳ | C# AOT 发布稳定（裁剪、启动时间、体积） |
-| G3 | ⏳ | BasicRuntime 宿主 v1 |
+| G3 | 🚧 | BasicRuntime 宿主 v1 + 可注入扩展 |
 | G4 | ⏳ | 多协议插件接入（与 Pixiu C 版能力对齐的子集） |
 | G5 | ⏳ | 远程诊断与现场可观测 |
 
@@ -51,7 +52,7 @@
 
 | 编号 | 状态 | 顺序 | 任务 |
 | --- | --- | --- | --- |
-| C1 | ⏳ | [依赖: B1] | BasicRuntime 接口注册表 C# 实现 |
+| C1 | 🚧 | [依赖: B1] | BasicRuntime 接口注册表 / 扩展注入 |
 | C2 | ⏳ | [依赖: C1] | 脚本加载、签名校验、版本槽 |
 | C3 | ⏳ | [依赖: C1] | 与 `external/IoTSharp.Edge.Stm32` 接口签名对齐 |
 | C4 | ⏳ | [依赖: C2] | 沙箱与运行预算 |

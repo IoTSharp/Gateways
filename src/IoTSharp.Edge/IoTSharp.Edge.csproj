@@ -10,4 +10,8 @@
     <ProjectReference Include="..\IoTSharp.Edge.Application\IoTSharp.Edge.Application.csproj" />
     <ProjectReference Include="..\IoTSharp.Edge.Infrastructure\IoTSharp.Edge.Infrastructure.csproj" />
   </ItemGroup>
+
+  <ItemGroup Condition="'$(EdgeEnableBasicRuntimeExtensions)' == 'true'">
+    <ProjectReference Include="..\IoTSharp.Edge.RuntimeExtensions\IoTSharp.Edge.RuntimeExtensions.csproj" />
+  </ItemGroup>
 </Project>

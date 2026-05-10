@@ -29,7 +29,17 @@ builder.Services.AddCors(options =>
 });
 builder.Services.AddSingleton<BootstrapConfigurationService>();
 builder.Services.AddSingleton<CollectionConfigurationSyncState>();
-builder.Services.AddSingleton<BasicRuntime>();
+#if EDGE_BASIC_RUNTIME_EXTENSIONS
+builder.Services.AddSingleton<IBasicRuntimeExtension>(sp => new IoTSharp.Edge.RuntimeExtensions.GatewayRuntimeExtension(
+    sp.GetRequiredService<IDeviceDriverRegistry>(),
+    sp.GetRequiredService<IUploadTransportRegistry>()));
+#endif
+builder.Services.AddSingleton<BasicRuntime>(sp =>
+{
+    var runtime = new BasicRuntime();
+    runtime.Use(sp.GetServices<IBasicRuntimeExtension>());
+    return runtime;
+});
 builder.Services.AddSingleton<ValueTransformationService>();
 builder.Services.AddScoped<DriverCatalogService>();
 builder.Services.AddScoped<GatewayRuntimeService>();
@@ -80,6 +90,7 @@ app.MapPost("/api/bootstrap/config", async (BootstrapConfigUpdateRequest request
 
 app.MapGet("/api/diagnostics/summary", async (
     IHostEnvironment environment,
+    BasicRuntime basicRuntime,
     BootstrapConfigurationService bootstrapConfiguration,
     IOptionsMonitor<EdgeReportingOptions> edgeOptionsMonitor,
     CollectionConfigurationSyncState collectionSyncState,
@@ -135,6 +146,11 @@ app.MapGet("/api/diagnostics/summary", async (
             metadata = edgeOptions.Metadata
         },
         collectionSync,
+        basicRuntime = new
+        {
+            extensionCount = basicRuntime.RegisteredExtensions.Count,
+            extensions = basicRuntime.RegisteredExtensions
+        },
         counts = new
         {
             channelCount = channels.Count,

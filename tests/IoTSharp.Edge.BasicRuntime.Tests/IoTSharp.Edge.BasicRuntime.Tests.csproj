@@ -32,6 +32,10 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(EdgeEnableBasicRuntimeExtensions)' == 'true'">
+    <ProjectReference Include="..\..\src\IoTSharp.Edge.RuntimeExtensions\IoTSharp.Edge.RuntimeExtensions.csproj" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\IoTSharp.Edge.BasicRuntime\IoTSharp.Edge.BasicRuntime.csproj" />
   </ItemGroup>

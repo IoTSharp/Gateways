@@ -126,6 +126,8 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
             BasicIterator iterator => FromIterator(iterator),
             BasicObjectValue obj => obj.IsPrototype ? FromClass(obj) : FromInstance(obj),
             IBasicCallable callable => FromCallable(callable),
+            IReadOnlyDictionary<string, object?> readOnlyDictionary => FromDictionary(ToBasicDictionary(readOnlyDictionary)),
+            IDictionary<string, object?> mutableDictionary => FromDictionary(ToBasicDictionary(mutableDictionary)),
             IReadOnlyList<object?> values => FromList(new BasicList(values.Select(FromObject))),
             IEnumerable<byte> bytes => FromList(new BasicList(bytes.Select(byteValue => FromNumber(byteValue)))),
             IEnumerable<object?> values => FromList(new BasicList(values.Select(FromObject))),
@@ -245,6 +247,17 @@ internal readonly struct BasicValue : IEquatable<BasicValue>
 
     private static bool IsIntegral(double value)
         => double.IsFinite(value) && Math.Abs(value % 1) < 0.0000000001d && value <= long.MaxValue && value >= long.MinValue;
+
+    private static BasicDictionary ToBasicDictionary(IEnumerable<KeyValuePair<string, object?>> values)
+    {
+        var dictionary = new BasicDictionary();
+        foreach (var pair in values)
+        {
+            dictionary.Set(pair.Key, FromObject(pair.Value));
+        }
+
+        return dictionary;
+    }
 
     private static string FormatNumber(double value)
     {

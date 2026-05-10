@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IoTSharp.Edge.BasicRuntime.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IoTSharp.Edge.Infrastructure.Tests", "tests\IoTSharp.Edge.Infrastructure.Tests\IoTSharp.Edge.Infrastructure.Tests.csproj", "{E4D15B61-E11A-4696-97A0-3C1A506522C2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IoTSharp.Edge.RuntimeExtensions", "src\IoTSharp.Edge.RuntimeExtensions\IoTSharp.Edge.RuntimeExtensions.csproj", "{598F6451-3F61-45E1-988A-91FE6329272E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -115,6 +117,18 @@ Global
 		{E4D15B61-E11A-4696-97A0-3C1A506522C2}.Release|x64.Build.0 = Release|Any CPU
 		{E4D15B61-E11A-4696-97A0-3C1A506522C2}.Release|x86.ActiveCfg = Release|Any CPU
 		{E4D15B61-E11A-4696-97A0-3C1A506522C2}.Release|x86.Build.0 = Release|Any CPU
+		{598F6451-3F61-45E1-988A-91FE6329272E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{598F6451-3F61-45E1-988A-91FE6329272E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{598F6451-3F61-45E1-988A-91FE6329272E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{598F6451-3F61-45E1-988A-91FE6329272E}.Debug|x64.Build.0 = Debug|Any CPU
+		{598F6451-3F61-45E1-988A-91FE6329272E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{598F6451-3F61-45E1-988A-91FE6329272E}.Debug|x86.Build.0 = Debug|Any CPU
+		{598F6451-3F61-45E1-988A-91FE6329272E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{598F6451-3F61-45E1-988A-91FE6329272E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{598F6451-3F61-45E1-988A-91FE6329272E}.Release|x64.ActiveCfg = Release|Any CPU
+		{598F6451-3F61-45E1-988A-91FE6329272E}.Release|x64.Build.0 = Release|Any CPU
+		{598F6451-3F61-45E1-988A-91FE6329272E}.Release|x86.ActiveCfg = Release|Any CPU
+		{598F6451-3F61-45E1-988A-91FE6329272E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -127,5 +141,6 @@ Global
 		{2480AAE9-6F57-4D21-9C05-08776EC4DF63} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{C46D5FDE-8650-4FF5-A95F-AC0AFECA7FF7} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{E4D15B61-E11A-4696-97A0-3C1A506522C2} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{598F6451-3F61-45E1-988A-91FE6329272E} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

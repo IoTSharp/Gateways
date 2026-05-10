@@ -5,9 +5,18 @@ namespace IoTSharp.Edge.BasicRuntime;
 
 public delegate object? BasicNativeFunction(BasicRuntimeContext context, IReadOnlyList<object?> arguments);
 
+public interface IBasicRuntimeExtension
+{
+    string Name { get; }
+
+    void Register(BasicRuntime runtime);
+}
+
 public sealed class BasicRuntime : IDisposable
 {
     private readonly Dictionary<string, InternalBasicFunction> _functions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<string> _registeredExtensions = [];
+    private readonly HashSet<string> _registeredExtensionNames = new(StringComparer.OrdinalIgnoreCase);
     private bool _disposed;
 
 #if EDGE_BASIC_RUNTIME_EXTENSIONS
@@ -62,6 +71,41 @@ public sealed class BasicRuntime : IDisposable
             return BasicValue.FromObject(result);
         };
     }
+
+    public BasicRuntime Use(IBasicRuntimeExtension extension)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(extension);
+
+        var extensionName = string.IsNullOrWhiteSpace(extension.Name)
+            ? extension.GetType().Name
+            : extension.Name.Trim();
+
+        if (_registeredExtensionNames.Contains(extensionName))
+        {
+            throw new InvalidOperationException($"Basic runtime extension '{extensionName}' is already registered.");
+        }
+
+        extension.Register(this);
+        _registeredExtensionNames.Add(extensionName);
+        _registeredExtensions.Add(extensionName);
+        return this;
+    }
+
+    public BasicRuntime Use(IEnumerable<IBasicRuntimeExtension> extensions)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(extensions);
+
+        foreach (var extension in extensions)
+        {
+            Use(extension);
+        }
+
+        return this;
+    }
+
+    public IReadOnlyCollection<string> RegisteredExtensions => _registeredExtensions.AsReadOnly();
 
     public BasicRuntimeResult Execute(
         string source,

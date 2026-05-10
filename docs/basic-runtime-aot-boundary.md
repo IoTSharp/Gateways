@@ -15,8 +15,11 @@ This repo keeps the BASIC runtime split into two layers:
 - serial port
 - Modbus
 - PLC helpers
+- gateway runtime bridges from `IoTSharp.Edge.RuntimeExtensions`
 
 These extensions are enabled by default in the normal build, but they are removed when the build passes `-MustAot`.
+
+The Edge host can inject those optional capabilities into `BasicRuntime` at startup when `EdgeEnableBasicRuntimeExtensions=true`.
 
 ## Build flags
 
