@@ -1,12 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(EdgeEnableBasicRuntimeExtensions)' == 'true'">
+  <ItemGroup>
     <PackageReference Include="IoTClient" />
     <PackageReference Include="MQTTnet" />
     <PackageReference Include="System.IO.Ports" />

@@ -418,8 +418,13 @@ internal static class MqttBuiltInFunctions
             return bytes;
         }
 
-        var model = ToPlainObject(value);
-        return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(model));
+        var buffer = new ArrayBufferWriter<byte>();
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            WriteJsonValue(writer, value);
+        }
+
+        return buffer.WrittenSpan.ToArray();
     }
 
     private static bool TryConvertToBinary(BasicValue value, out byte[] bytes)
@@ -451,38 +456,165 @@ internal static class MqttBuiltInFunctions
             && value.AsNumber() <= byte.MaxValue
             && Math.Abs(value.AsNumber() % 1) < 0.0000000001d;
 
-    private static object? ToPlainObject(BasicValue value)
+    private static void WriteJsonValue(Utf8JsonWriter writer, BasicValue value)
     {
-        return value.Kind switch
+        switch (value.Kind)
         {
-            BasicValueKind.Nil => null,
-            BasicValueKind.Number => value.ToObject(),
-            BasicValueKind.String => value.Text,
-            BasicValueKind.List => value.List.Items.Select(ToPlainObject).ToArray(),
-            BasicValueKind.Array => value.Array.ToObjectArray().Select(ToPlainObjectObject).ToArray(),
-            BasicValueKind.Dictionary => value.Dictionary.Keys.ToDictionary(key => key, key => ToPlainObject(value.Dictionary.Get(key)), StringComparer.OrdinalIgnoreCase),
-            BasicValueKind.Iterator => new object?[]
-            {
-                "iterator",
-                value.Iterator.Index
-            },
-            BasicValueKind.Class or BasicValueKind.Instance => value.ObjectValue.Fields.ToDictionary(pair => pair.Key, pair => ToPlainObject(pair.Value), StringComparer.OrdinalIgnoreCase),
-            BasicValueKind.Callable => value.AsString(),
-            _ => value.AsString()
-        };
+            case BasicValueKind.Nil:
+                writer.WriteNullValue();
+                return;
+            case BasicValueKind.Number:
+                WriteJsonNumberValue(writer, value.AsNumber());
+                return;
+            case BasicValueKind.String:
+                writer.WriteStringValue(value.Text);
+                return;
+            case BasicValueKind.List:
+                writer.WriteStartArray();
+                foreach (var item in value.List.Items)
+                {
+                    WriteJsonValue(writer, item);
+                }
+
+                writer.WriteEndArray();
+                return;
+            case BasicValueKind.Array:
+                writer.WriteStartArray();
+                foreach (var item in value.Array.ToObjectArray())
+                {
+                    WriteJsonObjectValue(writer, item);
+                }
+
+                writer.WriteEndArray();
+                return;
+            case BasicValueKind.Dictionary:
+                writer.WriteStartObject();
+                foreach (var key in value.Dictionary.Keys)
+                {
+                    writer.WritePropertyName(key);
+                    WriteJsonValue(writer, value.Dictionary.Get(key));
+                }
+
+                writer.WriteEndObject();
+                return;
+            case BasicValueKind.Iterator:
+                writer.WriteStartArray();
+                writer.WriteStringValue("iterator");
+                writer.WriteNumberValue(value.Iterator.Index);
+                writer.WriteEndArray();
+                return;
+            case BasicValueKind.Class:
+            case BasicValueKind.Instance:
+                writer.WriteStartObject();
+                foreach (var pair in value.ObjectValue.Fields)
+                {
+                    writer.WritePropertyName(pair.Key);
+                    WriteJsonValue(writer, pair.Value);
+                }
+
+                writer.WriteEndObject();
+                return;
+            case BasicValueKind.Callable:
+                writer.WriteStringValue(value.AsString());
+                return;
+            default:
+                writer.WriteStringValue(value.AsString());
+                return;
+        }
     }
 
-    private static object? ToPlainObjectObject(object? value)
+    private static void WriteJsonObjectValue(Utf8JsonWriter writer, object? value)
     {
-        return value switch
+        switch (value)
         {
-            null => null,
-            BasicDictionary dictionary => dictionary.Keys.ToDictionary(key => key, key => ToPlainObject(dictionary.Get(key)), StringComparer.OrdinalIgnoreCase),
-            BasicValue basicValue => ToPlainObject(basicValue),
-            IEnumerable<object?> objects => objects.Select(ToPlainObjectObject).ToArray(),
-            IEnumerable<byte> bytes => bytes.ToArray(),
-            _ => value
-        };
+            case null:
+                writer.WriteNullValue();
+                return;
+            case BasicValue basicValue:
+                WriteJsonValue(writer, basicValue);
+                return;
+            case BasicDictionary dictionary:
+                writer.WriteStartObject();
+                foreach (var key in dictionary.Keys)
+                {
+                    writer.WritePropertyName(key);
+                    WriteJsonValue(writer, dictionary.Get(key));
+                }
+
+                writer.WriteEndObject();
+                return;
+            case string text:
+                writer.WriteStringValue(text);
+                return;
+            case bool boolean:
+                writer.WriteBooleanValue(boolean);
+                return;
+            case byte byteValue:
+                writer.WriteNumberValue(byteValue);
+                return;
+            case sbyte sbyteValue:
+                writer.WriteNumberValue(sbyteValue);
+                return;
+            case short shortValue:
+                writer.WriteNumberValue(shortValue);
+                return;
+            case ushort ushortValue:
+                writer.WriteNumberValue(ushortValue);
+                return;
+            case int intValue:
+                writer.WriteNumberValue(intValue);
+                return;
+            case uint uintValue:
+                writer.WriteNumberValue(uintValue);
+                return;
+            case long longValue:
+                writer.WriteNumberValue(longValue);
+                return;
+            case ulong ulongValue:
+                writer.WriteNumberValue(ulongValue);
+                return;
+            case float floatValue:
+                writer.WriteNumberValue(floatValue);
+                return;
+            case double doubleValue:
+                writer.WriteNumberValue(doubleValue);
+                return;
+            case decimal decimalValue:
+                writer.WriteNumberValue(decimalValue);
+                return;
+            case IEnumerable<byte> bytes:
+                writer.WriteStartArray();
+                foreach (var byteItem in bytes)
+                {
+                    writer.WriteNumberValue(byteItem);
+                }
+
+                writer.WriteEndArray();
+                return;
+            case IEnumerable<object?> objects:
+                writer.WriteStartArray();
+                foreach (var item in objects)
+                {
+                    WriteJsonObjectValue(writer, item);
+                }
+
+                writer.WriteEndArray();
+                return;
+            default:
+                writer.WriteStringValue(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty);
+                return;
+        }
+    }
+
+    private static void WriteJsonNumberValue(Utf8JsonWriter writer, double value)
+    {
+        if (double.IsFinite(value) && Math.Abs(value % 1) < 0.0000000001d && value <= long.MaxValue && value >= long.MinValue)
+        {
+            writer.WriteNumberValue((long)value);
+            return;
+        }
+
+        writer.WriteNumberValue(value);
     }
 
     private static BasicDictionary CreateMessageDictionary(MqttReceivedMessage message)
