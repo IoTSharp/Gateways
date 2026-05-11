@@ -25,6 +25,12 @@ public interface IGatewayDbConnectionFactory
 
 public sealed class SqliteGatewayConnectionFactory : IGatewayDbConnectionFactory
 {
+    static SqliteGatewayConnectionFactory()
+    {
+        SqlMapper.AddTypeHandler(typeof(Guid), new GuidTextTypeHandler());
+        SqlMapper.AddTypeHandler(typeof(Guid?), new NullableGuidTextTypeHandler());
+    }
+
     private readonly GatewayStorageOptions _options;
 
     public SqliteGatewayConnectionFactory(IOptions<GatewayStorageOptions> options)
@@ -39,6 +45,39 @@ public sealed class SqliteGatewayConnectionFactory : IGatewayDbConnectionFactory
         await connection.OpenAsync(cancellationToken);
         return connection;
     }
+}
+
+public sealed class GuidTextTypeHandler : SqlMapper.TypeHandler<Guid>
+{
+    public override Guid Parse(object value)
+    {
+        return value switch
+        {
+            Guid guid => guid,
+            byte[] bytes when bytes.Length == 16 => new Guid(bytes),
+            string text when Guid.TryParse(text, out var guid) => guid,
+            _ => throw new DataException($"Cannot convert '{value?.GetType().FullName ?? "null"}' to Guid.")
+        };
+    }
+
+    public override void SetValue(IDbDataParameter parameter, Guid value)
+        => parameter.Value = value.ToString("D");
+}
+
+public sealed class NullableGuidTextTypeHandler : SqlMapper.TypeHandler<Guid?>
+{
+    public override Guid? Parse(object value)
+        => value switch
+        {
+            null or DBNull => null,
+            Guid guid => guid,
+            byte[] bytes when bytes.Length == 16 => new Guid(bytes),
+            string text when Guid.TryParse(text, out var guid) => guid,
+            _ => throw new DataException($"Cannot convert '{value?.GetType().FullName ?? "null"}' to Guid?.")
+        };
+
+    public override void SetValue(IDbDataParameter parameter, Guid? value)
+        => parameter.Value = value.HasValue ? value.Value.ToString("D") : DBNull.Value;
 }
 
 public sealed class SqliteGatewaySchemaInitializer : IGatewaySchemaInitializer

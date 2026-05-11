@@ -576,6 +576,7 @@ public sealed class GatewayRuntimeExtension : IBasicRuntimeExtension
             "http" => UploadProtocol.Http,
             "mqtt" or "iotsharpmqtt" => UploadProtocol.IotSharpMqtt,
             "devicehttp" or "iotsharpdevicehttp" or "iotsharp" => UploadProtocol.IotSharpDeviceHttp,
+            "sonnet" or "sonnetdb" => UploadProtocol.SonnetDb,
             _ => throw new BasicRuntimeException($"Upload protocol '{value}' is not supported.")
         };
 

@@ -2,17 +2,18 @@
 
 统一的 Gateway 单宿主程序。
 
-当前模式已经收口为一个可执行程序 `IoTSharp.Edge`，不再拆分 `IoTSharp.Edge.Api`、`IoTSharp.Edge.Worker`、`gateway-web`。Gateway 的职责也收口为：
+当前模式已经收口为一个可执行程序 `IoTSharp.Edge`，并新增独立前端 `IoTSharp.Edge.Admin`。Gateway 的职责为：
 
 - 读取本地 `bootstrap.json`
 - 向 IoTSharp 平台注册、心跳、上报能力
 - 从 IoTSharp 平台拉取采集配置
+- 维护本地离线采集配置 `local-collection.json`
 - 将平台侧采集模型映射为本地执行缓存并执行轮询
-- 将采集结果直接回传 IoTSharp
+- 将采集结果上传到 IoTSharp 或 SonnetDB
 
 ## 职责边界
 
-IoTSharp 平台侧负责：
+IoTSharp 平台侧可负责：
 
 - 采集模型设计
 - 边缘节点管理
@@ -22,31 +23,36 @@ IoTSharp 平台侧负责：
 Gateway 侧负责：
 
 - 南向协议执行
-- 本地执行缓存
-- 采集轮询与数据回传
-- 最小化 bootstrap / 诊断页面
+- 本地执行缓存与离线配置
+- 采集轮询与数据上传
+- BASIC 采集脚本执行
+- Bootstrap、诊断、本地配置 API
 
-Gateway 不再提供本地 CRUD 采集配置接口。
+当上游平台不可用或未启用时，Edge 可以通过本地配置继续工作；当上游平台成功下发配置时，Edge 会缓存最新配置到本地，离线后仍可沿用。
 
 当 `EdgeEnableBasicRuntimeExtensions=true` 时，宿主会在启动时注入 `IoTSharp.Edge.RuntimeExtensions`，把驱动读取、驱动写入、变换应用和上传桥接能力暴露给 BASIC 脚本；AOT 发布会自动跳过这一层扩展。基础运行时里的 MQTT、串口、Modbus、PLC 能力始终可用。
 
-## 本地页面
+## 本地管理界面
 
-启动后访问 `/`，只保留两个本地能力：
+本地管理界面位于独立项目 `src/IoTSharp.Edge.Admin`，通过 HTTP 调用 `src/IoTSharp.Edge` 的本地 API。
 
-- Bootstrap 配置
-  - 读取和保存本地 `bootstrap.json`
-  - 主要填写 `EdgeReporting.BaseUrl` 和 `EdgeReporting.AccessToken`
-- 诊断页
-  - 查看进程状态
-  - 查看 bootstrap 状态
-  - 查看平台配置同步状态
-  - 查看本地执行缓存统计
+当前界面提供：
 
-本地接口只保留：
+- 运行态与配置统计
+- Modbus 采集拓扑结构化编辑
+- SonnetDB 上传目标结构化编辑
+- 本地 JSON 高级编辑
+- BASIC 采集脚本查看
+- 运行日志查看
 
 - `GET /api/bootstrap/config`
 - `POST /api/bootstrap/config`
+- `GET /api/local/configuration`
+- `PUT /api/local/configuration`
+- `POST /api/local/configuration/apply`
+- `POST /api/local/configuration/reset`
+- `GET /api/scripts/polling`
+- `GET /api/diagnostics/logs`
 - `GET /api/diagnostics/summary`
 - `GET /api/health`
 
@@ -74,12 +80,13 @@ Gateway 会周期性调用：
 
 ## 上传链路
 
-平台配置映射后，Gateway 会自动派生回传通道：
+平台或本地配置映射后，Gateway 会自动派生上传通道：
 
 - 遥测上报到 `POST /api/Devices/{access_token}/Telemetry`
 - 属性上报到 `POST /api/Devices/{access_token}/Attributes`
+- SonnetDB 写入使用 NuGet 包 `SonnetDB` 提供的 ADO.NET provider
 
-这样采集模型完全归 IoTSharp 平台侧管理，Gateway 只负责执行。
+本地闭环示例默认将 Modbus 模拟设备数据写入 SonnetDB 的 `metrics.edge_modbus`。
 
 ## 目录结构
 
@@ -90,7 +97,11 @@ Gateway 会周期性调用：
 - `src/IoTSharp.Edge.Infrastructure`
   - SQLite 持久化、驱动适配、上传通道
 - `src/IoTSharp.Edge`
-  - 单宿主程序、bootstrap/诊断页、平台同步 worker
+  - 单宿主程序、bootstrap/诊断/本地配置 API、平台同步 worker
+- `src/IoTSharp.Edge.Admin`
+  - 独立本地管理前端
+- `src/IoTSharp.Edge.DeviceSimulator`
+  - 基于 IoTServer 的设备模拟程序
 
 ## 当前驱动
 
@@ -111,10 +122,16 @@ Gateway 会周期性调用：
 
 ## 本地运行
 
-```bash
-cd gateways/Gateways
-dotnet run --project src/IoTSharp.Edge/IoTSharp.Edge.csproj
+```powershell
+docker compose up -d --build
 ```
+
+默认地址：
+
+- Edge Admin: http://127.0.0.1:18182/
+- Edge API: http://127.0.0.1:18180/
+- Device Simulator: http://127.0.0.1:18181/api/values
+- SonnetDB: http://127.0.0.1:15080/
 
 ## 构建验证
 

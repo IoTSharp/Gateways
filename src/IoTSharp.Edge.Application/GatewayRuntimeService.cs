@@ -62,6 +62,8 @@ public sealed class GatewayRuntimeService
         enddef
         """;
 
+    public static string DefaultPollingScript => GatewayPollingScript;
+
     private readonly IGatewayRepository _repository;
     private readonly IDeviceDriverRegistry _driverRegistry;
     private readonly IUploadTransportRegistry _uploadTransportRegistry;

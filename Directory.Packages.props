@@ -6,11 +6,15 @@
   <ItemGroup>
     <PackageVersion Include="Dapper" Version="2.1.72" />
     <PackageVersion Include="IoTClient" Version="1.0.42" />
+    <PackageVersion Include="IoTServer" Version="0.0.15" />
+    <PackageVersion Include="log4net" Version="3.3.1" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.5" />
     <PackageVersion Include="MQTTnet" Version="5.1.0.1559" />
     <PackageVersion Include="MQTTnet.Server" Version="5.1.0.1559" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="OPCFoundation.NetStandard.Opc.Ua.Client" Version="1.5.378.134" />
     <PackageVersion Include="OPCFoundation.NetStandard.Opc.Ua.Configuration" Version="1.5.378.134" />
+    <PackageVersion Include="SonnetDB" Version="1.2.0" />
     <PackageVersion Include="System.IO.Ports" Version="8.0.0" />
 
     <PackageVersion Include="coverlet.collector" Version="6.0.0" />

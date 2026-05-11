@@ -5,8 +5,10 @@ using IoTSharp.Edge;
 using IoTSharp.Edge.Application;
 using IoTSharp.Edge.BasicRuntime;
 using IoTSharp.Edge.Domain;
+using IoTSharp.Edge.Diagnostics;
 using IoTSharp.Edge.Infrastructure;
 using IoTSharp.Edge.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -19,6 +21,7 @@ builder.Services.Configure<Microsoft.Extensions.Hosting.HostOptions>(options =>
     options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
 });
 builder.Services.Configure<EdgeReportingOptions>(builder.Configuration.GetSection("EdgeReporting"));
+builder.Services.Configure<LocalCollectionConfigurationOptions>(builder.Configuration.GetSection("LocalCollection"));
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -29,6 +32,9 @@ builder.Services.AddCors(options =>
 });
 builder.Services.AddSingleton<BootstrapConfigurationService>();
 builder.Services.AddSingleton<CollectionConfigurationSyncState>();
+builder.Services.AddSingleton<LocalCollectionConfigurationService>();
+builder.Services.AddSingleton<InMemoryLogStore>();
+builder.Logging.Services.AddSingleton<ILoggerProvider, InMemoryLoggerProvider>();
 #if EDGE_BASIC_RUNTIME_EXTENSIONS
 builder.Services.AddSingleton<IBasicRuntimeExtension>(sp => new IoTSharp.Edge.RuntimeExtensions.GatewayRuntimeExtension(
     sp.GetRequiredService<IDeviceDriverRegistry>(),
@@ -51,13 +57,14 @@ builder.Services.AddHostedService<EdgeRuntimeReportingWorker>();
 
 var app = builder.Build();
 app.UseCors();
-app.UseDefaultFiles();
-app.UseStaticFiles();
 
 using (var scope = app.Services.CreateScope())
 {
     var initializer = scope.ServiceProvider.GetRequiredService<IGatewaySchemaInitializer>();
     await initializer.InitializeAsync(CancellationToken.None);
+
+    var localConfiguration = scope.ServiceProvider.GetRequiredService<LocalCollectionConfigurationService>();
+    await localConfiguration.InitializeAsync(CancellationToken.None);
 }
 
 app.MapGet("/api/health", () => Results.Ok(new
@@ -69,6 +76,63 @@ app.MapGet("/api/health", () => Results.Ok(new
 
 app.MapGet("/api/bootstrap/config", async (BootstrapConfigurationService service, CancellationToken ct) =>
     Results.Ok(await service.GetAsync(ct)));
+
+app.MapGet("/api/local/configuration", async (LocalCollectionConfigurationService service, CancellationToken ct) =>
+    Results.Ok(await service.GetAsync(ct)));
+
+app.MapPut("/api/local/configuration", async (
+    EdgeCollectionConfigurationContract configuration,
+    LocalCollectionConfigurationService service,
+    HttpContext context,
+    CancellationToken ct) =>
+{
+    try
+    {
+        var apply = !bool.TryParse(context.Request.Query["apply"], out var parsed) || parsed;
+        return Results.Ok(await service.SaveAsync(configuration, apply, updatedBy: "LocalAdmin", ct));
+    }
+    catch (Exception exception)
+    {
+        return Results.BadRequest(new { message = exception.Message });
+    }
+});
+
+app.MapPost("/api/local/configuration/apply", async (LocalCollectionConfigurationService service, CancellationToken ct) =>
+{
+    try
+    {
+        return Results.Ok(await service.ApplyCurrentAsync(ct));
+    }
+    catch (Exception exception)
+    {
+        return Results.BadRequest(new { message = exception.Message });
+    }
+});
+
+app.MapPost("/api/local/configuration/reset", async (LocalCollectionConfigurationService service, CancellationToken ct) =>
+{
+    try
+    {
+        return Results.Ok(await service.ResetAsync(ct));
+    }
+    catch (Exception exception)
+    {
+        return Results.BadRequest(new { message = exception.Message });
+    }
+});
+
+app.MapGet("/api/scripts/polling", () => Results.Ok(new
+{
+    name = "Default Gateway Polling Script",
+    language = "BASIC",
+    script = GatewayRuntimeService.DefaultPollingScript
+}));
+
+app.MapGet("/api/diagnostics/logs", (InMemoryLogStore store, int? count, string? level) => Results.Ok(new
+{
+    generatedAtUtc = DateTime.UtcNow,
+    entries = store.GetRecent(count ?? 200, InMemoryLogStore.ParseLogLevel(level))
+}));
 
 app.MapPost("/api/bootstrap/config", async (BootstrapConfigUpdateRequest request, BootstrapConfigurationService service, CancellationToken ct) =>
 {
@@ -92,6 +156,7 @@ app.MapGet("/api/diagnostics/summary", async (
     IHostEnvironment environment,
     BasicRuntime basicRuntime,
     BootstrapConfigurationService bootstrapConfiguration,
+    LocalCollectionConfigurationService localConfigurationService,
     IOptionsMonitor<EdgeReportingOptions> edgeOptionsMonitor,
     CollectionConfigurationSyncState collectionSyncState,
     IGatewayRepository repository,
@@ -102,6 +167,7 @@ app.MapGet("/api/diagnostics/summary", async (
 
     var edgeOptions = edgeOptionsMonitor.CurrentValue;
     var bootstrapInfo = await bootstrapConfiguration.GetAsync(ct);
+    var localConfiguration = await localConfigurationService.GetAsync(ct);
     var channels = await repository.GetChannelsAsync(ct);
     var devices = await repository.GetDevicesAsync(ct);
     var points = await repository.GetPointsAsync(ct);
@@ -132,6 +198,16 @@ app.MapGet("/api/diagnostics/summary", async (
             bootstrapInfo.Exists,
             bootstrapInfo.FilePath,
             bootstrapInfo.LastWriteTimeUtc
+        },
+        localConfiguration = new
+        {
+            localConfiguration.Exists,
+            localConfiguration.FilePath,
+            localConfiguration.LastWriteTimeUtc,
+            localConfiguration.Applied,
+            localConfiguration.Configuration.Version,
+            localConfiguration.Configuration.UpdatedAt,
+            localConfiguration.Configuration.UpdatedBy
         },
         edgeReporting = new
         {

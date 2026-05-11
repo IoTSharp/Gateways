@@ -12,6 +12,7 @@
     <PackageReference Include="MQTTnet" />
     <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Client" />
     <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Configuration" />
+    <PackageReference Include="SonnetDB" />
   </ItemGroup>
 
   <PropertyGroup>

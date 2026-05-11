@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IoTSharp Edge Admin</title>
+  <link rel="stylesheet" href="/styles.css?v=20260511-2">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">E</div>
+        <div>
+          <div class="brand-title">IoTSharp Edge</div>
+          <div class="brand-subtitle">Local Admin</div>
+        </div>
+      </div>
+      <nav class="nav" aria-label="主导航">
+        <button class="nav-item active" data-panel="dashboard" type="button">仪表盘</button>
+        <button class="nav-item" data-panel="topology" type="button">采集拓扑</button>
+        <button class="nav-item" data-panel="upload" type="button">SonnetDB</button>
+        <button class="nav-item" data-panel="script" type="button">BASIC 脚本</button>
+        <button class="nav-item" data-panel="logs" type="button">运行日志</button>
+        <button class="nav-item" data-panel="bootstrap" type="button">本地配置</button>
+      </nav>
+      <div class="sidebar-foot">
+        <div id="apiStatus">API: waiting...</div>
+        <div id="syncStatus">Local mode</div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div>
+          <h1>Edge Local Console</h1>
+          <p>本地管理采集配置、SonnetDB 目标和运行态。</p>
+        </div>
+        <div class="topbar-tools">
+          <div class="topbar-metrics">
+            <div class="metric" id="metricRuntime">runtime</div>
+            <div class="metric" id="metricConfig">config</div>
+            <div class="metric" id="metricUpload">upload</div>
+          </div>
+          <div class="actions topbar-actions">
+            <button id="reloadButton" type="button">刷新</button>
+            <button id="applyButton" type="button" class="primary">应用配置</button>
+            <button id="resetButton" type="button">重置</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="summary-grid" id="summaryGrid">
+        <article class="summary-card">
+          <span>运行状态</span>
+          <strong id="summaryHealth">--</strong>
+          <small id="summaryProcess">--</small>
+        </article>
+        <article class="summary-card">
+          <span>本地配置</span>
+          <strong id="summaryLocalConfig">--</strong>
+          <small id="summaryLocalPath">--</small>
+        </article>
+        <article class="summary-card">
+          <span>SonnetDB</span>
+          <strong id="summarySonnet">--</strong>
+          <small id="summarySonnetMeta">--</small>
+        </article>
+        <article class="summary-card">
+          <span>采集拓扑</span>
+          <strong id="summaryTopology">--</strong>
+          <small id="summaryTopologyMeta">--</small>
+        </article>
+      </section>
+
+      <section class="workspace">
+        <section class="panel-group active" data-panel="dashboard">
+          <article class="panel">
+            <div class="panel-head">
+              <h2>本地运行态</h2>
+              <span id="runtimeBadge" class="badge">--</span>
+            </div>
+            <pre id="runtimeJson" class="code-block">{}</pre>
+          </article>
+        </section>
+
+        <section class="panel-group" data-panel="topology">
+          <article class="panel split">
+            <div>
+              <div class="panel-head">
+                <h2>Modbus 采集</h2>
+                <span class="badge">structured</span>
+              </div>
+              <div id="topologyEditor" class="stack">
+                <div class="form-grid">
+                  <label>Task Key<input id="topologyTaskKey" type="text"></label>
+                  <label>Connection<input id="topologyConnectionName" type="text"></label>
+                  <label>Host<input id="topologyHost" type="text"></label>
+                  <label>Port<input id="topologyPort" type="number" min="1" max="65535"></label>
+                  <label>Device Key<input id="topologyDeviceKey" type="text"></label>
+                  <label>Device Name<input id="topologyDeviceName" type="text"></label>
+                  <label>Station<input id="topologyStation" type="number" min="1" max="247"></label>
+                  <label>Timeout Ms<input id="topologyTimeout" type="number" min="100"></label>
+                </div>
+                <div class="mini-toolbar">
+                  <button id="addPointButton" type="button">新增点位</button>
+                  <button id="syncTopologyButton" type="button">同步到 JSON</button>
+                  <button id="applyTopologyButton" type="button" class="primary">保存并应用</button>
+                </div>
+                <div class="table-wrap points-editor">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Key</th>
+                        <th>Name</th>
+                        <th>Source</th>
+                        <th>Address</th>
+                        <th>Raw</th>
+                        <th>Length</th>
+                        <th>Target</th>
+                        <th>Unit</th>
+                        <th>Period</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="pointsTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="panel-head subhead">
+                <h2>运行拓扑</h2>
+                <span class="badge">snapshot</span>
+              </div>
+              <div id="topologyTable" class="table-wrap"></div>
+            </div>
+            <div>
+              <div class="panel-head">
+                <h2>本地 JSON</h2>
+                <span class="badge">editable</span>
+              </div>
+              <textarea id="configurationEditor" spellcheck="false"></textarea>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel-group" data-panel="upload">
+          <article class="panel split">
+            <div>
+              <div class="panel-head">
+                <h2>SonnetDB</h2>
+                <span class="badge">local target</span>
+              </div>
+              <div id="uploadSummary" class="info-list"></div>
+            </div>
+            <div>
+              <div class="panel-head">
+                <h2>快速编辑</h2>
+                <span class="badge">settings</span>
+              </div>
+              <div class="form-grid">
+                <label>Endpoint<input id="uploadEndpoint" type="text"></label>
+                <label>Database<input id="uploadDatabase" type="text"></label>
+                <label>Token<input id="uploadToken" type="password"></label>
+                <label>Measurement<input id="uploadMeasurement" type="text"></label>
+                <label>Field<input id="uploadField" type="text"></label>
+                <label>Site<input id="uploadSite" type="text"></label>
+              </div>
+              <div class="mini-toolbar">
+                <button id="syncUploadButton" type="button">同步到 JSON</button>
+                <button id="applyUploadButton" type="button" class="primary">保存并应用</button>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel-group" data-panel="script">
+          <article class="panel">
+            <div class="panel-head">
+              <h2>BASIC 采集脚本</h2>
+              <span class="badge">read-only</span>
+            </div>
+            <pre id="scriptOutput" class="code-block"></pre>
+          </article>
+        </section>
+
+        <section class="panel-group" data-panel="logs">
+          <article class="panel">
+            <div class="panel-head">
+              <h2>运行日志</h2>
+              <span class="badge">live</span>
+            </div>
+            <pre id="logsOutput" class="logs"></pre>
+          </article>
+        </section>
+
+        <section class="panel-group" data-panel="bootstrap">
+          <article class="panel">
+            <div class="panel-head">
+              <h2>本地配置</h2>
+              <span class="badge">json</span>
+            </div>
+            <pre id="bootstrapOutput" class="code-block"></pre>
+          </article>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="/app.js?v=20260511-2" defer></script>
+</body>
+</html>

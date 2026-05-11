@@ -1,0 +1,116 @@
+{
+  "contractVersion": "edge-collection-v1",
+  "edgeNodeId": "7c7f8e44-646e-4e75-a31d-8c4e4b4f5f39",
+  "version": 1,
+  "updatedAt": "2026-05-11T00:00:00Z",
+  "updatedBy": "LocalDockerTemplate",
+  "upload": {
+    "protocol": "SonnetDb",
+    "endpoint": "http://sonnetdb:5080",
+    "settings": {
+      "database": "metrics",
+      "token": "sonnetdb-dev-token",
+      "measurement": "edge_modbus",
+      "field": "value",
+      "site": "docker-compose"
+    }
+  },
+  "tasks": [
+    {
+      "id": "0f013f70-50ec-45cf-8d7f-19db4c7a5b19",
+      "taskKey": "modbus-device-simulator",
+      "protocol": "Modbus",
+      "version": 1,
+      "edgeNodeId": "7c7f8e44-646e-4e75-a31d-8c4e4b4f5f39",
+      "connection": {
+        "connectionKey": "device-simulator-modbus",
+        "connectionName": "Device Simulator Modbus TCP",
+        "protocol": "Modbus",
+        "transport": "tcp",
+        "host": "device-simulator",
+        "port": 1502,
+        "timeoutMs": 3000,
+        "retryCount": 3,
+        "protocolOptions": {
+          "endianFormat": "ABCD",
+          "plcAddresses": "true"
+        }
+      },
+      "devices": [
+        {
+          "deviceKey": "device-simulator-01",
+          "deviceName": "Device Simulator 01",
+          "enabled": true,
+          "externalKey": "device-simulator-01",
+          "protocolOptions": {
+            "stationNumber": "1"
+          },
+          "points": [
+            {
+              "pointKey": "temperature",
+              "pointName": "Temperature",
+              "sourceType": "HoldingRegister",
+              "address": "40001",
+              "rawValueType": "Float",
+              "length": 2,
+              "polling": {
+                "readPeriodMs": 2000,
+                "group": "default"
+              },
+              "mapping": {
+                "targetType": "Telemetry",
+                "targetName": "temperature",
+                "valueType": "Double",
+                "displayName": "Temperature",
+                "unit": "C"
+              }
+            },
+            {
+              "pointKey": "pressure",
+              "pointName": "Pressure",
+              "sourceType": "HoldingRegister",
+              "address": "40003",
+              "rawValueType": "Float",
+              "length": 2,
+              "polling": {
+                "readPeriodMs": 2000,
+                "group": "default"
+              },
+              "mapping": {
+                "targetType": "Telemetry",
+                "targetName": "pressure",
+                "valueType": "Double",
+                "displayName": "Pressure",
+                "unit": "bar"
+              }
+            },
+            {
+              "pointKey": "motorRpm",
+              "pointName": "Motor RPM",
+              "sourceType": "HoldingRegister",
+              "address": "40005",
+              "rawValueType": "Int16",
+              "length": 1,
+              "polling": {
+                "readPeriodMs": 2000,
+                "group": "default"
+              },
+              "mapping": {
+                "targetType": "Telemetry",
+                "targetName": "motorRpm",
+                "valueType": "Int32",
+                "displayName": "Motor RPM",
+                "unit": "rpm"
+              }
+            }
+          ]
+        }
+      ],
+      "reportPolicy": {
+        "defaultTrigger": "Always",
+        "includeQuality": true,
+        "includeTimestamp": true
+      }
+    }
+  ]
+}

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace IoTSharp.Edge;
 
-public sealed class GatewayCollectionConfigurationWorker : BackgroundService
+internal sealed class GatewayCollectionConfigurationWorker : BackgroundService
 {
     private const int ApiSuccessCode = 10000;
 
@@ -19,6 +19,7 @@ public sealed class GatewayCollectionConfigurationWorker : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IOptionsMonitor<EdgeReportingOptions> _optionsMonitor;
+    private readonly LocalCollectionConfigurationService _localConfigurationService;
     private readonly CollectionConfigurationSyncState _syncState;
     private readonly ILogger<GatewayCollectionConfigurationWorker> _logger;
 
@@ -28,12 +29,14 @@ public sealed class GatewayCollectionConfigurationWorker : BackgroundService
         IServiceScopeFactory scopeFactory,
         IHttpClientFactory httpClientFactory,
         IOptionsMonitor<EdgeReportingOptions> optionsMonitor,
+        LocalCollectionConfigurationService localConfigurationService,
         CollectionConfigurationSyncState syncState,
         ILogger<GatewayCollectionConfigurationWorker> logger)
     {
         _scopeFactory = scopeFactory;
         _httpClientFactory = httpClientFactory;
         _optionsMonitor = optionsMonitor;
+        _localConfigurationService = localConfigurationService;
         _syncState = syncState;
         _logger = logger;
     }
@@ -91,11 +94,13 @@ public sealed class GatewayCollectionConfigurationWorker : BackgroundService
         var applied = false;
         if (_appliedVersion != configuration.Version)
         {
+            await TryCacheConfigurationAsync(configuration, cancellationToken);
             var snapshot = GatewayCollectionConfigurationMapper.Map(configuration, options);
             await using var scope = _scopeFactory.CreateAsyncScope();
             var repository = scope.ServiceProvider.GetRequiredService<IGatewayRepository>();
             await repository.ReplaceConfigurationAsync(snapshot, cancellationToken);
             _appliedVersion = configuration.Version;
+            _localConfigurationService.MarkApplied(configuration.Version);
             applied = true;
 
             _logger.LogInformation(
@@ -129,6 +134,18 @@ public sealed class GatewayCollectionConfigurationWorker : BackgroundService
         }
 
         return apiResult.Data ?? new EdgeCollectionConfigurationContract();
+    }
+
+    private async Task TryCacheConfigurationAsync(EdgeCollectionConfigurationContract configuration, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _localConfigurationService.CacheUpstreamAsync(configuration, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Failed to cache upstream collection configuration locally.");
+        }
     }
 
     private static string? NormalizeBaseUrlOrNull(string? baseUrl)

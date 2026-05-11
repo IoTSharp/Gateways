@@ -49,6 +49,7 @@ public static class GatewayInfrastructureServiceCollectionExtensions
         services.AddSingleton<IUploadTransport, HttpUploadTransport>();
         services.AddSingleton<IUploadTransport, IotSharpMqttUploadTransport>();
         services.AddSingleton<IUploadTransport, IotSharpDeviceHttpUploadTransport>();
+        services.AddSingleton<IUploadTransport, SonnetDbUploadTransport>();
         services.AddSingleton<IUploadTransportRegistry, UploadTransportRegistry>();
 
         return services;

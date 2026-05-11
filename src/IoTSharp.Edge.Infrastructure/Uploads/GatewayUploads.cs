@@ -1,10 +1,13 @@
 using System.Net.Http.Json;
+using System.Data;
 using System.Text;
 using System.Text.Json;
 using MQTTnet;
 using MQTTnet.Protocol;
 using IoTSharp.Edge.Application;
 using IoTSharp.Edge.Domain;
+using Microsoft.Extensions.Logging;
+using SonnetDB.Data;
 
 namespace IoTSharp.Edge.Infrastructure.Uploads;
 
@@ -135,6 +138,158 @@ public sealed class IotSharpDeviceHttpUploadTransport : IUploadTransport
 
         using var response = await client.PostAsJsonAsync(channel.Endpoint, payload, cancellationToken);
         response.EnsureSuccessStatusCode();
+    }
+}
+
+public sealed class SonnetDbUploadTransport : IUploadTransport
+{
+    private readonly ILogger<SonnetDbUploadTransport> _logger;
+
+    public SonnetDbUploadTransport(ILogger<SonnetDbUploadTransport> logger)
+    {
+        _logger = logger;
+    }
+
+    public UploadProtocol Protocol => UploadProtocol.SonnetDb;
+
+    public async Task UploadAsync(UploadChannel channel, UploadEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var settings = GatewayJson.Parse(channel.SettingsJson);
+        var connectionString = BuildConnectionString(channel.Endpoint, settings);
+        var measurement = FirstNonEmpty(GatewayJson.Get(settings, "measurement"), "edge_modbus");
+        var fieldName = SanitizeName(FirstNonEmpty(GatewayJson.Get(settings, "field"), "value"));
+        var flushMode = FirstNonEmpty(GatewayJson.Get(settings, "flush"), "async");
+        var payload = BuildJsonPointsPayload(measurement, fieldName, settings, envelope);
+
+        await using var connection = new SndbConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandType = CommandType.TableDirect;
+        command.CommandText = payload;
+        command.Parameters.Add(new SndbParameter("flush", flushMode));
+
+        var written = await command.ExecuteNonQueryAsync(cancellationToken);
+        _logger.LogInformation(
+            "Uploaded {PointName} from {DeviceName} to SonnetDB measurement {Measurement}; written rows {Written}.",
+            envelope.PointName,
+            envelope.DeviceName,
+            measurement,
+            written);
+    }
+
+    private static string BuildConnectionString(string endpoint, IReadOnlyDictionary<string, string?> settings)
+    {
+        var configured = FirstNonEmpty(GatewayJson.Get(settings, "connectionString"));
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured;
+        }
+
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            throw new InvalidOperationException("SonnetDB endpoint or settings.connectionString is required.");
+        }
+
+        var trimmedEndpoint = endpoint.Trim();
+        if (trimmedEndpoint.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase))
+        {
+            return trimmedEndpoint;
+        }
+
+        var token = FirstNonEmpty(
+            GatewayJson.Get(settings, "token"),
+            GatewayJson.Get(settings, "bearerToken"),
+            GatewayJson.Get(settings, "accessToken"));
+        var tokenPart = string.IsNullOrWhiteSpace(token) ? string.Empty : $";Token={token}";
+
+        if (trimmedEndpoint.StartsWith("sonnetdb+", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Data Source={trimmedEndpoint}{tokenPart}";
+        }
+
+        var database = FirstNonEmpty(GatewayJson.Get(settings, "database"), "metrics");
+        return $"Data Source=sonnetdb+{trimmedEndpoint.TrimEnd('/')}/{database}{tokenPart}";
+    }
+
+    private static string BuildJsonPointsPayload(
+        string measurement,
+        string fieldName,
+        IReadOnlyDictionary<string, string?> settings,
+        UploadEnvelope envelope)
+    {
+        var tags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["device"] = envelope.DeviceName,
+            ["point"] = envelope.PointName,
+            ["target"] = string.IsNullOrWhiteSpace(envelope.Target) ? envelope.PointName : envelope.Target,
+            ["quality"] = envelope.Quality.ToString()
+        };
+
+        if (settings.TryGetValue("site", out var site) && !string.IsNullOrWhiteSpace(site))
+        {
+            tags["site"] = site;
+        }
+
+        var fields = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            [fieldName] = NormalizeFieldValue(envelope.Value ?? envelope.RawValue)
+        };
+
+        if (IsEnabled(settings, "includeRawValue", false) && envelope.RawValue is not null)
+        {
+            fields[SanitizeName(FirstNonEmpty(GatewayJson.Get(settings, "rawField"), "raw_value"))] = NormalizeFieldValue(envelope.RawValue);
+        }
+
+        var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["m"] = measurement,
+            ["points"] = new[]
+            {
+                new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["t"] = envelope.Timestamp.ToUnixTimeMilliseconds(),
+                    ["tags"] = tags,
+                    ["fields"] = fields
+                }
+            }
+        };
+
+        return JsonSerializer.Serialize(payload);
+    }
+
+    private static object? NormalizeFieldValue(object? value)
+        => value switch
+        {
+            null => null,
+            bool boolValue => boolValue,
+            byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal => Convert.ToDouble(value, CultureInfo.InvariantCulture),
+            _ => Convert.ToString(value, CultureInfo.InvariantCulture)
+        };
+
+    private static bool IsEnabled(IReadOnlyDictionary<string, string?> settings, string key, bool defaultValue)
+        => settings.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? bool.TryParse(value, out var parsed) ? parsed : value is "1" or "yes" or "on"
+            : defaultValue;
+
+    private static string FirstNonEmpty(params string?[] values)
+        => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+
+    private static string SanitizeName(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        foreach (var ch in value)
+        {
+            builder.Append(char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_');
+        }
+
+        var normalized = builder.ToString().Trim('_');
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return "value";
+        }
+
+        return char.IsDigit(normalized[0]) ? $"_{normalized}" : normalized;
     }
 }
 

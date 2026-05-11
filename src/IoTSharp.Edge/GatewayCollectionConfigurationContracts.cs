@@ -71,7 +71,15 @@ internal sealed record EdgeCollectionConfigurationContract
     public int Version { get; init; }
     public DateTime UpdatedAt { get; init; }
     public string UpdatedBy { get; init; } = string.Empty;
+    public CollectionUploadContract? Upload { get; init; }
     public IReadOnlyList<CollectionTaskContract> Tasks { get; init; } = [];
+}
+
+internal sealed record CollectionUploadContract
+{
+    public string Protocol { get; init; } = string.Empty;
+    public string Endpoint { get; init; } = string.Empty;
+    public JsonElement? Settings { get; init; }
 }
 
 internal sealed record CollectionTaskContract

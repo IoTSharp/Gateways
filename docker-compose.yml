@@ -1,0 +1,100 @@
+services:
+  sonnetdb:
+    image: iotsharp/sonnetdb:latest
+    container_name: iotsharp-edge-sonnetdb
+    restart: unless-stopped
+    ports:
+      - "15080:5080"
+    volumes:
+      - sonnetdb-data:/data
+
+  sonnetdb-init:
+    image: curlimages/curl:8.16.0
+    container_name: iotsharp-edge-sonnetdb-init
+    depends_on:
+      - sonnetdb
+    environment:
+      SONNETDB_URL: http://sonnetdb:5080
+      SONNETDB_TOKEN: sonnetdb-dev-token
+      SONNETDB_DATABASE: metrics
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        until curl -fsS "$$SONNETDB_URL/v1/setup/status" >/tmp/setup.json; do
+          sleep 1
+        done
+        if grep -q '"needsSetup":true' /tmp/setup.json; then
+          curl -fsS -X POST "$$SONNETDB_URL/v1/setup/initialize" \
+            -H "Content-Type: application/json" \
+            -d "{\"serverId\":\"iotsharp-edge-lab\",\"organization\":\"IoTSharp Lab\",\"username\":\"admin\",\"password\":\"Admin123!\",\"bearerToken\":\"$$SONNETDB_TOKEN\"}"
+        fi
+        curl -fsS -X POST "$$SONNETDB_URL/v1/db" \
+          -H "Authorization: Bearer $$SONNETDB_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{\"name\":\"$$SONNETDB_DATABASE\"}" || true
+        curl -fsS -X POST "$$SONNETDB_URL/v1/db/$$SONNETDB_DATABASE/sql" \
+          -H "Authorization: Bearer $$SONNETDB_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{\"sql\":\"CREATE MEASUREMENT edge_modbus (site TAG, device TAG, point TAG, target TAG, quality TAG, value FIELD FLOAT)\"}" || true
+
+  device-simulator:
+    build:
+      context: .
+      dockerfile: src/IoTSharp.Edge.DeviceSimulator/Dockerfile
+    container_name: iotsharp-edge-device-simulator
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ModbusSimulator__Port: "1502"
+      ModbusSimulator__StationNumber: "1"
+      ModbusSimulator__EndianFormat: ABCD
+      ModbusSimulator__PlcAddresses: "true"
+    ports:
+      - "1502:1502"
+      - "18181:8080"
+
+  edge:
+    build:
+      context: .
+      dockerfile: src/IoTSharp.Edge/Dockerfile
+    container_name: iotsharp-edge-runtime
+    restart: unless-stopped
+    depends_on:
+      device-simulator:
+        condition: service_started
+      sonnetdb-init:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      GatewayStorage__ConnectionString: Data Source=/data/gateways.db
+      EdgeReporting__Enabled: "false"
+      LocalCollection__Enabled: "true"
+      LocalCollection__ApplyOnStartup: "true"
+      LocalCollection__CacheUpstreamConfigurations: "true"
+      LocalCollection__FilePath: /data/local-collection.json
+      LocalCollection__TemplatePath: /app/local-collection.docker.json
+    ports:
+      - "18180:8080"
+    volumes:
+      - edge-data:/data
+
+  edge-admin:
+    build:
+      context: .
+      dockerfile: src/IoTSharp.Edge.Admin/Dockerfile
+    container_name: iotsharp-edge-admin
+    restart: unless-stopped
+    depends_on:
+      edge:
+        condition: service_started
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      EdgeApi__BaseUrl: http://127.0.0.1:18180
+    ports:
+      - "18182:8080"
+
+volumes:
+  sonnetdb-data:
+  edge-data:

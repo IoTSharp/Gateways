@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/.idea/
+.git/
+*.user
+*.suo
+*.db
+*.db-shm
+*.db-wal
+sonnetdb-data/
+edge-data/

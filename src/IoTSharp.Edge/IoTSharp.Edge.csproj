@@ -14,4 +14,8 @@
   <ItemGroup Condition="'$(EdgeEnableBasicRuntimeExtensions)' == 'true'">
     <ProjectReference Include="..\IoTSharp.Edge.RuntimeExtensions\IoTSharp.Edge.RuntimeExtensions.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="local-collection.docker.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

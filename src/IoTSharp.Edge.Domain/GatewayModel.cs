@@ -45,7 +45,8 @@ public enum UploadProtocol
 {
     Http,
     IotSharpMqtt,
-    IotSharpDeviceHttp
+    IotSharpDeviceHttp,
+    SonnetDb
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

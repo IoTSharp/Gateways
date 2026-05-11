@@ -414,6 +414,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             {
                 UploadProtocol.Http => "http",
                 UploadProtocol.IotSharpMqtt => "mqtt",
+                UploadProtocol.SonnetDb => "sonnetdb",
                 _ => channel.Protocol.ToString()
             }))
             .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -450,6 +451,11 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         if (uploadChannels.Any(channel => channel.Enabled && channel.Protocol == UploadProtocol.IotSharpMqtt))
         {
             features.Add("iotsharp-mqtt-upload");
+        }
+
+        if (uploadChannels.Any(channel => channel.Enabled && channel.Protocol == UploadProtocol.SonnetDb))
+        {
+            features.Add("sonnetdb-upload");
         }
 
         var pollingTaskNames = pollingTasks.Where(task => task.Enabled)
