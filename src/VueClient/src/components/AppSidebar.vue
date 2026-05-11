@@ -8,6 +8,7 @@ import {
   FileCode2,
   ListTree,
   PanelLeft,
+  Route,
   Settings2,
   TerminalSquare,
   Wifi,
@@ -198,6 +199,11 @@ function toggleUploadCategory(category: string) {
           </div>
         </div>
       </div>
+
+      <button class="nav-item" :class="{ active: activePanel === 'routing' }" type="button" @click="emit('switch-panel', 'routing')">
+        <Route :size="17" />
+        <span>数据路由</span>
+      </button>
 
       <button class="nav-item" :class="{ active: activePanel === 'script' }" type="button" @click="emit('switch-panel', 'script')">
         <FileCode2 :size="17" />

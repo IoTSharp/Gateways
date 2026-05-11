@@ -77,6 +77,7 @@ internal sealed record EdgeCollectionConfigurationContract
     public string UpdatedBy { get; init; } = string.Empty;
     public CollectionUploadContract? Upload { get; init; }
     public IReadOnlyList<CollectionUploadContract> Uploads { get; init; } = [];
+    public IReadOnlyList<CollectionRouteContract> UploadRoutes { get; init; } = [];
     public IReadOnlyList<CollectionTaskContract> Tasks { get; init; } = [];
 }
 
@@ -90,6 +91,17 @@ internal sealed record CollectionUploadContract
     public bool Enabled { get; init; } = true;
     public int BatchSize { get; init; } = 1;
     public bool BufferingEnabled { get; init; }
+}
+
+internal sealed record CollectionRouteContract
+{
+    public string TaskKey { get; init; } = string.Empty;
+    public string DeviceKey { get; init; } = string.Empty;
+    public string PointKey { get; init; } = string.Empty;
+    public string UploadTargetKey { get; init; } = string.Empty;
+    public string TargetName { get; init; } = string.Empty;
+    public string PayloadTemplate { get; init; } = string.Empty;
+    public bool Enabled { get; init; } = true;
 }
 
 internal sealed record CollectionTaskContract

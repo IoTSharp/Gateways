@@ -22,6 +22,8 @@ internal static class GatewayCollectionConfigurationMapper
         var normalizedBaseUrl = string.IsNullOrWhiteSpace(options.BaseUrl) ? string.Empty : NormalizeBaseUrl(options.BaseUrl);
         var accessToken = options.AccessToken ?? string.Empty;
         var uploadTargets = ResolveUploadTargets(configuration, normalizedBaseUrl, accessToken);
+        var uploadTargetsByKey = uploadTargets.ToDictionary(target => target.TargetKey, StringComparer.OrdinalIgnoreCase);
+        var uploadRoutesByPoint = BuildUploadRoutesByPoint(configuration.UploadRoutes);
 
         var channels = new List<GatewayChannel>();
         var devices = new List<Device>();
@@ -99,17 +101,46 @@ internal static class GatewayCollectionConfigurationMapper
                     var targetType = NormalizeTargetType(pointContract.Mapping.TargetType, pointContract.PointKey);
                     requiredTargetTypes.Add(targetType);
 
-                    foreach (var uploadTarget in uploadTargets.Where(target => target.Enabled))
+                    var pointRouteKey = BuildPointRouteKey(task.TaskKey, deviceContract.DeviceKey, pointContract.PointKey);
+                    if (uploadRoutesByPoint.TryGetValue(pointRouteKey, out var explicitRoutes))
                     {
-                        uploadRoutes.Add(new UploadRoute
+                        foreach (var routeContract in explicitRoutes.Where(route => route.Enabled))
                         {
-                            Id = CreateDeterministicGuid(edgeNodeId, "upload-route", task.TaskKey, deviceContract.DeviceKey, pointContract.PointKey, uploadTarget.TargetKey, targetType.ToString()),
-                            PointId = pointId,
-                            UploadChannelId = CreateUploadChannelId(edgeNodeId, uploadTarget.TargetKey, targetType),
-                            PayloadTemplate = string.Empty,
-                            Target = pointContract.Mapping.TargetName,
-                            Enabled = pointEnabled
-                        });
+                            if (!uploadTargetsByKey.TryGetValue(routeContract.UploadTargetKey, out var uploadTarget))
+                            {
+                                throw new InvalidOperationException($"任务“{task.TaskKey}”、设备“{deviceContract.DeviceKey}”、点位“{pointContract.PointKey}”的上传路由引用了不存在的上传目标“{routeContract.UploadTargetKey}”。");
+                            }
+
+                            if (!uploadTarget.Enabled)
+                            {
+                                continue;
+                            }
+
+                            uploadRoutes.Add(new UploadRoute
+                            {
+                                Id = CreateDeterministicGuid(edgeNodeId, "upload-route", task.TaskKey, deviceContract.DeviceKey, pointContract.PointKey, uploadTarget.TargetKey, ResolveRouteTargetName(routeContract, pointContract.Mapping.TargetName), targetType.ToString()),
+                                PointId = pointId,
+                                UploadChannelId = CreateUploadChannelId(edgeNodeId, uploadTarget.TargetKey, targetType),
+                                PayloadTemplate = routeContract.PayloadTemplate,
+                                Target = ResolveRouteTargetName(routeContract, pointContract.Mapping.TargetName),
+                                Enabled = pointEnabled && routeContract.Enabled
+                            });
+                        }
+                    }
+                    else
+                    {
+                        foreach (var uploadTarget in uploadTargets.Where(target => target.Enabled))
+                        {
+                            uploadRoutes.Add(new UploadRoute
+                            {
+                                Id = CreateDeterministicGuid(edgeNodeId, "upload-route", task.TaskKey, deviceContract.DeviceKey, pointContract.PointKey, uploadTarget.TargetKey, targetType.ToString()),
+                                PointId = pointId,
+                                UploadChannelId = CreateUploadChannelId(edgeNodeId, uploadTarget.TargetKey, targetType),
+                                PayloadTemplate = string.Empty,
+                                Target = pointContract.Mapping.TargetName,
+                                Enabled = pointEnabled
+                            });
+                        }
                     }
                 }
 
@@ -269,6 +300,18 @@ internal static class GatewayCollectionConfigurationMapper
             upload.Enabled);
     }
 
+    private static IReadOnlyDictionary<string, CollectionRouteContract[]> BuildUploadRoutesByPoint(IReadOnlyList<CollectionRouteContract>? routes)
+    {
+        if (routes is not { Count: > 0 })
+        {
+            return new Dictionary<string, CollectionRouteContract[]>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return routes
+            .GroupBy(route => BuildPointRouteKey(route.TaskKey, route.DeviceKey, route.PointKey), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
+    }
+
     private static Dictionary<string, string?> BuildUploadTargetSettings(
         CollectionUploadContract upload,
         string normalizedBaseUrl,
@@ -362,6 +405,12 @@ internal static class GatewayCollectionConfigurationMapper
 
     private static Guid CreateUploadChannelId(Guid edgeNodeId, string targetKey, GatewayCollectionTargetType targetType)
         => CreateDeterministicGuid(edgeNodeId, "upload-channel", targetKey, targetType.ToString());
+
+    private static string ResolveRouteTargetName(CollectionRouteContract route, string fallback)
+        => string.IsNullOrWhiteSpace(route.TargetName) ? fallback : route.TargetName.Trim();
+
+    private static string BuildPointRouteKey(string taskKey, string deviceKey, string pointKey)
+        => string.Join("::", taskKey.Trim(), deviceKey.Trim(), pointKey.Trim());
 
     private static string CreateUploadTargetKey(string displayName, UploadProtocol protocol, int index)
     {

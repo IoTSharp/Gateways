@@ -252,6 +252,7 @@ internal sealed class LocalCollectionConfigurationService
         string? updatedBy)
     {
         var normalizedUploads = NormalizeUploads(configuration.Uploads, configuration.Upload);
+        var normalizedRoutes = NormalizeRoutes(configuration.UploadRoutes);
         var normalized = configuration with
         {
             EdgeNodeId = configuration.EdgeNodeId == Guid.Empty ? Guid.NewGuid() : configuration.EdgeNodeId,
@@ -262,6 +263,7 @@ internal sealed class LocalCollectionConfigurationService
                 : updatedBy.Trim(),
             Upload = normalizedUploads.FirstOrDefault(),
             Uploads = normalizedUploads,
+            UploadRoutes = normalizedRoutes,
             Tasks = (configuration.Tasks ?? []).Select(NormalizeTask).ToArray()
         };
 
@@ -301,8 +303,29 @@ internal sealed class LocalCollectionConfigurationService
             Settings = upload.Settings.HasValue
                 ? upload.Settings
                 : JsonSerializer.SerializeToElement(new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase), JsonOptions)
-        };
+            };
     }
+
+    private static IReadOnlyList<CollectionRouteContract> NormalizeRoutes(IReadOnlyList<CollectionRouteContract>? routes)
+    {
+        if (routes is not { Count: > 0 })
+        {
+            return [];
+        }
+
+        return routes.Select(NormalizeRoute).ToArray();
+    }
+
+    private static CollectionRouteContract NormalizeRoute(CollectionRouteContract route)
+        => route with
+        {
+            TaskKey = route.TaskKey?.Trim() ?? string.Empty,
+            DeviceKey = route.DeviceKey?.Trim() ?? string.Empty,
+            PointKey = route.PointKey?.Trim() ?? string.Empty,
+            UploadTargetKey = route.UploadTargetKey?.Trim() ?? string.Empty,
+            TargetName = route.TargetName?.Trim() ?? string.Empty,
+            PayloadTemplate = route.PayloadTemplate?.Trim() ?? string.Empty
+        };
 
     private static CollectionTaskContract NormalizeTask(CollectionTaskContract task)
     {
@@ -396,6 +419,7 @@ internal sealed class LocalCollectionConfigurationService
                     BufferingEnabled = false
                 }
             ],
+            UploadRoutes = [],
             Tasks = []
         };
     }

@@ -8,6 +8,7 @@ import DashboardPanel from './components/DashboardPanel.vue'
 import LogsPanel from './components/LogsPanel.vue'
 import ScriptPanel from './components/ScriptPanel.vue'
 import SummaryGrid from './components/SummaryGrid.vue'
+import RoutingPanel from './components/RoutingPanel.vue'
 import TopologyPanel from './components/TopologyPanel.vue'
 import UploadTargetsPanel from './components/UploadTargetsPanel.vue'
 import type {
@@ -16,6 +17,7 @@ import type {
   CollectionProtocolDescriptor,
   CollectionTask,
   CollectionUpload,
+  CollectionRoute,
   ConnectionSettingDefinition,
   EdgeCollectionConfiguration,
   LocalConfigurationResponse,
@@ -26,7 +28,17 @@ import type {
   UploadProtocolCatalogResponse,
   UploadProtocolDescriptor,
 } from './types'
-import type { PanelName, PointRow, ProtocolGroup, StatusTone, TopologyRow, UploadProtocolGroup } from './uiTypes'
+import type {
+  PanelName,
+  PointRow,
+  ProtocolGroup,
+  RoutePointOption,
+  RouteRow,
+  RouteUploadTargetOption,
+  StatusTone,
+  TopologyRow,
+  UploadProtocolGroup,
+} from './uiTypes'
 
 const activePanel = ref<PanelName>('dashboard')
 const selectedProtocolCode = ref('modbus')
@@ -47,8 +59,10 @@ const isLoading = ref(false)
 const isSaving = ref(false)
 const topologyFormDirty = ref(false)
 const uploadFormDirty = ref(false)
+const routeFormDirty = ref(false)
 const selectedUploadProtocolCode = ref('IoTSharp')
 const selectedUploadTargetIndex = ref(-1)
+const selectedRouteIndex = ref(-1)
 
 const topologyForm = reactive({
   taskKey: '',
@@ -69,6 +83,13 @@ const uploadForm = reactive({
 })
 const uploadSettingValues = reactive<Record<string, string>>({})
 const pointRows = ref<PointRow[]>([])
+const routeForm = reactive({
+  pointRef: '',
+  uploadTargetKey: '',
+  targetName: '',
+  payloadTemplate: '',
+  enabled: true,
+})
 
 const fallbackProtocol = computed<CollectionProtocolDescriptor>(() => ({
   code: 'modbus',
@@ -163,6 +184,13 @@ const uploadProtocolFlags = computed(() => [
   selectedUploadTarget.value?.endpoint ? '已配置端点' : '',
 ].filter(Boolean))
 
+const routeRows = computed(() => buildRouteRows(baseConfiguration.value))
+const routePointOptions = computed(() => buildRoutePointOptions(baseConfiguration.value))
+const routeUploadTargetOptions = computed(() => buildRouteUploadTargetOptions(baseConfiguration.value))
+const selectedRouteRows = computed(() => routeRows.value)
+const selectedRoute = computed(() => selectedRouteRows.value[selectedRouteIndex.value] ?? selectedRouteRows.value[0] ?? null)
+const selectedRouteCount = computed(() => selectedRouteRows.value.length)
+
 const connectionSettings = computed(() => selectedProtocol.value.connectionSettings ?? [])
 const visibleConnectionSettings = computed(() => connectionSettings.value.filter((setting) => isConnectionSettingVisible(setting, selectedProtocol.value, connectionValues.transport)))
 const protocolFlags = computed(() => [
@@ -217,6 +245,7 @@ const dashboardCards = computed(() => {
 const pageTitle = computed(() => {
   if (activePanel.value === 'topology') return `${selectedProtocol.value.displayName} 采集`
   if (activePanel.value === 'upload') return `${selectedUploadProtocol.value.displayName} 上传`
+  if (activePanel.value === 'routing') return '数据路由'
   if (activePanel.value === 'script') return 'BASIC 脚本'
   if (activePanel.value === 'logs') return '运行日志'
   if (activePanel.value === 'bootstrap') return '本地配置'
@@ -272,6 +301,7 @@ async function loadAll() {
     writeConfigurationText(baseConfiguration.value)
     populateFormsFromConfiguration(baseConfiguration.value, selectedProtocol.value)
     populateUploadFormsFromConfiguration(baseConfiguration.value, selectedUploadProtocol.value)
+    populateRouteFormsFromConfiguration(baseConfiguration.value)
     setStatus(`最近刷新：${formatDate(summary.generatedAtUtc)}`, 'ok')
   } catch (error) {
     setStatus(errorMessage(error), 'warn')
@@ -321,6 +351,7 @@ async function saveConfiguration(apply: boolean, successMessage: string) {
 
     topologyFormDirty.value = false
     uploadFormDirty.value = false
+    routeFormDirty.value = false
     await loadAll()
     setStatus(successMessage, 'ok')
   } catch (error) {
@@ -348,7 +379,7 @@ function switchPanel(panel: PanelName) {
 }
 
 function selectProtocol(code: string) {
-  if (topologyFormDirty.value || uploadFormDirty.value) {
+  if (topologyFormDirty.value || uploadFormDirty.value || routeFormDirty.value) {
     syncFormsToJson('草稿已同步')
   }
 
@@ -359,7 +390,7 @@ function selectProtocol(code: string) {
 }
 
 function selectUploadProtocol(code: string) {
-  if (topologyFormDirty.value || uploadFormDirty.value) {
+  if (topologyFormDirty.value || uploadFormDirty.value || routeFormDirty.value) {
     syncFormsToJson('草稿已同步')
   }
 
@@ -386,8 +417,10 @@ function onJsonInput() {
   baseConfiguration.value = parsed
   topologyFormDirty.value = false
   uploadFormDirty.value = false
+  routeFormDirty.value = false
   populateFormsFromConfiguration(parsed, selectedProtocol.value, selectedDeviceIndex.value)
   populateUploadFormsFromConfiguration(parsed, selectedUploadProtocol.value, selectedUploadTargetIndex.value)
+  populateRouteFormsFromConfiguration(parsed, selectedRouteIndex.value)
   setStatus('JSON 已修改')
 }
 
@@ -407,8 +440,10 @@ function syncFormsToJson(message = '表单已同步到 JSON') {
   writeConfigurationText(payload)
   populateFormsFromConfiguration(payload, selectedProtocol.value, selectedDeviceIndex.value)
   populateUploadFormsFromConfiguration(payload, selectedUploadProtocol.value, selectedUploadTargetIndex.value)
+  populateRouteFormsFromConfiguration(payload, selectedRouteIndex.value)
   topologyFormDirty.value = false
   uploadFormDirty.value = false
+  routeFormDirty.value = false
   setStatus(message, 'ok')
 }
 
@@ -417,7 +452,7 @@ function selectDevice(index: number) {
     return
   }
 
-  if (topologyFormDirty.value || uploadFormDirty.value) {
+  if (topologyFormDirty.value || uploadFormDirty.value || routeFormDirty.value) {
     syncFormsToJson('草稿已同步')
   }
 
@@ -431,7 +466,7 @@ function selectUploadTarget(index: number) {
     return
   }
 
-  if (topologyFormDirty.value || uploadFormDirty.value) {
+  if (topologyFormDirty.value || uploadFormDirty.value || routeFormDirty.value) {
     syncFormsToJson('草稿已同步')
   }
 
@@ -468,6 +503,7 @@ function addUploadTarget() {
   populateUploadFormsFromConfiguration(configuration, selectedUploadProtocol.value, selectedUploadTargetIndex.value)
   topologyFormDirty.value = false
   uploadFormDirty.value = false
+  routeFormDirty.value = false
   setStatus('已新增上传目标', 'ok')
 }
 
@@ -499,13 +535,14 @@ function removeUploadTarget() {
   populateUploadFormsFromConfiguration(configuration, selectedUploadProtocol.value, selectedUploadTargetIndex.value)
   topologyFormDirty.value = false
   uploadFormDirty.value = false
+  routeFormDirty.value = false
   setStatus('上传目标已删除', 'ok')
 }
 
 function addDevice() {
   const previousTask = findTopologyTask(baseConfiguration.value, selectedProtocol.value)
   const previousDeviceCount = Array.isArray(previousTask?.devices) ? previousTask.devices.length : 0
-  const hasDraftChanges = topologyFormDirty.value || uploadFormDirty.value
+  const hasDraftChanges = topologyFormDirty.value || uploadFormDirty.value || routeFormDirty.value
   const payload = previousDeviceCount > 0 || hasDraftChanges
     ? readMergedConfiguration()
     : clone(baseConfiguration.value)
@@ -526,6 +563,7 @@ function addDevice() {
   populateFormsFromConfiguration(configuration, selectedProtocol.value, selectedDeviceIndex.value)
   topologyFormDirty.value = false
   uploadFormDirty.value = false
+  routeFormDirty.value = false
   setStatus('已新建设备', 'ok')
 }
 
@@ -549,6 +587,7 @@ function removeDevice() {
   populateFormsFromConfiguration(configuration, selectedProtocol.value, selectedDeviceIndex.value)
   topologyFormDirty.value = false
   uploadFormDirty.value = false
+  routeFormDirty.value = false
   setStatus('设备已删除', 'ok')
 }
 
@@ -563,6 +602,7 @@ function addPoint() {
   populateFormsFromConfiguration(configuration, selectedProtocol.value, selectedDeviceIndex.value)
   topologyFormDirty.value = false
   uploadFormDirty.value = false
+  routeFormDirty.value = false
   setStatus('已新增点位')
 }
 
@@ -629,10 +669,114 @@ function populateUploadFormsFromConfiguration(configuration: EdgeCollectionConfi
   }
 }
 
+function populateRouteFormsFromConfiguration(configuration: EdgeCollectionConfiguration, routeIndex = selectedRouteIndex.value) {
+  const routes = buildRouteRows(configuration)
+  const resolvedRouteIndex = routes.length ? Math.min(Math.max(0, routeIndex), routes.length - 1) : -1
+  selectedRouteIndex.value = resolvedRouteIndex
+  const route = resolvedRouteIndex >= 0 ? routes[resolvedRouteIndex] : null
+  const pointOptions = buildRoutePointOptions(configuration)
+  const uploadTargetOptions = buildRouteUploadTargetOptions(configuration)
+
+  const pointRef = route ? buildPointRef(route.taskKey, route.deviceKey, route.pointKey) : pointOptions[0]?.value ?? ''
+  const pointTargetName = resolvePointTargetName(configuration, pointRef)
+
+  routeForm.pointRef = pointRef
+  routeForm.uploadTargetKey = route?.uploadTargetKey ?? uploadTargetOptions[0]?.value ?? ''
+  routeForm.targetName = route?.targetName || pointTargetName
+  routeForm.payloadTemplate = route?.payloadTemplate ?? ''
+  routeForm.enabled = route?.enabled !== false
+}
+
+function markRouteDirty() {
+  routeFormDirty.value = true
+  setStatus('路由已修改')
+}
+
+function handleRoutePointChange() {
+  routeForm.targetName = resolvePointTargetName(baseConfiguration.value, routeForm.pointRef)
+  markRouteDirty()
+}
+
+function selectRoute(index: number) {
+  if (Number.isNaN(index) || index < 0 || index >= selectedRouteRows.value.length || index === selectedRouteIndex.value) {
+    return
+  }
+
+  if (topologyFormDirty.value || uploadFormDirty.value || routeFormDirty.value) {
+    syncFormsToJson('草稿已同步')
+  }
+
+  selectedRouteIndex.value = index
+  populateRouteFormsFromConfiguration(baseConfiguration.value, selectedRouteIndex.value)
+  setStatus('路由已切换')
+}
+
+function addRoute() {
+  const payload = readMergedConfiguration()
+  const configuration = clone(payload)
+  const routes = Array.isArray(configuration.uploadRoutes) && configuration.uploadRoutes.length > 0
+    ? [...configuration.uploadRoutes]
+    : []
+
+  const pointOptions = buildRoutePointOptions(configuration)
+  const uploadTargetOptions = buildRouteUploadTargetOptions(configuration)
+  const defaultPointRef = pointOptions[0]?.value ?? ''
+  const defaultPoint = parsePointRef(defaultPointRef)
+  const newRoute: CollectionRoute = {
+    taskKey: defaultPoint?.taskKey ?? '',
+    deviceKey: defaultPoint?.deviceKey ?? '',
+    pointKey: defaultPoint?.pointKey ?? '',
+    uploadTargetKey: uploadTargetOptions[0]?.value ?? '',
+    targetName: defaultPointRef ? resolvePointTargetName(configuration, defaultPointRef) : '',
+    payloadTemplate: '',
+    enabled: true,
+  }
+
+  routes.push(newRoute)
+  configuration.uploadRoutes = routes
+
+  baseConfiguration.value = configuration
+  writeConfigurationText(configuration)
+  const nextRows = buildRouteRows(configuration)
+  selectedRouteIndex.value = Math.max(0, nextRows.findIndex((row) => row.configIndex === routes.length - 1))
+  populateRouteFormsFromConfiguration(configuration, selectedRouteIndex.value)
+  topologyFormDirty.value = false
+  uploadFormDirty.value = false
+  routeFormDirty.value = false
+  setStatus('已新增路由', 'ok')
+}
+
+function removeRoute() {
+  const payload = readMergedConfiguration()
+  const configuration = clone(payload)
+  const routes = Array.isArray(configuration.uploadRoutes) && configuration.uploadRoutes.length > 0
+    ? [...configuration.uploadRoutes]
+    : []
+  const selected = selectedRouteRows.value[selectedRouteIndex.value]
+
+  if (!selected) {
+    return
+  }
+
+  routes.splice(selected.configIndex, 1)
+  configuration.uploadRoutes = routes
+
+  baseConfiguration.value = configuration
+  writeConfigurationText(configuration)
+  const nextRows = buildRouteRows(configuration)
+  selectedRouteIndex.value = nextRows.length ? Math.min(selectedRouteIndex.value, nextRows.length - 1) : -1
+  populateRouteFormsFromConfiguration(configuration, selectedRouteIndex.value)
+  topologyFormDirty.value = false
+  uploadFormDirty.value = false
+  routeFormDirty.value = false
+  setStatus('路由已删除', 'ok')
+}
+
 function readMergedConfiguration() {
   let payload = clone(baseConfiguration.value)
   payload = applyTopologyForm(payload, selectedProtocol.value, selectedDeviceIndex.value)
   payload = applyUploadForm(payload)
+  payload = applyRouteForm(payload)
 
   return payload
 }
@@ -640,6 +784,7 @@ function readMergedConfiguration() {
 function validateStructuralKeys(configuration: EdgeCollectionConfiguration) {
   const tasks = Array.isArray(configuration.tasks) ? configuration.tasks : []
   const taskKeys = new Set<string>()
+  const pointRefs = new Set<string>()
 
   for (const task of tasks) {
     const taskKey = normalizeStructuralKey(task.taskKey)
@@ -674,8 +819,52 @@ function validateStructuralKeys(configuration: EdgeCollectionConfiguration) {
           return `任务“${task.taskKey?.trim() ?? ''}”、设备“${device.deviceKey?.trim() ?? ''}”中点位键“${point.pointKey?.trim() ?? ''}”重复。`
         }
         pointKeys.add(pointKey)
+        pointRefs.add(buildPointRef(task.taskKey ?? '', device.deviceKey ?? '', point.pointKey ?? ''))
       }
     }
+  }
+
+  const uploads = getUploadTargets(configuration)
+  const uploadKeys = new Set(
+    uploads
+      .map((upload) => normalizeStructuralKey(upload.targetKey))
+      .filter(Boolean),
+  )
+
+  const routeKeys = new Set<string>()
+  for (const route of Array.isArray(configuration.uploadRoutes) ? configuration.uploadRoutes : []) {
+    const taskKey = normalizeStructuralKey(route.taskKey)
+    const deviceKey = normalizeStructuralKey(route.deviceKey)
+    const pointKey = normalizeStructuralKey(route.pointKey)
+    const uploadTargetKey = normalizeStructuralKey(route.uploadTargetKey)
+
+    if (!taskKey) {
+      return '上传路由的 taskKey 不能为空。'
+    }
+    if (!deviceKey) {
+      return `上传路由“${route.taskKey?.trim() ?? ''}”的 deviceKey 不能为空。`
+    }
+    if (!pointKey) {
+      return `上传路由“${route.taskKey?.trim() ?? ''}/${route.deviceKey?.trim() ?? ''}”的 pointKey 不能为空。`
+    }
+    if (!uploadTargetKey) {
+      return `上传路由“${route.taskKey?.trim() ?? ''}/${route.deviceKey?.trim() ?? ''}/${route.pointKey?.trim() ?? ''}”的 uploadTargetKey 不能为空。`
+    }
+
+    const pointRef = buildPointRef(route.taskKey ?? '', route.deviceKey ?? '', route.pointKey ?? '')
+    if (!pointRefs.has(pointRef)) {
+      return `上传路由引用了不存在的点位“${route.taskKey?.trim() ?? ''}/${route.deviceKey?.trim() ?? ''}/${route.pointKey?.trim() ?? ''}”。`
+    }
+
+    if (!uploadKeys.has(uploadTargetKey)) {
+      return `上传路由“${route.taskKey?.trim() ?? ''}/${route.deviceKey?.trim() ?? ''}/${route.pointKey?.trim() ?? ''}”引用了不存在的上传目标“${route.uploadTargetKey?.trim() ?? ''}”。`
+    }
+
+    const routeKey = stringJoinKey(pointRef, uploadTargetKey, normalizeStructuralKey(route.targetName), normalizeStructuralKey(route.payloadTemplate))
+    if (routeKeys.has(routeKey)) {
+      return `上传路由“${route.taskKey?.trim() ?? ''}/${route.deviceKey?.trim() ?? ''}/${route.pointKey?.trim() ?? ''} -> ${route.uploadTargetKey?.trim() ?? ''}”重复。`
+    }
+    routeKeys.add(routeKey)
   }
 
   return ''
@@ -774,6 +963,54 @@ function applyUploadForm(configuration: EdgeCollectionConfiguration) {
   next.uploads = uploads
   next.upload = uploads[0] ?? undefined
   selectedUploadTargetIndex.value = selected ? selectedUploadTargetIndex.value : Math.max(0, uploads.filter((item) => sameUploadProtocol(item.protocol, selectedUploadProtocol.value.code)).length - 1)
+
+  return next
+}
+
+function applyRouteForm(configuration: EdgeCollectionConfiguration) {
+  const next = clone(configuration)
+  const routes = Array.isArray(next.uploadRoutes) && next.uploadRoutes.length > 0
+    ? [...next.uploadRoutes]
+    : []
+  const selected = selectedRouteRows.value[selectedRouteIndex.value] ?? null
+
+  if (!selected && !routeFormDirty.value) {
+    next.uploadRoutes = routes
+    return next
+  }
+
+  const parsedPointRef = parsePointRef(routeForm.pointRef) ?? (selected
+    ? { taskKey: selected.taskKey, deviceKey: selected.deviceKey, pointKey: selected.pointKey }
+    : null)
+
+  if (!parsedPointRef) {
+    next.uploadRoutes = routes
+    return next
+  }
+
+  let routeIndex = selected?.configIndex ?? -1
+  const route: CollectionRoute = routeIndex >= 0 ? clone(routes[routeIndex]) : {}
+  const pointRef = buildPointRef(parsedPointRef.taskKey, parsedPointRef.deviceKey, parsedPointRef.pointKey)
+
+  route.taskKey = parsedPointRef.taskKey
+  route.deviceKey = parsedPointRef.deviceKey
+  route.pointKey = parsedPointRef.pointKey
+  route.uploadTargetKey = routeForm.uploadTargetKey.trim()
+  route.targetName = routeForm.targetName.trim() || resolvePointTargetName(next, pointRef) || parsedPointRef.pointKey
+  route.payloadTemplate = routeForm.payloadTemplate.trim()
+  route.enabled = routeForm.enabled !== false
+
+  if (routeIndex >= 0) {
+    routes[routeIndex] = route
+  } else {
+    routeIndex = routes.length
+    routes.push(route)
+  }
+
+  next.uploadRoutes = routes
+  const nextRows = buildRouteRows(next)
+  const nextSelectedIndex = nextRows.findIndex((row) => row.configIndex === routeIndex)
+  selectedRouteIndex.value = nextSelectedIndex >= 0 ? nextSelectedIndex : Math.max(0, nextRows.length - 1)
 
   return next
 }
@@ -945,6 +1182,158 @@ function buildTopologyRows(configuration: EdgeCollectionConfiguration, protocol:
   }
 
   return rows
+}
+
+function buildRoutePointOptions(configuration: EdgeCollectionConfiguration) {
+  const pointMap = new Map<string, RoutePointOption>()
+  for (const { task, device, point } of enumeratePoints(configuration)) {
+    const pointRef = buildPointRef(task.taskKey ?? '', device.deviceKey ?? '', point.pointKey ?? '')
+    pointMap.set(pointRef, {
+      value: pointRef,
+      label: buildPointOptionLabel(task, device, point)
+    })
+  }
+
+  for (const route of Array.isArray(configuration.uploadRoutes) ? configuration.uploadRoutes : []) {
+    const pointRef = buildPointRef(route.taskKey ?? '', route.deviceKey ?? '', route.pointKey ?? '')
+    if (!pointMap.has(pointRef)) {
+      pointMap.set(pointRef, {
+        value: pointRef,
+        label: buildMissingPointOptionLabel(route.taskKey ?? '', route.deviceKey ?? '', route.pointKey ?? '')
+      })
+    }
+  }
+
+  return Array.from(pointMap.values()).sort((left, right) => left.label.localeCompare(right.label, 'zh-Hans-CN'))
+}
+
+function buildRouteUploadTargetOptions(configuration: EdgeCollectionConfiguration) {
+  const targets = getUploadTargets(configuration)
+  const targetMap = new Map<string, RouteUploadTargetOption>()
+
+  targets.forEach((upload, index) => {
+    const targetKey = normalizeStructuralKey(upload.targetKey)
+    if (!targetKey) return
+    targetMap.set(targetKey, {
+      value: upload.targetKey ?? '',
+      label: buildUploadTargetOptionLabel(upload, index)
+    })
+  })
+
+  for (const route of Array.isArray(configuration.uploadRoutes) ? configuration.uploadRoutes : []) {
+    const targetKey = normalizeStructuralKey(route.uploadTargetKey)
+    if (!targetKey || targetMap.has(targetKey)) {
+      continue
+    }
+
+    targetMap.set(targetKey, {
+      value: route.uploadTargetKey ?? '',
+      label: buildMissingUploadTargetLabel(route.uploadTargetKey ?? '')
+    })
+  }
+
+  return Array.from(targetMap.values()).sort((left, right) => left.label.localeCompare(right.label, 'zh-Hans-CN'))
+}
+
+function buildRouteRows(configuration: EdgeCollectionConfiguration) {
+  const uploads = getUploadTargets(configuration)
+  const uploadMap = new Map(uploads.map((upload) => [normalizeStructuralKey(upload.targetKey), upload] as const))
+  const rows: RouteRow[] = []
+
+  for (const [index, route] of (Array.isArray(configuration.uploadRoutes) ? configuration.uploadRoutes : []).entries()) {
+    const point = findPointByRef(configuration, route.taskKey ?? '', route.deviceKey ?? '', route.pointKey ?? '')
+    const upload = uploadMap.get(normalizeStructuralKey(route.uploadTargetKey))
+    const pointTargetName = String(point?.point.mapping?.targetName ?? '').trim()
+    rows.push({
+      configIndex: index,
+      taskKey: route.taskKey ?? '',
+      deviceKey: route.deviceKey ?? '',
+      pointKey: route.pointKey ?? '',
+      pointLabel: point ? buildPointOptionLabel(point.task, point.device, point.point) : buildMissingPointOptionLabel(route.taskKey ?? '', route.deviceKey ?? '', route.pointKey ?? ''),
+      uploadTargetKey: route.uploadTargetKey ?? '',
+      uploadTargetLabel: upload ? buildUploadTargetOptionLabel(upload, uploads.indexOf(upload)) : buildMissingUploadTargetLabel(route.uploadTargetKey ?? ''),
+      targetName: route.targetName?.trim() || pointTargetName || route.pointKey || '',
+      payloadTemplate: route.payloadTemplate ?? '',
+      enabled: route.enabled !== false,
+    })
+  }
+
+  return rows.sort((left, right) => {
+    const pointCompare = left.pointLabel.localeCompare(right.pointLabel, 'zh-Hans-CN')
+    if (pointCompare !== 0) return pointCompare
+    return left.uploadTargetLabel.localeCompare(right.uploadTargetLabel, 'zh-Hans-CN')
+  })
+}
+
+function enumeratePoints(configuration: EdgeCollectionConfiguration) {
+  const items: Array<{ task: CollectionTask; device: CollectionDevice; point: CollectionPoint }> = []
+  for (const task of Array.isArray(configuration.tasks) ? configuration.tasks : []) {
+    for (const device of Array.isArray(task.devices) ? task.devices : []) {
+      for (const point of Array.isArray(device.points) ? device.points : []) {
+        items.push({ task, device, point })
+      }
+    }
+  }
+
+  return items
+}
+
+function findPointByRef(configuration: EdgeCollectionConfiguration, taskKey: string, deviceKey: string, pointKey: string) {
+  const pointRef = buildPointRef(taskKey, deviceKey, pointKey)
+  return enumeratePoints(configuration).find(({ task, device, point }) =>
+    buildPointRef(task.taskKey ?? '', device.deviceKey ?? '', point.pointKey ?? '') === pointRef)
+}
+
+function resolvePointTargetName(configuration: EdgeCollectionConfiguration, pointRef: string) {
+  const parsed = parsePointRef(pointRef)
+  if (!parsed) return ''
+
+  const point = findPointByRef(configuration, parsed.taskKey, parsed.deviceKey, parsed.pointKey)
+  return String(point?.point.mapping?.targetName ?? point?.point.pointKey ?? '').trim()
+}
+
+function buildPointOptionLabel(task: CollectionTask, device: CollectionDevice, point: CollectionPoint) {
+  const taskKey = task.taskKey?.trim() || '--'
+  const deviceLabel = device.deviceName?.trim() || device.deviceKey?.trim() || '--'
+  const pointLabel = point.pointName?.trim() || point.pointKey?.trim() || '--'
+  const pointKey = point.pointKey?.trim()
+  return pointKey ? `${taskKey} / ${deviceLabel} / ${pointLabel} · ${pointKey}` : `${taskKey} / ${deviceLabel} / ${pointLabel}`
+}
+
+function buildMissingPointOptionLabel(taskKey: string, deviceKey: string, pointKey: string) {
+  return `无效点位 · ${taskKey || '--'} / ${deviceKey || '--'} / ${pointKey || '--'}`
+}
+
+function buildUploadTargetOptionLabel(upload: CollectionUpload, index = 0) {
+  const fallback = `上传目标 ${index + 1}`
+  const name = upload.displayName?.trim() || upload.targetKey?.trim() || fallback
+  const targetKey = upload.targetKey?.trim() || '--'
+  return `${name} · ${targetKey} · ${displayUploadProtocol(upload.protocol)}`
+}
+
+function buildMissingUploadTargetLabel(targetKey: string) {
+  return `无效目标 · ${targetKey || '--'}`
+}
+
+function buildPointRef(taskKey: string, deviceKey: string, pointKey: string) {
+  return stringJoinKey(taskKey, deviceKey, pointKey)
+}
+
+function parsePointRef(value: string) {
+  const parts = String(value ?? '').split('::')
+  if (parts.length !== 3 || parts.some((part) => !part)) {
+    return null
+  }
+
+  return {
+    taskKey: parts[0],
+    deviceKey: parts[1],
+    pointKey: parts[2],
+  }
+}
+
+function stringJoinKey(...values: Array<unknown>) {
+  return values.map((value) => normalizeStructuralKey(value)).join('::')
 }
 
 function countTasksForProtocol(configuration: EdgeCollectionConfiguration, protocol: CollectionProtocolDescriptor) {
@@ -2053,6 +2442,28 @@ function normalizeTargetName(value: string) {
           :input-type="inputType"
           :display-connection-setting-description="displayConnectionSettingDescription"
           :handle-upload-setting-boolean-change="handleUploadSettingBooleanChange"
+          :sync-forms-to-json="syncFormsToJson"
+          :apply-configuration="applyConfiguration"
+          @json-input="onJsonInput"
+        />
+
+        <RoutingPanel
+          v-show="activePanel === 'routing'"
+          v-model:configuration-text="configurationText"
+          :route-rows="routeRows"
+          :selected-route="selectedRoute"
+          :selected-route-count="selectedRouteCount"
+          :selected-route-index="selectedRouteIndex"
+          :route-point-options="routePointOptions"
+          :route-upload-target-options="routeUploadTargetOptions"
+          :route-form="routeForm"
+          :json-parse-error="jsonParseError"
+          :is-saving="isSaving"
+          :select-route="selectRoute"
+          :add-route="addRoute"
+          :remove-route="removeRoute"
+          :handle-route-point-change="handleRoutePointChange"
+          :mark-route-dirty="markRouteDirty"
           :sync-forms-to-json="syncFormsToJson"
           :apply-configuration="applyConfiguration"
           @json-input="onJsonInput"

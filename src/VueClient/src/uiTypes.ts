@@ -3,7 +3,7 @@ import type {
   UploadProtocolDescriptor,
 } from './types'
 
-export type PanelName = 'dashboard' | 'topology' | 'upload' | 'script' | 'logs' | 'bootstrap'
+export type PanelName = 'dashboard' | 'topology' | 'upload' | 'routing' | 'script' | 'logs' | 'bootstrap'
 export type StatusTone = 'info' | 'ok' | 'warn'
 
 export interface ProtocolGroup {
@@ -43,4 +43,27 @@ export interface TopologyRow {
   address: string
   target: string
   protocol: string
+}
+
+export interface RoutePointOption {
+  value: string
+  label: string
+}
+
+export interface RouteUploadTargetOption {
+  value: string
+  label: string
+}
+
+export interface RouteRow {
+  configIndex: number
+  taskKey: string
+  deviceKey: string
+  pointKey: string
+  pointLabel: string
+  uploadTargetKey: string
+  uploadTargetLabel: string
+  targetName: string
+  payloadTemplate: string
+  enabled: boolean
 }

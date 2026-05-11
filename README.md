@@ -41,6 +41,7 @@ Gateway 侧负责：
 - 运行态与配置统计
 - 按协议目录驱动的采集拓扑结构化编辑
 - 按上传协议分组的多目标上传编辑
+- 数据路由编辑
 - IoTSharp、ThingsBoard、SonnetDB、InfluxDB 上传协议页
 - 本地 JSON 高级编辑
 - BASIC 采集脚本查看

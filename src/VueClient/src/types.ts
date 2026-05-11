@@ -64,6 +64,7 @@ export interface EdgeCollectionConfiguration {
   updatedBy?: string
   upload?: CollectionUpload
   uploads?: CollectionUpload[]
+  uploadRoutes?: CollectionRoute[]
   tasks?: CollectionTask[]
   [key: string]: unknown
 }
@@ -77,6 +78,17 @@ export interface CollectionUpload {
   enabled?: boolean
   batchSize?: number
   bufferingEnabled?: boolean
+  [key: string]: unknown
+}
+
+export interface CollectionRoute {
+  taskKey?: string
+  deviceKey?: string
+  pointKey?: string
+  uploadTargetKey?: string
+  targetName?: string
+  payloadTemplate?: string
+  enabled?: boolean
   [key: string]: unknown
 }
 

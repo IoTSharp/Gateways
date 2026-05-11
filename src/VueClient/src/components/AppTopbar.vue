@@ -25,7 +25,7 @@ const emit = defineEmits<{
   <header class="topbar">
     <div>
       <h1>{{ pageTitle }}</h1>
-      <p>本地管理采集配置、上传目标和运行态。</p>
+      <p>本地管理采集配置、上传目标、数据路由和运行态。</p>
     </div>
     <div class="topbar-tools">
       <div class="metrics">
