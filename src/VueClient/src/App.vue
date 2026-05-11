@@ -1,25 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import {
-  Activity,
-  AlertTriangle,
-  ChevronRight,
-  CloudUpload,
-  Cpu,
-  FileCode2,
-  ListTree,
-  Network,
-  PanelLeft,
-  Plus,
-  RefreshCw,
-  RotateCcw,
-  Save,
-  Settings2,
-  TerminalSquare,
-  Trash2,
-  Wifi,
-} from 'lucide-vue-next'
 import { edgeRequest } from './api'
+import AppSidebar from './components/AppSidebar.vue'
+import AppTopbar from './components/AppTopbar.vue'
+import BootstrapPanel from './components/BootstrapPanel.vue'
+import DashboardPanel from './components/DashboardPanel.vue'
+import LogsPanel from './components/LogsPanel.vue'
+import ScriptPanel from './components/ScriptPanel.vue'
+import SummaryGrid from './components/SummaryGrid.vue'
+import TopologyPanel from './components/TopologyPanel.vue'
+import UploadTargetsPanel from './components/UploadTargetsPanel.vue'
 import type {
   CollectionDevice,
   CollectionPoint,
@@ -36,33 +26,7 @@ import type {
   UploadProtocolCatalogResponse,
   UploadProtocolDescriptor,
 } from './types'
-
-type PanelName = 'dashboard' | 'topology' | 'upload' | 'script' | 'logs' | 'bootstrap'
-type StatusTone = 'info' | 'ok' | 'warn'
-
-interface ProtocolGroup {
-  category: string
-  protocols: CollectionProtocolDescriptor[]
-}
-
-interface UploadProtocolGroup {
-  category: string
-  protocols: UploadProtocolDescriptor[]
-}
-
-interface PointRow {
-  pointKey: string
-  pointName: string
-  sourceType: string
-  address: string
-  rawValueType: string
-  length: string
-  targetName: string
-  targetType: string
-  valueType: string
-  unit: string
-  readPeriodMs: string
-}
+import type { PanelName, PointRow, ProtocolGroup, StatusTone, TopologyRow, UploadProtocolGroup } from './uiTypes'
 
 const activePanel = ref<PanelName>('dashboard')
 const selectedProtocolCode = ref('modbus')
@@ -1969,569 +1933,134 @@ function normalizeTargetName(value: string) {
 
 <template>
   <div class="shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">
-          <Cpu :size="22" />
-        </div>
-        <div>
-          <div class="brand-title">IoTSharp Edge</div>
-          <div class="brand-subtitle">本地控制台</div>
-        </div>
-      </div>
-
-      <nav class="nav" aria-label="主导航">
-        <button class="nav-item" :class="{ active: activePanel === 'dashboard' }" type="button" @click="switchPanel('dashboard')">
-          <Activity :size="17" />
-          <span>仪表盘</span>
-        </button>
-
-        <div class="nav-group" :class="{ active: activePanel === 'topology' }">
-          <button class="nav-item" :class="{ active: activePanel === 'topology' }" type="button" @click="switchPanel('topology')">
-            <ListTree :size="17" />
-            <span>采集拓扑</span>
-            <ChevronRight class="nav-chevron" :size="16" />
-          </button>
-          <div class="protocol-nav" aria-label="采集协议">
-            <div v-if="!protocolGroups.length" class="nav-empty">协议目录加载中</div>
-            <div v-for="group in protocolGroups" :key="group.category" class="protocol-nav-group">
-              <div class="protocol-nav-title">{{ displayProtocolCategory(group.category) }} 采集</div>
-              <button
-                v-for="protocol in group.protocols"
-                :key="protocol.code"
-                class="protocol-nav-item"
-                :class="{ active: sameProtocol(protocol.code, selectedProtocolCode) }"
-                type="button"
-                :title="protocol.description"
-                @click="selectProtocol(protocol.code)"
-              >
-                <span>{{ protocol.displayName }}</span>
-                <small :class="lifecycleClass(protocol.lifecycle)">{{ displayLifecycleLabel(protocol.lifecycle) }}</small>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="nav-group" :class="{ active: activePanel === 'upload' }">
-          <button class="nav-item" :class="{ active: activePanel === 'upload' }" type="button" @click="switchPanel('upload')">
-            <CloudUpload :size="17" />
-            <span>上传目标</span>
-            <ChevronRight class="nav-chevron" :size="16" />
-          </button>
-          <div class="protocol-nav" aria-label="上传协议">
-            <div v-if="!uploadProtocolGroups.length" class="nav-empty">协议目录加载中</div>
-            <div v-for="group in uploadProtocolGroups" :key="group.category" class="protocol-nav-group">
-              <div class="protocol-nav-title">{{ group.category }} 上传</div>
-              <button
-                v-for="protocol in group.protocols"
-                :key="protocol.code"
-                class="protocol-nav-item"
-                :class="{ active: sameUploadProtocol(protocol.code, selectedUploadProtocolCode) }"
-                type="button"
-                :title="protocol.description"
-                @click="selectUploadProtocol(protocol.code)"
-              >
-                <span>{{ protocol.displayName }}</span>
-                <small :class="lifecycleClass(protocol.lifecycle)">{{ displayLifecycleLabel(protocol.lifecycle) }}</small>
-              </button>
-            </div>
-          </div>
-        </div>
-        <button class="nav-item" :class="{ active: activePanel === 'script' }" type="button" @click="switchPanel('script')">
-          <FileCode2 :size="17" />
-          <span>BASIC 脚本</span>
-        </button>
-        <button class="nav-item" :class="{ active: activePanel === 'logs' }" type="button" @click="switchPanel('logs')">
-          <TerminalSquare :size="17" />
-          <span>运行日志</span>
-        </button>
-        <button class="nav-item" :class="{ active: activePanel === 'bootstrap' }" type="button" @click="switchPanel('bootstrap')">
-          <Settings2 :size="17" />
-          <span>本地配置</span>
-        </button>
-      </nav>
-
-      <div class="sidebar-foot">
-        <div class="foot-row">
-          <Wifi :size="15" />
-          <span>接口：{{ edgeApiBaseUrl }}</span>
-        </div>
-        <div class="foot-row" :data-tone="statusTone">
-          <PanelLeft :size="15" />
-          <span>{{ displayStatusText(statusText) }}</span>
-        </div>
-      </div>
-    </aside>
+    <AppSidebar
+      :active-panel="activePanel"
+      :edge-api-base-url="edgeApiBaseUrl"
+      :protocol-groups="protocolGroups"
+      :selected-protocol-code="selectedProtocolCode"
+      :upload-protocol-groups="uploadProtocolGroups"
+      :selected-upload-protocol-code="selectedUploadProtocolCode"
+      :status-text="statusText"
+      :status-tone="statusTone"
+      :display-protocol-category="displayProtocolCategory"
+      :display-lifecycle-label="displayLifecycleLabel"
+      :display-status-text="displayStatusText"
+      :lifecycle-class="lifecycleClass"
+      :same-protocol="sameProtocol"
+      :same-upload-protocol="sameUploadProtocol"
+      @switch-panel="switchPanel"
+      @select-protocol="selectProtocol"
+      @select-upload-protocol="selectUploadProtocol"
+    />
 
     <main class="content">
-      <header class="topbar">
-        <div>
-          <h1>{{ pageTitle }}</h1>
-          <p>本地管理采集配置、上传目标和运行态。</p>
-        </div>
-        <div class="topbar-tools">
-          <div class="metrics">
-            <div class="metric">{{ displaySyncStatus(runtimeSummary?.collectionSync?.status) }}</div>
-            <div class="metric">{{ displayUpdatedBy(baseConfiguration.updatedBy) }}</div>
-            <div class="metric">{{ displayUploadSummary(baseConfiguration) }}</div>
-          </div>
-          <div class="actions">
-            <button type="button" :disabled="isLoading" @click="loadAll">
-              <RefreshCw :size="16" />
-              <span>刷新</span>
-            </button>
-            <button type="button" class="primary" :disabled="isSaving || !!jsonParseError" @click="applyConfiguration">
-              <Save :size="16" />
-              <span>应用配置</span>
-            </button>
-            <button type="button" :disabled="isSaving" @click="resetConfiguration">
-              <RotateCcw :size="16" />
-              <span>重置</span>
-            </button>
-          </div>
-        </div>
-      </header>
+      <AppTopbar
+        :page-title="pageTitle"
+        :runtime-summary="runtimeSummary"
+        :base-configuration="baseConfiguration"
+        :is-loading="isLoading"
+        :is-saving="isSaving"
+        :json-parse-error="jsonParseError"
+        :display-sync-status="displaySyncStatus"
+        :display-updated-by="displayUpdatedBy"
+        :display-upload-summary="displayUploadSummary"
+        @refresh="loadAll"
+        @apply="applyConfiguration"
+        @reset="resetConfiguration"
+      />
 
-      <section class="summary-grid">
-        <article v-for="card in dashboardCards" :key="card.label" class="summary-card">
-          <span>{{ card.label }}</span>
-          <strong>{{ card.value }}</strong>
-          <small>{{ card.meta }}</small>
-        </article>
-      </section>
+      <SummaryGrid :cards="dashboardCards" />
 
       <section class="workspace">
-        <section v-show="activePanel === 'dashboard'" class="panel-group">
-          <article class="panel">
-            <div class="panel-head">
-              <div>
-                <h2>本地运行态</h2>
-                <small>工作集 {{ formatBytes(runtimeSummary?.process?.workingSetBytes) }}</small>
-              </div>
-              <span class="badge">{{ runtimeSummary?.edgeReporting?.enabled ? '上游已启用' : '本地模式' }}</span>
-            </div>
-            <pre class="code-block">{{ JSON.stringify(runtimeSummary ?? {}, null, 2) }}</pre>
-          </article>
-        </section>
+        <DashboardPanel
+          v-show="activePanel === 'dashboard'"
+          :runtime-summary="runtimeSummary"
+          :format-bytes="formatBytes"
+        />
 
-        <section v-show="activePanel === 'topology'" class="panel-group">
-          <article class="panel split">
-            <div class="stack">
-              <div class="protocol-summary">
-                <div class="protocol-title">
-                  <div>
-                    <h2>{{ selectedProtocol.displayName }} 采集</h2>
-                    <small>{{ displayProtocolCategory(selectedProtocol.category) }} · {{ selectedProtocol.contractProtocol }}</small>
-                  </div>
-                  <span class="badge" :class="lifecycleClass(selectedProtocol.lifecycle)">
-                    {{ displayLifecycleLabel(selectedProtocol.lifecycle) }}
-                  </span>
-                </div>
-                <p>{{ selectedProtocol.description }}</p>
-                <div class="protocol-flags">
-                  <span v-for="flag in protocolFlags" :key="flag">{{ displayCapability(flag) }}</span>
-                  <span>{{ displayRiskLabel(selectedProtocol.riskLevel) }}</span>
-                  <span>{{ protocolTaskCount }} 个任务</span>
-                  <span>{{ visibleConnectionSettings.length }} 个字段</span>
-                </div>
-                <div v-if="protocolTaskCount > 1" class="inline-warning">
-                  <AlertTriangle :size="15" />
-                  <span>检测到 {{ protocolTaskCount }} 个同协议任务，当前页面只编辑第一个任务。</span>
-                </div>
-              </div>
+        <TopologyPanel
+          v-show="activePanel === 'topology'"
+          v-model:configuration-text="configurationText"
+          :selected-protocol="selectedProtocol"
+          :protocol-flags="protocolFlags"
+          :protocol-task-count="protocolTaskCount"
+          :visible-connection-settings="visibleConnectionSettings"
+          :selected-device-count="selectedDeviceCount"
+          :selected-device-index="selectedDeviceIndex"
+          :topology-devices="topologyDevices"
+          :selected-device="selectedDevice"
+          :selected-device-summary="selectedDeviceSummary"
+          :is-modbus-protocol="isModbusProtocol"
+          :topology-form="topologyForm"
+          :connection-values="connectionValues"
+          :point-rows="pointRows"
+          :topology-rows="topologyRows"
+          :json-parse-error="jsonParseError"
+          :is-saving="isSaving"
+          :display-protocol-category="displayProtocolCategory"
+          :display-lifecycle-label="displayLifecycleLabel"
+          :lifecycle-class="lifecycleClass"
+          :display-capability="displayCapability"
+          :display-risk-label="displayRiskLabel"
+          :display-device-label="displayDeviceLabel"
+          :is-boolean-setting="isBooleanSetting"
+          :is-select-setting="isSelectSetting"
+          :display-connection-setting-label="displayConnectionSettingLabel"
+          :display-connection-setting-options="displayConnectionSettingOptions"
+          :display-connection-option="displayConnectionOption"
+          :input-type="inputType"
+          :display-connection-setting-description="displayConnectionSettingDescription"
+          :point-source-options="pointSourceOptions"
+          :display-point-source="displayPointSource"
+          :mark-topology-dirty="markTopologyDirty"
+          :handle-device-select-change="handleDeviceSelectChange"
+          :add-device="addDevice"
+          :save-current-device-configuration="saveCurrentDeviceConfiguration"
+          :remove-device="removeDevice"
+          :handle-boolean-connection-value="handleBooleanConnectionValue"
+          :add-point="addPoint"
+          :sync-forms-to-json="syncFormsToJson"
+          :remove-point="removePoint"
+          @json-input="onJsonInput"
+        />
 
-              <div class="panel-section">
-                <div class="panel-head compact">
-                  <h2>设备管理</h2>
-                  <span class="badge">{{ selectedDeviceCount ? `${selectedDeviceCount} 台` : '新设备草稿' }}</span>
-                </div>
-                <div class="device-manager">
-                  <label class="device-select">
-                    <span>选择设备</span>
-                    <select :disabled="!selectedDeviceCount" :value="selectedDeviceCount ? selectedDeviceIndex : -1" @change="handleDeviceSelectChange">
-                      <option v-if="!selectedDeviceCount" :value="-1">新设备草稿</option>
-                      <option v-for="(device, index) in topologyDevices" :key="device.deviceKey || index" :value="index">
-                        {{ displayDeviceLabel(device, index) }}
-                      </option>
-                    </select>
-                  </label>
-                  <div class="actions device-actions">
-                    <button type="button" @click="addDevice">
-                      <Plus :size="15" />
-                      <span>新建设备</span>
-                    </button>
-                    <button type="button" :disabled="isSaving || !!jsonParseError" @click="saveCurrentDeviceConfiguration">
-                      <Save :size="15" />
-                      <span>保存当前设备配置</span>
-                    </button>
-                    <button type="button" :disabled="!selectedDevice" @click="removeDevice">
-                      <Trash2 :size="15" />
-                      <span>删除设备</span>
-                    </button>
-                  </div>
-                  <small class="device-summary">{{ selectedDeviceSummary }}</small>
-                </div>
-              </div>
+        <UploadTargetsPanel
+          v-show="activePanel === 'upload'"
+          v-model:configuration-text="configurationText"
+          :selected-upload-protocol="selectedUploadProtocol"
+          :selected-upload-targets="selectedUploadTargets"
+          :selected-upload-target="selectedUploadTarget"
+          :selected-upload-target-count="selectedUploadTargetCount"
+          :selected-upload-target-index="selectedUploadTargetIndex"
+          :upload-protocol-flags="uploadProtocolFlags"
+          :visible-upload-settings="visibleUploadSettings"
+          :upload-form="uploadForm"
+          :upload-setting-values="uploadSettingValues"
+          :json-parse-error="jsonParseError"
+          :is-saving="isSaving"
+          :lifecycle-class="lifecycleClass"
+          :display-lifecycle-label="displayLifecycleLabel"
+          :display-upload-protocol="displayUploadProtocol"
+          :select-upload-target="selectUploadTarget"
+          :add-upload-target="addUploadTarget"
+          :remove-upload-target="removeUploadTarget"
+          :mark-upload-dirty="markUploadDirty"
+          :is-boolean-setting="isBooleanSetting"
+          :is-select-setting="isSelectSetting"
+          :display-connection-setting-label="displayConnectionSettingLabel"
+          :display-connection-setting-options="displayConnectionSettingOptions"
+          :display-connection-option="displayConnectionOption"
+          :input-type="inputType"
+          :display-connection-setting-description="displayConnectionSettingDescription"
+          :handle-upload-setting-boolean-change="handleUploadSettingBooleanChange"
+          :sync-forms-to-json="syncFormsToJson"
+          :apply-configuration="applyConfiguration"
+          @json-input="onJsonInput"
+        />
 
-              <div class="panel-section">
-                <div class="panel-head compact">
-                  <h2>当前设备配置</h2>
-                  <span class="badge">当前</span>
-                </div>
-                <div class="form-grid">
-                  <label>任务键<input v-model="topologyForm.taskKey" type="text" @input="markTopologyDirty" /></label>
-                  <label>连接名<input v-model="topologyForm.connectionName" type="text" @input="markTopologyDirty" /></label>
-                  <label>设备键<input v-model="topologyForm.deviceKey" type="text" @input="markTopologyDirty" /></label>
-                  <label>设备名称<input v-model="topologyForm.deviceName" type="text" @input="markTopologyDirty" /></label>
-                  <label v-if="isModbusProtocol">站号 / 从站<input v-model="topologyForm.stationNumber" type="number" min="1" max="247" @input="markTopologyDirty" /></label>
-                </div>
-              </div>
-
-              <div class="panel-section">
-                <div class="panel-head compact">
-                  <h2>连接参数</h2>
-                  <span class="badge">字段</span>
-                </div>
-                <div v-if="visibleConnectionSettings.length" class="form-grid">
-                  <label v-for="setting in visibleConnectionSettings" :key="setting.key" :class="{ 'checkbox-label': isBooleanSetting(setting) }">
-                    <span>{{ displayConnectionSettingLabel(setting) }}<em v-if="setting.required">*</em></span>
-                    <select v-if="isSelectSetting(setting)" v-model="connectionValues[setting.key]" @change="markTopologyDirty">
-                      <option v-for="option in displayConnectionSettingOptions(setting)" :key="option" :value="option">{{ displayConnectionOption(setting, option) }}</option>
-                    </select>
-                    <input
-                      v-else-if="isBooleanSetting(setting)"
-                      type="checkbox"
-                      :checked="connectionValues[setting.key] === 'true'"
-                      @change="handleBooleanConnectionValue(setting.key, $event)"
-                    />
-                    <input
-                      v-else
-                      v-model="connectionValues[setting.key]"
-                      :type="inputType(setting)"
-                      :required="setting.required"
-                      @input="markTopologyDirty"
-                    />
-                    <small>{{ displayConnectionSettingDescription(setting) }}</small>
-                  </label>
-                </div>
-                <div v-else class="empty">当前协议还没有连接字段定义。</div>
-              </div>
-
-              <div class="panel-section">
-                <div class="panel-head compact">
-                  <h2>点位</h2>
-                  <div class="actions dense">
-                    <button type="button" @click="addPoint">
-                      <Plus :size="15" />
-                      <span>新增点位</span>
-                    </button>
-                    <button type="button" @click="syncFormsToJson('采集拓扑已同步到 JSON')">
-                      <Save :size="15" />
-                      <span>同步到 JSON</span>
-                    </button>
-                  </div>
-                </div>
-                <div class="table-wrap points-editor">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>键</th>
-                        <th>名称</th>
-                        <th>来源</th>
-                        <th>地址</th>
-                        <th>原始</th>
-                        <th>长度</th>
-                        <th>目标</th>
-                        <th>值</th>
-                        <th>周期</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-if="!pointRows.length">
-                        <td colspan="10" class="empty">暂无点位。</td>
-                      </tr>
-                      <tr v-for="(point, index) in pointRows" :key="index">
-                        <td><input v-model="point.pointKey" @input="markTopologyDirty" /></td>
-                        <td><input v-model="point.pointName" @input="markTopologyDirty" /></td>
-                        <td>
-                          <select v-model="point.sourceType" @change="markTopologyDirty">
-                            <option v-for="option in pointSourceOptions(selectedProtocol)" :key="option" :value="option">{{ displayPointSource(option) }}</option>
-                          </select>
-                        </td>
-                        <td><input v-model="point.address" @input="markTopologyDirty" /></td>
-                        <td>
-                          <select v-model="point.rawValueType" @change="markTopologyDirty">
-                            <option value="Float">浮点数</option>
-                            <option value="Double">双精度</option>
-                            <option value="Int16">16 位整数</option>
-                            <option value="Int32">32 位整数</option>
-                            <option value="Boolean">布尔</option>
-                            <option value="String">字符串</option>
-                          </select>
-                        </td>
-                        <td><input v-model="point.length" type="number" min="1" @input="markTopologyDirty" /></td>
-                        <td><input v-model="point.targetName" @input="markTopologyDirty" /></td>
-                        <td>
-                          <select v-model="point.valueType" @change="markTopologyDirty">
-                            <option value="Double">双精度</option>
-                            <option value="Int32">32 位整数</option>
-                            <option value="Boolean">布尔</option>
-                            <option value="String">字符串</option>
-                          </select>
-                        </td>
-                        <td><input v-model="point.readPeriodMs" type="number" min="1000" step="1000" @input="markTopologyDirty" /></td>
-                        <td>
-                          <button class="icon-button" type="button" title="删除点位" @click="removePoint(index)">
-                            <Trash2 :size="15" />
-                          </button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div class="panel-section">
-                <div class="panel-head compact">
-                  <h2>运行拓扑</h2>
-                  <span class="badge">快照</span>
-                </div>
-                <div class="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>任务</th>
-                        <th>设备</th>
-                        <th>点位</th>
-                        <th>地址</th>
-                        <th>目标</th>
-                        <th>协议</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-if="!topologyRows.length">
-                        <td colspan="6" class="empty">当前还未配置 {{ selectedProtocol.displayName }} 拓扑。</td>
-                      </tr>
-                      <tr v-for="row in topologyRows" :key="`${row.taskKey}-${row.deviceName}-${row.pointName}`">
-                        <td>{{ row.taskKey }}</td>
-                        <td>{{ row.deviceName }}</td>
-                        <td>{{ row.pointName }}</td>
-                        <td><code>{{ row.address }}</code></td>
-                        <td>{{ row.target }}</td>
-                        <td>{{ row.protocol }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div class="stack">
-              <div class="panel-section stretch">
-                <div class="panel-head compact">
-                  <h2>本地 JSON</h2>
-                  <span class="badge" :class="{ warn: jsonParseError }">{{ jsonParseError ? '有误' : '可编辑' }}</span>
-                </div>
-                <textarea v-model="configurationText" spellcheck="false" @input="onJsonInput"></textarea>
-                <div v-if="jsonParseError" class="inline-warning">
-                  <AlertTriangle :size="15" />
-                  <span>{{ jsonParseError }}</span>
-                </div>
-              </div>
-            </div>
-          </article>
-        </section>
-
-        <section v-show="activePanel === 'upload'" class="panel-group">
-          <article class="panel split">
-            <div class="stack">
-              <div class="protocol-summary">
-                <div class="protocol-title">
-                  <div>
-                    <h2>{{ selectedUploadProtocol.displayName }} 上传</h2>
-                    <small>{{ selectedUploadProtocol.category }} · {{ selectedUploadProtocol.code }}</small>
-                  </div>
-                  <span class="badge" :class="lifecycleClass(selectedUploadProtocol.lifecycle)">
-                    {{ displayLifecycleLabel(selectedUploadProtocol.lifecycle) }}
-                  </span>
-                </div>
-                <p>{{ selectedUploadProtocol.description }}</p>
-                <div class="protocol-flags">
-                  <span v-for="flag in uploadProtocolFlags" :key="flag">{{ flag }}</span>
-                  <span>{{ selectedUploadProtocol.connectionSettings.length }} 个字段</span>
-                </div>
-              </div>
-
-              <div class="panel-section">
-                <div class="panel-head compact">
-                  <h2>上传目标</h2>
-                  <div class="actions dense">
-                    <button type="button" @click="addUploadTarget">
-                      <Plus :size="15" />
-                      <span>新增目标</span>
-                    </button>
-                    <button type="button" :disabled="!selectedUploadTarget" @click="removeUploadTarget">
-                      <Trash2 :size="15" />
-                      <span>删除目标</span>
-                    </button>
-                  </div>
-                </div>
-                <div v-if="selectedUploadTargetCount" class="upload-target-list">
-                  <button
-                    v-for="(target, index) in selectedUploadTargets"
-                    :key="target.targetKey || index"
-                    class="upload-target-item"
-                    :class="{ active: index === selectedUploadTargetIndex }"
-                    type="button"
-                    @click="selectUploadTarget(index)"
-                  >
-                    <div class="upload-target-main">
-                      <strong>{{ target.displayName || target.targetKey || '未命名目标' }}</strong>
-                      <small>{{ target.targetKey || '--' }}</small>
-                    </div>
-                    <div class="upload-target-meta">
-                      <span>{{ target.enabled === false ? '已禁用' : '启用' }}</span>
-                      <span>{{ displayUploadProtocol(target.protocol) }}</span>
-                      <span>{{ target.batchSize ?? 1 }} 批</span>
-                    </div>
-                  </button>
-                </div>
-                <div v-else class="empty">当前协议还没有上传目标，先新建一个。</div>
-              </div>
-
-              <div class="panel-section">
-                <div class="panel-head compact">
-                  <h2>目标配置</h2>
-                  <span class="badge">{{ selectedUploadTarget ? (selectedUploadTarget.enabled === false ? '已禁用' : '启用') : '新目标草稿' }}</span>
-                </div>
-                <div class="form-grid">
-                  <label>目标键<input v-model="uploadForm.targetKey" type="text" @input="markUploadDirty" /></label>
-                  <label>显示名称<input v-model="uploadForm.displayName" type="text" @input="markUploadDirty" /></label>
-                  <label>端点<input v-model="uploadForm.endpoint" type="text" @input="markUploadDirty" /></label>
-                  <label>批大小<input v-model="uploadForm.batchSize" type="number" min="1" @input="markUploadDirty" /></label>
-                  <label class="checkbox-label">
-                    <span>启用</span>
-                    <input v-model="uploadForm.enabled" type="checkbox" @change="markUploadDirty" />
-                    <small>禁用后不会生成上传通道。</small>
-                  </label>
-                  <label class="checkbox-label">
-                    <span>启用缓冲</span>
-                    <input v-model="uploadForm.bufferingEnabled" type="checkbox" @change="markUploadDirty" />
-                    <small>开启后由运行时缓存后批量发送。</small>
-                  </label>
-                </div>
-              </div>
-
-              <div class="panel-section">
-                <div class="panel-head compact">
-                  <h2>协议字段</h2>
-                  <span class="badge">{{ visibleUploadSettings.length }} 个字段</span>
-                </div>
-                <div v-if="visibleUploadSettings.length" class="form-grid">
-                  <label
-                    v-for="setting in visibleUploadSettings"
-                    :key="setting.key"
-                    :class="{ 'checkbox-label': isBooleanSetting(setting) }"
-                  >
-                    <span>{{ displayConnectionSettingLabel(setting) }}<em v-if="setting.required">*</em></span>
-                    <select v-if="isSelectSetting(setting)" v-model="uploadSettingValues[setting.key]" @change="markUploadDirty">
-                      <option v-for="option in displayConnectionSettingOptions(setting)" :key="option" :value="option">
-                        {{ displayConnectionOption(setting, option) }}
-                      </option>
-                    </select>
-                    <input
-                      v-else-if="isBooleanSetting(setting)"
-                      type="checkbox"
-                      :checked="uploadSettingValues[setting.key] === 'true'"
-                      @change="handleUploadSettingBooleanChange(setting.key, $event)"
-                    />
-                    <input
-                      v-else
-                      v-model="uploadSettingValues[setting.key]"
-                      :type="inputType(setting)"
-                      :required="setting.required"
-                      @input="markUploadDirty"
-                    />
-                    <small>{{ displayConnectionSettingDescription(setting) }}</small>
-                  </label>
-                </div>
-                <div v-else class="empty">当前协议没有额外字段。</div>
-              </div>
-
-              <div class="panel-section">
-                <div class="panel-head compact">
-                  <h2>目标概览</h2>
-                  <span class="badge">快照</span>
-                </div>
-                <div class="info-list">
-                  <div class="info-row"><span>协议</span><strong>{{ displayUploadProtocol(selectedUploadProtocol.code) }}</strong></div>
-                  <div class="info-row"><span>目标键</span><strong>{{ selectedUploadTarget?.targetKey || '--' }}</strong></div>
-                  <div class="info-row"><span>显示名称</span><strong>{{ selectedUploadTarget?.displayName || '--' }}</strong></div>
-                  <div class="info-row"><span>端点</span><strong>{{ selectedUploadTarget?.endpoint || '--' }}</strong></div>
-                  <div class="info-row"><span>状态</span><strong>{{ selectedUploadTarget?.enabled === false ? '已禁用' : '启用' }}</strong></div>
-                  <div class="info-row"><span>批大小</span><strong>{{ selectedUploadTarget?.batchSize ?? '--' }}</strong></div>
-                  <div class="info-row"><span>缓冲</span><strong>{{ selectedUploadTarget?.bufferingEnabled ? '已启用' : '未启用' }}</strong></div>
-                </div>
-              </div>
-
-              <div class="actions align-end">
-                <button type="button" @click="syncFormsToJson('上传配置已同步到 JSON')">
-                  <Save :size="16" />
-                  <span>同步到 JSON</span>
-                </button>
-                <button type="button" class="primary" :disabled="isSaving || !!jsonParseError" @click="applyConfiguration">
-                  <Network :size="16" />
-                  <span>保存并应用</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="stack">
-              <div class="panel-section stretch">
-                <div class="panel-head compact">
-                  <h2>本地 JSON</h2>
-                  <span class="badge" :class="{ warn: jsonParseError }">{{ jsonParseError ? '有误' : '可编辑' }}</span>
-                </div>
-                <textarea v-model="configurationText" spellcheck="false" @input="onJsonInput"></textarea>
-                <div v-if="jsonParseError" class="inline-warning">
-                  <AlertTriangle :size="15" />
-                  <span>{{ jsonParseError }}</span>
-                </div>
-              </div>
-            </div>
-          </article>
-        </section>
-
-        <section v-show="activePanel === 'script'" class="panel-group">
-          <article class="panel">
-            <div class="panel-head">
-              <h2>BASIC 采集脚本</h2>
-              <span class="badge">只读</span>
-            </div>
-            <pre class="code-block">{{ scriptText }}</pre>
-          </article>
-        </section>
-
-        <section v-show="activePanel === 'logs'" class="panel-group">
-          <article class="panel">
-            <div class="panel-head">
-              <h2>运行日志</h2>
-              <span class="badge">实时</span>
-            </div>
-            <pre class="logs">{{ logLines.length ? logLines.join('\n\n') : '暂无日志。' }}</pre>
-          </article>
-        </section>
-
-        <section v-show="activePanel === 'bootstrap'" class="panel-group">
-          <article class="panel">
-            <div class="panel-head">
-              <h2>本地配置</h2>
-              <span class="badge">原始</span>
-            </div>
-            <pre class="code-block">{{ bootstrapJson }}</pre>
-          </article>
-        </section>
+        <ScriptPanel v-show="activePanel === 'script'" :script-text="scriptText" />
+        <LogsPanel v-show="activePanel === 'logs'" :log-lines="logLines" />
+        <BootstrapPanel v-show="activePanel === 'bootstrap'" :bootstrap-json="bootstrapJson" />
       </section>
     </main>
   </div>
