@@ -48,6 +48,7 @@ builder.Services.AddSingleton<BasicRuntime>(sp =>
 });
 builder.Services.AddSingleton<ValueTransformationService>();
 builder.Services.AddScoped<DriverCatalogService>();
+builder.Services.AddScoped<CollectionProtocolCatalogService>();
 builder.Services.AddScoped<GatewayRuntimeService>();
 builder.Services.AddGatewayInfrastructure(builder.Configuration);
 builder.Services.AddSingleton<IEdgeTaskReceiptReporter, EdgeTaskReceiptExample>();
@@ -126,6 +127,12 @@ app.MapGet("/api/scripts/polling", () => Results.Ok(new
     name = "Default Gateway Polling Script",
     language = "BASIC",
     script = GatewayRuntimeService.DefaultPollingScript
+}));
+
+app.MapGet("/api/collection/protocols", (CollectionProtocolCatalogService service) => Results.Ok(new
+{
+    generatedAtUtc = DateTime.UtcNow,
+    protocols = service.GetProtocols()
 }));
 
 app.MapGet("/api/diagnostics/logs", (InMemoryLogStore store, int? count, string? level) => Results.Ok(new

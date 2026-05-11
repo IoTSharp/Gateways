@@ -15,6 +15,10 @@ internal enum GatewayCollectionProtocolType
     OpcDa = 6,
     MtCnc = 7,
     FanucCnc = 8,
+    SiemensS7 = 9,
+    Mitsubishi = 10,
+    OmronFins = 11,
+    AllenBradley = 12,
     Custom = 99
 }
 

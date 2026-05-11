@@ -322,6 +322,34 @@ internal static class GatewayCollectionConfigurationMapper
                 settings["port"] = (task.Connection.Port ?? 502).ToString(CultureInfo.InvariantCulture);
                 settings["timeout"] = Math.Max(task.Connection.TimeoutMs, 1).ToString(CultureInfo.InvariantCulture);
                 break;
+            case GatewayCollectionProtocolType.SiemensS7:
+                settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Siemens S7.");
+                settings["port"] = (task.Connection.Port ?? 102).ToString(CultureInfo.InvariantCulture);
+                settings["timeout"] = Math.Max(task.Connection.TimeoutMs, 1).ToString(CultureInfo.InvariantCulture);
+                settings["model"] = FirstString(task.Connection.ProtocolOptions, "model", "plcModel")
+                    ?? throw new InvalidOperationException($"task '{task.TaskKey}' requires protocolOptions.model for Siemens S7.");
+                settings["rack"] = FirstString(task.Connection.ProtocolOptions, "rack") ?? "0";
+                settings["slot"] = FirstString(task.Connection.ProtocolOptions, "slot") ?? "0";
+                break;
+            case GatewayCollectionProtocolType.Mitsubishi:
+                settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Mitsubishi.");
+                settings["port"] = (task.Connection.Port ?? 6000).ToString(CultureInfo.InvariantCulture);
+                settings["timeout"] = Math.Max(task.Connection.TimeoutMs, 1).ToString(CultureInfo.InvariantCulture);
+                settings["model"] = FirstString(task.Connection.ProtocolOptions, "model", "plcModel")
+                    ?? throw new InvalidOperationException($"task '{task.TaskKey}' requires protocolOptions.model for Mitsubishi.");
+                break;
+            case GatewayCollectionProtocolType.OmronFins:
+                settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Omron FINS.");
+                settings["port"] = (task.Connection.Port ?? 9600).ToString(CultureInfo.InvariantCulture);
+                settings["timeout"] = Math.Max(task.Connection.TimeoutMs, 1).ToString(CultureInfo.InvariantCulture);
+                settings["endianFormat"] = FirstString(task.Connection.ProtocolOptions, "endianFormat", "endian") ?? "ABCD";
+                break;
+            case GatewayCollectionProtocolType.AllenBradley:
+                settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Allen-Bradley.");
+                settings["port"] = (task.Connection.Port ?? 44818).ToString(CultureInfo.InvariantCulture);
+                settings["timeout"] = Math.Max(task.Connection.TimeoutMs, 1).ToString(CultureInfo.InvariantCulture);
+                settings["slot"] = FirstString(task.Connection.ProtocolOptions, "slot") ?? "0";
+                break;
             case GatewayCollectionProtocolType.OpcUa:
                 settings["endpoint"] = ResolveOpcUaEndpoint(task.Connection);
                 if (!string.IsNullOrWhiteSpace(task.Connection.Host))
@@ -625,6 +653,10 @@ internal static class GatewayCollectionConfigurationMapper
             GatewayCollectionProtocolType.OpcDa => "opc-da",
             GatewayCollectionProtocolType.MtCnc => "mt-cnc",
             GatewayCollectionProtocolType.FanucCnc => "fanuc-cnc",
+            GatewayCollectionProtocolType.SiemensS7 => "siemens-s7",
+            GatewayCollectionProtocolType.Mitsubishi => "mitsubishi",
+            GatewayCollectionProtocolType.OmronFins => "omron-fins",
+            GatewayCollectionProtocolType.AllenBradley => "allen-bradley",
             _ => throw new NotSupportedException($"Gateway sync does not support collection protocol '{protocol}'.")
         };
     }

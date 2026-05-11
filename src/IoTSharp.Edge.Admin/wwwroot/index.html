@@ -18,7 +18,10 @@
       </div>
       <nav class="nav" aria-label="主导航">
         <button class="nav-item active" data-panel="dashboard" type="button">仪表盘</button>
-        <button class="nav-item" data-panel="topology" type="button">采集拓扑</button>
+        <div class="nav-group">
+          <button class="nav-item" data-panel="topology" type="button">采集拓扑</button>
+          <div id="topologyProtocolNav" class="nav-subnav" aria-label="采集协议"></div>
+        </div>
         <button class="nav-item" data-panel="upload" type="button">SonnetDB</button>
         <button class="nav-item" data-panel="script" type="button">BASIC 脚本</button>
         <button class="nav-item" data-panel="logs" type="button">运行日志</button>
@@ -88,9 +91,13 @@
           <article class="panel split">
             <div>
               <div class="panel-head">
-                <h2>Modbus 采集</h2>
-                <span class="badge">structured</span>
+                <div>
+                  <h2 id="topologyPanelTitle">采集拓扑</h2>
+                  <small id="topologyPanelSubtitle" class="panel-subtitle">--</small>
+                </div>
+                <span id="topologyPanelBadge" class="badge">structured</span>
               </div>
+              <div id="topologyProtocolSummary" class="protocol-summary"></div>
               <div id="topologyEditor" class="stack">
                 <div class="form-grid">
                   <label>Task Key<input id="topologyTaskKey" type="text"></label>
@@ -99,7 +106,7 @@
                   <label>Port<input id="topologyPort" type="number" min="1" max="65535"></label>
                   <label>Device Key<input id="topologyDeviceKey" type="text"></label>
                   <label>Device Name<input id="topologyDeviceName" type="text"></label>
-                  <label>Station<input id="topologyStation" type="number" min="1" max="247"></label>
+                  <label>Station / Slave<input id="topologyStation" type="number" min="1" max="247"></label>
                   <label>Timeout Ms<input id="topologyTimeout" type="number" min="100"></label>
                 </div>
                 <div class="mini-toolbar">

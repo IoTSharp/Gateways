@@ -2,6 +2,8 @@ const state = {
   edgeApiBaseUrl: 'http://127.0.0.1:18180',
   localConfiguration: null,
   runtimeSummary: null,
+  protocolCatalog: [],
+  selectedTopologyProtocolCode: 'modbus',
   script: null,
   logs: null,
   uploadFormDirty: false,
@@ -24,6 +26,11 @@ const elements = {
   summaryTopologyMeta: document.getElementById('summaryTopologyMeta'),
   runtimeBadge: document.getElementById('runtimeBadge'),
   runtimeJson: document.getElementById('runtimeJson'),
+  topologyProtocolNav: document.getElementById('topologyProtocolNav'),
+  topologyPanelTitle: document.getElementById('topologyPanelTitle'),
+  topologyPanelSubtitle: document.getElementById('topologyPanelSubtitle'),
+  topologyPanelBadge: document.getElementById('topologyPanelBadge'),
+  topologyProtocolSummary: document.getElementById('topologyProtocolSummary'),
   topologyTable: document.getElementById('topologyTable'),
   configurationEditor: document.getElementById('configurationEditor'),
   uploadSummary: document.getElementById('uploadSummary'),
@@ -150,6 +157,70 @@ function keyFrom(value, fallback) {
   return key || fallback
 }
 
+function normalizeProtocolKey(value) {
+  return String(value ?? '')
+    .trim()
+    .replace(/[^a-z0-9]+/gi, '')
+    .toLowerCase()
+}
+
+function getFallbackProtocol() {
+  return {
+    code: 'modbus',
+    contractProtocol: 'Modbus',
+    displayName: 'Modbus',
+    category: 'PLC',
+    description: 'Modbus TCP / RTU over TCP 采集。',
+    lifecycle: 'ready',
+    supportsRead: true,
+    supportsWrite: true,
+    supportsBatchRead: true,
+    supportsBatchWrite: true,
+    riskLevel: 'normal',
+    connectionSettings: [],
+  }
+}
+
+function getSelectedProtocol() {
+  const protocol = (state.protocolCatalog || []).find((item) => normalizeProtocolKey(item.code) === normalizeProtocolKey(state.selectedTopologyProtocolCode))
+  return protocol || (state.protocolCatalog || []).find((item) => normalizeProtocolKey(item.code) === 'modbus') || getFallbackProtocol()
+}
+
+function getProtocolByContractProtocol(protocolName) {
+  const normalized = normalizeProtocolKey(protocolName)
+  return (state.protocolCatalog || []).find((item) => normalizeProtocolKey(item.contractProtocol) === normalized)
+    || (state.protocolCatalog || []).find((item) => normalizeProtocolKey(item.code) === normalized)
+    || null
+}
+
+function getProtocolDefaults(protocol) {
+  const code = normalizeProtocolKey(protocol?.code)
+
+  return {
+    taskKey: code === 'modbus' ? 'modbus-device-simulator' : `${code || 'protocol'}-collector`,
+    connectionName: protocol?.displayName ? `${protocol.displayName} Connection` : 'Protocol Connection',
+    host: code === 'modbus' ? 'device-simulator' : '127.0.0.1',
+    port: protocolDefaultPort(code),
+    deviceKey: code === 'modbus' ? 'device-simulator-01' : `${code || 'protocol'}-01`,
+    deviceName: protocol?.displayName ? `${protocol.displayName} 01` : 'Device 01',
+    stationNumber: '1',
+  }
+}
+
+function protocolDefaultPort(code) {
+  return {
+    modbus: 1502,
+    'opc-ua': 4840,
+    'siemens-s7': 102,
+    mitsubishi: 6000,
+    'omron-fins': 9600,
+    'allen-bradley': 44818,
+    'mt-cnc': 5000,
+    'opc-da': 135,
+    'fanuc-cnc': 8193,
+  }[code] || 502
+}
+
 function normalizeConfigurationDocument(document) {
   const configuration = document?.configuration ?? document
   const uploadSettings = asSettings(configuration?.upload?.settings)
@@ -169,7 +240,8 @@ function writeEditorConfiguration(configuration) {
   elements.configurationEditor.value = JSON.stringify(configuration ?? {}, null, 2)
 }
 
-function ensureLocalTopology(input) {
+function ensureLocalTopology(input, protocol = getSelectedProtocol()) {
+  const selectedProtocol = protocol || getFallbackProtocol()
   const configuration = clone(input)
   configuration.contractVersion ||= 'edge-collection-v1'
   configuration.edgeNodeId ||= newGuid()
@@ -181,14 +253,17 @@ function ensureLocalTopology(input) {
     configuration.tasks = []
   }
 
-  if (configuration.tasks.length === 0) {
-    configuration.tasks.push({})
+  let task = configuration.tasks.find((item) => normalizeProtocolKey(item?.protocol) === normalizeProtocolKey(selectedProtocol.contractProtocol))
+  if (!task) {
+    task = {}
+    configuration.tasks.push(task)
   }
 
-  const task = configuration.tasks[0]
+  const defaults = getProtocolDefaults(selectedProtocol)
+  const contractProtocol = selectedProtocol.contractProtocol || 'Modbus'
   task.id ||= newGuid()
-  task.taskKey ||= 'modbus-device-simulator'
-  task.protocol = 'Modbus'
+  task.taskKey ||= defaults.taskKey
+  task.protocol = contractProtocol
   task.version = Math.max(1, toNumber(task.version, 1))
   task.edgeNodeId ||= configuration.edgeNodeId
 
@@ -197,18 +272,23 @@ function ensureLocalTopology(input) {
   }
 
   task.connection.connectionKey ||= `${task.taskKey}-connection`
-  task.connection.connectionName ||= 'Device Simulator Modbus TCP'
-  task.connection.protocol = 'Modbus'
-  task.connection.transport ||= 'tcp'
-  task.connection.host ||= 'device-simulator'
-  task.connection.port = Math.max(1, toNumber(task.connection.port, 1502))
+  task.connection.connectionName ||= defaults.connectionName
+  task.connection.protocol = contractProtocol
+  task.connection.transport ||= contractProtocol === 'Modbus' ? 'tcp' : task.connection.transport || ''
+  task.connection.host ||= defaults.host
+  task.connection.port = Math.max(1, toNumber(task.connection.port, defaults.port))
   task.connection.timeoutMs = Math.max(100, toNumber(task.connection.timeoutMs, 3000))
   task.connection.retryCount = Math.max(0, toNumber(task.connection.retryCount, 3))
-  task.connection.protocolOptions = {
-    endianFormat: 'ABCD',
-    plcAddresses: 'true',
+  const connectionOptions = {
     ...asSettings(task.connection.protocolOptions),
   }
+
+  if (contractProtocol === 'Modbus') {
+    connectionOptions.endianFormat ||= 'ABCD'
+    connectionOptions.plcAddresses ||= 'true'
+  }
+
+  task.connection.protocolOptions = connectionOptions
 
   if (!Array.isArray(task.devices)) {
     task.devices = []
@@ -219,14 +299,19 @@ function ensureLocalTopology(input) {
   }
 
   const device = task.devices[0]
-  device.deviceKey ||= 'device-simulator-01'
-  device.deviceName ||= 'Device Simulator 01'
+  device.deviceKey ||= defaults.deviceKey
+  device.deviceName ||= defaults.deviceName
   device.enabled = device.enabled !== false
   device.externalKey ||= device.deviceKey
-  device.protocolOptions = {
-    stationNumber: '1',
+  const deviceOptions = {
     ...asSettings(device.protocolOptions),
   }
+
+  if (contractProtocol === 'Modbus') {
+    deviceOptions.stationNumber ||= defaults.stationNumber
+  }
+
+  device.protocolOptions = deviceOptions
 
   if (!Array.isArray(device.points)) {
     device.points = []
@@ -275,18 +360,109 @@ function renderSummary() {
   elements.runtimeJson.textContent = JSON.stringify(summary ?? {}, null, 2)
   elements.bootstrapOutput.textContent = JSON.stringify(summary?.bootstrap ?? {}, null, 2)
 
+  renderProtocolNav()
   renderEditableConfiguration(configuration ?? {})
   renderScript()
   renderLogs()
 }
 
+function renderProtocolNav() {
+  const protocols = state.protocolCatalog || []
+  if (!protocols.length) {
+    elements.topologyProtocolNav.innerHTML = '<div class="nav-subempty">协议目录加载中...</div>'
+    return
+  }
+
+  const groups = protocols.reduce((acc, protocol) => {
+    const category = protocol.category || 'Other'
+    if (!acc[category]) {
+      acc[category] = []
+    }
+    acc[category].push(protocol)
+    return acc
+  }, {})
+
+  const categories = Object.keys(groups).sort((left, right) => left.localeCompare(right, 'zh-Hans-CN'))
+  elements.topologyProtocolNav.innerHTML = categories.map((category) => `
+    <div class="nav-subgroup">
+      <div class="nav-subtitle">${escapeHtml(category)} 采集</div>
+      ${groups[category]
+        .sort((left, right) => left.displayName.localeCompare(right.displayName, 'zh-Hans-CN'))
+        .map((protocol) => {
+          const isActive = normalizeProtocolKey(protocol.code) === normalizeProtocolKey(state.selectedTopologyProtocolCode) ? ' active' : ''
+          const status = protocol.lifecycle === 'guarded' ? ' guarded' : ''
+          return `
+            <button
+              class="nav-subitem${isActive}"
+              type="button"
+              data-topology-protocol="${escapeAttr(protocol.code)}"
+              title="${escapeAttr(protocol.description || protocol.displayName)}"
+            >
+              ${escapeHtml(protocol.displayName)}
+              <span class="nav-subitem-meta${status}">${escapeHtml(protocol.contractProtocol)}</span>
+            </button>
+          `
+        }).join('')}
+    </div>
+  `).join('')
+}
+
 function renderEditableConfiguration(configuration) {
   writeEditorConfiguration(configuration)
+  renderTopologyProtocolSummary(configuration)
   renderTopologyTable(configuration)
   renderTopologyEditor(configuration)
   renderUploadSummary(configuration, asSettings(configuration?.upload?.settings))
   state.topologyFormDirty = false
   state.uploadFormDirty = false
+}
+
+function renderTopologyProtocolSummary(configuration) {
+  const protocol = getSelectedProtocol()
+  const descriptorCount = (protocol.connectionSettings || []).length
+  const summary = (configuration?.tasks || []).filter((task) => normalizeProtocolKey(task?.protocol) === normalizeProtocolKey(protocol.contractProtocol)).length
+
+  elements.topologyPanelTitle.textContent = `${protocol.displayName} 采集`
+  elements.topologyPanelSubtitle.textContent = protocol.description || protocol.lifecycle || '--'
+  elements.topologyPanelBadge.textContent = protocol.lifecycle === 'guarded'
+    ? 'guarded'
+    : protocol.category || 'ready'
+
+  const settings = (protocol.connectionSettings || []).map((setting) => `
+    <div class="protocol-setting">
+      <span>${escapeHtml(setting.label || setting.key)}</span>
+      <strong>${escapeHtml(setting.required ? 'required' : 'optional')} · ${escapeHtml(setting.valueType || '--')}</strong>
+    </div>
+  `).join('')
+
+  const flags = [
+    protocol.supportsRead ? 'read' : '',
+    protocol.supportsWrite ? 'write' : '',
+    protocol.supportsBatchRead ? 'batch-read' : '',
+    protocol.supportsBatchWrite ? 'batch-write' : '',
+  ].filter(Boolean)
+
+  elements.topologyProtocolSummary.innerHTML = `
+    <div class="protocol-card">
+      <div class="protocol-card-head">
+        <div class="protocol-card-title">
+          <strong>${escapeHtml(protocol.displayName)}</strong>
+          <small>${escapeHtml(protocol.category || 'Other')} · ${escapeHtml(protocol.contractProtocol)}</small>
+        </div>
+        <span class="badge">${escapeHtml(protocol.lifecycle || 'ready')}</span>
+      </div>
+      <div class="protocol-flags">
+        ${flags.map((flag) => `<span class="protocol-flag">${escapeHtml(flag)}</span>`).join('')}
+        <span class="protocol-flag">${escapeHtml(protocol.riskLevel || 'normal')}</span>
+        <span class="protocol-flag">${escapeHtml(summary)} task(s)</span>
+        <span class="protocol-flag">${escapeHtml(descriptorCount)} setting(s)</span>
+      </div>
+      <div class="protocol-settings">
+        ${settings || '<div class="empty">No connection settings defined.</div>'}
+      </div>
+      <div class="empty">${escapeHtml(protocol.description || '')}</div>
+    </div>
+  `
 }
 
 function renderTopologyTable(configuration) {
@@ -296,19 +472,30 @@ function renderTopologyTable(configuration) {
   }
 
   const tasks = Array.isArray(configuration.tasks) ? configuration.tasks : []
-  const rows = tasks.flatMap((task) =>
-    (Array.isArray(task.devices) ? task.devices : []).flatMap((device) =>
-      (Array.isArray(device.points) ? device.points : []).map((point) => ({
-        taskKey: task.taskKey,
-        deviceName: device.deviceName || device.deviceKey,
-        pointName: point.pointName,
-        address: point.address,
-        target: point.mapping?.targetName || '--',
-        protocol: task.protocol,
-      }))))
+  const selectedProtocol = getSelectedProtocol()
+  const selectedProtocolName = normalizeProtocolKey(selectedProtocol.contractProtocol)
+  const rows = []
+  for (const task of tasks) {
+    if (normalizeProtocolKey(task.protocol) !== selectedProtocolName) {
+      continue
+    }
+
+    for (const device of Array.isArray(task.devices) ? task.devices : []) {
+      for (const point of Array.isArray(device.points) ? device.points : []) {
+        rows.push({
+          taskKey: task.taskKey,
+          deviceName: device.deviceName || device.deviceKey,
+          pointName: point.pointName,
+          address: point.address,
+          target: point.mapping?.targetName || '--',
+          protocol: task.protocol,
+        })
+      }
+    }
+  }
 
   if (!rows.length) {
-    elements.topologyTable.innerHTML = '<div class="empty">Local configuration is empty.</div>'
+    elements.topologyTable.innerHTML = `<div class="empty">No ${escapeHtml(selectedProtocol.displayName)} topology configured yet.</div>`
     return
   }
 
@@ -342,16 +529,20 @@ function renderTopologyTable(configuration) {
 }
 
 function renderTopologyEditor(configuration) {
-  const { task, device } = ensureLocalTopology(configuration)
+  const protocol = getSelectedProtocol()
+  const { task, device } = ensureLocalTopology(configuration, protocol)
   const deviceOptions = asSettings(device.protocolOptions)
+  const isModbus = normalizeProtocolKey(protocol.contractProtocol) === 'modbus'
 
   elements.topologyTaskKey.value = task.taskKey ?? ''
   elements.topologyConnectionName.value = task.connection.connectionName ?? ''
   elements.topologyHost.value = task.connection.host ?? ''
-  elements.topologyPort.value = task.connection.port ?? 1502
+  elements.topologyPort.value = task.connection.port ?? protocolDefaultPort(normalizeProtocolKey(protocol.code))
   elements.topologyDeviceKey.value = device.deviceKey ?? ''
   elements.topologyDeviceName.value = device.deviceName ?? ''
-  elements.topologyStation.value = deviceOptions.stationNumber ?? deviceOptions.slaveId ?? '1'
+  elements.topologyStation.value = isModbus ? (deviceOptions.stationNumber ?? deviceOptions.slaveId ?? '1') : ''
+  elements.topologyStation.disabled = !isModbus
+  elements.topologyStation.placeholder = isModbus ? '' : 'Modbus only'
   elements.topologyTimeout.value = task.connection.timeoutMs ?? 3000
 
   const points = Array.isArray(device.points) ? device.points : []
@@ -370,7 +561,7 @@ function renderPointRow(point, index) {
     <tr data-point-row>
       <td><input data-point-field="pointKey" value="${escapeAttr(point.pointKey ?? '')}"></td>
       <td><input data-point-field="pointName" value="${escapeAttr(point.pointName ?? '')}"></td>
-      <td>${renderSelect('sourceType', ['HoldingRegister', 'InputRegister', 'Coil', 'DiscreteInput'], point.sourceType || 'HoldingRegister')}</td>
+      <td>${renderSelect('sourceType', ['HoldingRegister', 'InputRegister', 'Coil', 'DiscreteInput', 'NodeId', 'Tag', 'DataItem', 'Address'], point.sourceType || 'HoldingRegister')}</td>
       <td><input data-point-field="address" value="${escapeAttr(point.address ?? '')}"></td>
       <td>${renderSelect('rawValueType', ['Float', 'Double', 'Int16', 'Int32', 'Boolean', 'String'], point.rawValueType || 'Float')}</td>
       <td><input data-point-field="length" type="number" min="1" value="${escapeAttr(point.length || 1)}"></td>
@@ -482,26 +673,33 @@ function readPointsFromTable(existingPoints) {
 }
 
 function applyTopologyForm(configuration) {
-  const { configuration: next, task, device } = ensureLocalTopology(configuration)
+  const protocol = getSelectedProtocol()
+  const { configuration: next, task, device } = ensureLocalTopology(configuration, protocol)
   const taskKey = elements.topologyTaskKey.value.trim() || task.taskKey
   const deviceKey = elements.topologyDeviceKey.value.trim() || device.deviceKey
   const stationNumber = String(Math.max(1, toNumber(elements.topologyStation.value, 1)))
+  const contractProtocol = protocol.contractProtocol || 'Modbus'
+  const isModbus = normalizeProtocolKey(contractProtocol) === 'modbus'
 
   task.taskKey = taskKey
-  task.protocol = 'Modbus'
+  task.protocol = contractProtocol
   task.connection = {
     ...task.connection,
     connectionKey: keyFrom(task.connection.connectionKey || taskKey, `${taskKey}-connection`),
     connectionName: elements.topologyConnectionName.value.trim() || task.connection.connectionName,
-    protocol: 'Modbus',
-    transport: 'tcp',
+    protocol: contractProtocol,
+    transport: isModbus ? 'tcp' : task.connection.transport || '',
     host: elements.topologyHost.value.trim() || task.connection.host,
-    port: Math.max(1, toNumber(elements.topologyPort.value, task.connection.port || 1502)),
+    port: Math.max(1, toNumber(elements.topologyPort.value, task.connection.port || protocolDefaultPort(normalizeProtocolKey(protocol.code)))),
     timeoutMs: Math.max(100, toNumber(elements.topologyTimeout.value, task.connection.timeoutMs || 3000)),
     protocolOptions: {
       ...asSettings(task.connection.protocolOptions),
-      endianFormat: asSettings(task.connection.protocolOptions).endianFormat || 'ABCD',
-      plcAddresses: asSettings(task.connection.protocolOptions).plcAddresses || 'true',
+      ...(isModbus
+        ? {
+            endianFormat: asSettings(task.connection.protocolOptions).endianFormat || 'ABCD',
+            plcAddresses: asSettings(task.connection.protocolOptions).plcAddresses || 'true',
+          }
+        : {}),
     },
   }
 
@@ -511,7 +709,7 @@ function applyTopologyForm(configuration) {
   device.enabled = true
   device.protocolOptions = {
     ...asSettings(device.protocolOptions),
-    stationNumber,
+    ...(isModbus ? { stationNumber } : {}),
   }
   device.points = readPointsFromTable(device.points ?? [])
 
@@ -557,13 +755,26 @@ function syncFormsToJson(toneMessage) {
   return payload
 }
 
-function defaultPoint(index) {
+function defaultPoint(index, protocol = getSelectedProtocol()) {
   const number = index + 1
+  const code = normalizeProtocolKey(protocol?.code)
+  const address = {
+    modbus: String(40001 + index * 2),
+    'opc-ua': `ns=2;s=Device.Value${number}`,
+    'siemens-s7': `DB1.DBD${index * 4}`,
+    mitsubishi: `D${index + 1}`,
+    'omron-fins': `D${index + 1}`,
+    'allen-bradley': `Tag${number}`,
+    'mt-cnc': 'availability',
+    'opc-da': 'Random.Real8',
+    'fanuc-cnc': 'status',
+  }[code] || `point-${number}`
+
   return {
     pointKey: `point-${number}`,
     pointName: `Point ${number}`,
     sourceType: 'HoldingRegister',
-    address: String(40001 + index * 2),
+    address,
     rawValueType: 'Float',
     length: 2,
     polling: {
@@ -581,17 +792,22 @@ function defaultPoint(index) {
 
 async function loadAll() {
   setStatus('loading')
-  const [config, summary, script, logs] = await Promise.all([
+  const [config, summary, script, logs, protocols] = await Promise.all([
     request('/api/local/configuration'),
     request('/api/diagnostics/summary'),
     request('/api/scripts/polling'),
     request('/api/diagnostics/logs?count=100&level=Information'),
+    request('/api/collection/protocols'),
   ])
 
   state.localConfiguration = config
   state.runtimeSummary = summary
   state.script = script
   state.logs = logs
+  state.protocolCatalog = protocols?.protocols ?? []
+  if (!state.protocolCatalog.some((item) => normalizeProtocolKey(item.code) === normalizeProtocolKey(state.selectedTopologyProtocolCode))) {
+    state.selectedTopologyProtocolCode = state.protocolCatalog[0]?.code || 'modbus'
+  }
   renderSummary()
   elements.apiStatus.textContent = `API: ${state.edgeApiBaseUrl}`
   setStatus(`last refresh ${formatDate(summary.generatedAtUtc)}`, 'ok')
@@ -658,7 +874,34 @@ function escapeAttr(value) {
   return escapeHtml(value)
 }
 
+function setSelectedTopologyProtocol(protocolCode) {
+  let local = state.localConfiguration
+  if (local && (state.topologyFormDirty || state.uploadFormDirty)) {
+    const payload = readMergedConfiguration()
+    local = local.configuration !== undefined
+      ? { ...local, configuration: payload }
+      : payload
+    state.localConfiguration = local
+  }
+
+  state.selectedTopologyProtocolCode = protocolCode
+  if (local) {
+    const configuration = local.configuration ?? local
+    renderEditableConfiguration(configuration)
+    renderProtocolNav()
+    renderLogs()
+  }
+
+  switchPanel('topology')
+}
+
 document.querySelector('.nav').addEventListener('click', (event) => {
+  const protocolButton = event.target.closest('[data-topology-protocol]')
+  if (protocolButton) {
+    setSelectedTopologyProtocol(protocolButton.dataset.topologyProtocol)
+    return
+  }
+
   const button = event.target.closest('[data-panel]')
   if (button) {
     switchPanel(button.dataset.panel)
@@ -674,8 +917,9 @@ elements.syncTopologyButton.addEventListener('click', () => syncFormsToJson('top
 elements.applyTopologyButton.addEventListener('click', applyConfiguration)
 elements.addPointButton.addEventListener('click', () => {
   const payload = readMergedConfiguration()
-  const { configuration, device } = ensureLocalTopology(payload)
-  device.points.push(defaultPoint(device.points.length))
+  const protocol = getSelectedProtocol()
+  const { configuration, device } = ensureLocalTopology(payload, protocol)
+  device.points.push(defaultPoint(device.points.length, protocol))
   renderEditableConfiguration(configuration)
   setStatus('point added', 'info')
 })

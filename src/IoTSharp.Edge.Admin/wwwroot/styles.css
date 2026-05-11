@@ -61,6 +61,15 @@ body {
   gap: 8px;
 }
 
+.nav-group {
+  display: grid;
+  gap: 6px;
+}
+
+.nav-group:not(.active) .nav-subnav {
+  display: none;
+}
+
 .nav-item {
   border: 1px solid transparent;
   background: transparent;
@@ -76,6 +85,71 @@ body {
 .nav-item:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.08);
+}
+
+.nav-subnav {
+  display: grid;
+  gap: 4px;
+  padding-left: 12px;
+  margin-bottom: 4px;
+}
+
+.nav-subgroup {
+  display: grid;
+  gap: 4px;
+}
+
+.nav-subtitle {
+  color: #8ca0a5;
+  font-size: 12px;
+  padding: 4px 10px 2px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.nav-subempty {
+  color: #8ca0a5;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.nav-subitem {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #b7c7ca;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.nav-subitem:hover,
+.nav-subitem.active {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.nav-subitem-meta {
+  color: #8ca0a5;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.nav-subitem-meta.guarded {
+  color: #e5a63a;
+}
+
+.nav-subitem.active .nav-subitem-meta,
+.nav-subitem:hover .nav-subitem-meta {
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .sidebar-foot {
@@ -237,6 +311,13 @@ button {
   font-size: 18px;
 }
 
+.panel-subtitle {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -339,6 +420,81 @@ th {
 
 .points-editor table {
   min-width: 1040px;
+}
+
+.protocol-summary {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.protocol-card {
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: #f8fbfc;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.protocol-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.protocol-card-title {
+  display: grid;
+  gap: 4px;
+}
+
+.protocol-card-title strong {
+  font-size: 15px;
+}
+
+.protocol-card-title small {
+  color: var(--muted);
+}
+
+.protocol-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.protocol-flag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #eef6f7;
+  color: var(--accent-strong);
+  font-size: 12px;
+}
+
+.protocol-settings {
+  display: grid;
+  gap: 8px;
+}
+
+.protocol-setting {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #edf1f3;
+  padding-bottom: 6px;
+  font-size: 13px;
+}
+
+.protocol-setting span {
+  color: var(--muted);
+}
+
+.protocol-setting strong {
+  text-align: right;
+  word-break: break-word;
 }
 
 .points-editor input,
