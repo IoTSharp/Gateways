@@ -252,31 +252,3 @@ public sealed record UploadEnvelope(
     QualityStatus Quality,
     string Target,
     string PayloadTemplate);
-
-public interface IDeviceDriver
-{
-    DriverMetadata Metadata { get; }
-    Task<ConnectionTestResult> TestConnectionAsync(DriverConnectionContext context, CancellationToken cancellationToken);
-    Task<AddressValidationResult> ValidateAddressAsync(DriverReadRequest request, CancellationToken cancellationToken);
-    Task<DriverReadResult> ReadAsync(DriverConnectionContext context, DriverReadRequest request, CancellationToken cancellationToken);
-    Task<IReadOnlyCollection<DriverReadResult>> ReadBatchAsync(DriverConnectionContext context, DriverBatchReadRequest request, CancellationToken cancellationToken);
-    Task<DriverWriteResult> WriteAsync(DriverConnectionContext context, DriverWriteRequest request, CancellationToken cancellationToken);
-    Task<IReadOnlyCollection<DriverWriteResult>> WriteBatchAsync(DriverConnectionContext context, DriverBatchWriteRequest request, CancellationToken cancellationToken);
-}
-
-public interface IDeviceDriverRegistry
-{
-    IReadOnlyCollection<DriverMetadata> GetMetadata();
-    IDeviceDriver GetRequiredDriver(string code);
-}
-
-public interface IUploadTransport
-{
-    UploadProtocol Protocol { get; }
-    Task UploadAsync(UploadChannel channel, UploadEnvelope envelope, CancellationToken cancellationToken);
-}
-
-public interface IUploadTransportRegistry
-{
-    IUploadTransport GetRequiredTransport(UploadProtocol protocol);
-}
