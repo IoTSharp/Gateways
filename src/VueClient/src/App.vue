@@ -128,12 +128,10 @@ const protocolGroups = computed<ProtocolGroup[]>(() => {
     groups.set(category, [...(groups.get(category) ?? []), protocol])
   }
 
-  return Array.from(groups.entries())
-    .sort(([left], [right]) => left.localeCompare(right, 'zh-Hans-CN'))
-    .map(([category, protocols]) => ({
-      category,
-      protocols: protocols.sort((left, right) => left.displayName.localeCompare(right.displayName, 'zh-Hans-CN')),
-    }))
+  return Array.from(groups.entries()).map(([category, protocols]) => ({
+    category,
+    protocols,
+  }))
 })
 
 const connectionSettings = computed(() => selectedProtocol.value.connectionSettings ?? [])
@@ -470,7 +468,7 @@ function ensureLocalTopology(input: EdgeCollectionConfiguration, protocol: Colle
   configuration.edgeNodeId ||= newGuid()
   configuration.version = Math.max(1, toNumber(configuration.version, 1))
   configuration.updatedAt ||= new Date().toISOString()
-  configuration.updatedBy ||= 'LocalAdmin'
+  configuration.updatedBy ||= 'LocalEdge'
 
   if (!Array.isArray(configuration.tasks)) {
     configuration.tasks = []
@@ -932,7 +930,7 @@ function errorMessage(error: unknown) {
         </div>
         <div>
           <div class="brand-title">IoTSharp Edge</div>
-          <div class="brand-subtitle">Local Admin</div>
+          <div class="brand-subtitle">Local Console</div>
         </div>
       </div>
 

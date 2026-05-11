@@ -9,6 +9,7 @@
     <PackageVersion Include="IoTServer" Version="0.0.15" />
     <PackageVersion Include="log4net" Version="3.3.1" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.7" />
     <PackageVersion Include="MQTTnet" Version="5.1.0.1559" />
     <PackageVersion Include="MQTTnet.Server" Version="5.1.0.1559" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />

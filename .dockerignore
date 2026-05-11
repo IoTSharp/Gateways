@@ -11,3 +11,5 @@
 *.db-wal
 sonnetdb-data/
 edge-data/
+**/node_modules/
+**/dist/

@@ -2,7 +2,7 @@
 
 统一的 Gateway 单宿主程序。
 
-当前模式已经收口为一个可执行程序 `IoTSharp.Edge`，并新增独立前端 `IoTSharp.Edge.Admin`。Gateway 的职责为：
+当前模式已经收口为一个可执行程序 `IoTSharp.Edge`，Vue SPA 前端源码位于 `src/VueClient`，开发时由宿主通过 SpaProxy 拉起，发布时构建产物拷贝到 `wwwroot`。Gateway 的职责为：
 
 - 读取本地 `bootstrap.json`
 - 向 IoTSharp 平台注册、心跳、上报能力
@@ -34,12 +34,12 @@ Gateway 侧负责：
 
 ## 本地管理界面
 
-本地管理界面位于独立项目 `src/IoTSharp.Edge.Admin`，通过 HTTP 调用 `src/IoTSharp.Edge` 的本地 API。
+本地管理界面随 `IoTSharp.Edge` 一起启动，源码位于 `src/VueClient`，通过 HTTP 调用同宿主暴露的本地 API。
 
 当前界面提供：
 
 - 运行态与配置统计
-- Modbus 采集拓扑结构化编辑
+- 按协议目录驱动的采集拓扑结构化编辑
 - SonnetDB 上传目标结构化编辑
 - 本地 JSON 高级编辑
 - BASIC 采集脚本查看
@@ -97,9 +97,9 @@ Gateway 会周期性调用：
 - `src/IoTSharp.Edge.Infrastructure`
   - SQLite 持久化、驱动适配、上传通道
 - `src/IoTSharp.Edge`
-  - 单宿主程序、bootstrap/诊断/本地配置 API、平台同步 worker
-- `src/IoTSharp.Edge.Admin`
-  - 独立本地管理前端
+  - 单宿主程序、bootstrap/诊断/本地配置 API、平台同步 worker、Vue SPA 托管入口
+- `src/VueClient`
+  - 本地管理前端
 - `src/IoTSharp.Edge.DeviceSimulator`
   - 基于 IoTServer 的设备模拟程序
 
@@ -112,13 +112,16 @@ Gateway 会周期性调用：
 - Mitsubishi
 - Omron FINS
 - Allen-Bradley
+- OPC UA
+- MTConnect
 
 已保留统一契约但暂未启用完整实现：
 
-- OPC UA
 - OPC DA
-- MT CNC
 - Fanuc CNC
+- BACnet
+- IEC 60870-5-104
+- MQTT
 
 ## 本地运行
 
@@ -128,8 +131,7 @@ docker compose up -d --build
 
 默认地址：
 
-- Edge Admin: http://127.0.0.1:18182/
-- Edge API: http://127.0.0.1:18180/
+- Edge UI / API: http://127.0.0.1:18180/
 - Device Simulator: http://127.0.0.1:18181/api/values
 - SonnetDB: http://127.0.0.1:15080/
 

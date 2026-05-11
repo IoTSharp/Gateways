@@ -13,7 +13,10 @@ public enum DriverType
     OpcUa,
     OpcDa,
     MtCnc,
-    FanucCnc
+    FanucCnc,
+    Bacnet,
+    Iec104,
+    Mqtt
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

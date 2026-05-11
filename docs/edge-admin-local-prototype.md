@@ -1,4 +1,4 @@
-# IoTSharp Edge Local Admin Prototype
+# IoTSharp Edge Local SPA Prototype
 
 ## Goal
 
@@ -6,7 +6,7 @@ Edge must be able to manage its own collection configuration and SonnetDB upload
 
 ## Reference Direction
 
-The admin UI follows the gateway console style used by industrial IoT gateway projects such as:
+The embedded SPA follows the gateway console style used by industrial IoT gateway projects such as:
 
 - https://github.com/iioter/iotgateway
 - https://gitee.com/ThingsGateway/ThingsGateway
@@ -69,7 +69,7 @@ Shows local runtime logs from the Edge API, filtered to operational levels first
 
 ```text
 +---------------------------------------------------------------------+
-| IoTSharp Edge Admin        Local Mode | Running | Last applied ...  |
+| IoTSharp Edge Console      Local Mode | Running | Last applied ...  |
 +----------------------+----------------------------------------------+
 | Dashboard            | Runtime cards                                |
 | Topology             | - Health                                     |
@@ -87,7 +87,7 @@ Shows local runtime logs from the Edge API, filtered to operational levels first
 
 ## API Shape
 
-The separate frontend project talks to `src/IoTSharp.Edge` through HTTP APIs.
+The SPA bundled with `src/IoTSharp.Edge` talks to the local APIs through HTTP.
 
 Required first-pass APIs:
 
@@ -114,9 +114,9 @@ Required first-pass APIs:
 
 - Add local configuration file store in `src/IoTSharp.Edge`.
 - Add APIs to read, save, apply, and reset the local configuration.
-- Add a separate `src/IoTSharp.Edge.Admin` frontend project.
+- Embed the Vue SPA in `src/VueClient`, host it from `src/IoTSharp.Edge`, and use SpaProxy in development.
 - Remove `samples/IoTSharp.Edge.MockPlatform`.
-- Update Docker Compose to run Edge, Edge Admin, Device Simulator, and SonnetDB only.
+- Update Docker Compose to run Edge, Device Simulator, and SonnetDB only.
 
 ### Phase 2
 

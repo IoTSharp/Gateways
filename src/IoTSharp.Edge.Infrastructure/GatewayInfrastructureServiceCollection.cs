@@ -26,6 +26,41 @@ public static class GatewayInfrastructureServiceCollectionExtensions
         services.AddSingleton<IDeviceDriver, OpcUaDriver>();
         services.AddSingleton<IDeviceDriver, MtConnectDriver>();
         services.AddSingleton<IDeviceDriver>(_ => new UnsupportedDriver(
+            new DriverMetadata("bacnet", DriverType.Bacnet, "BACnet", "BACnet/IP collection contract for building automation devices and object properties.", true, true, true, true,
+                new[]
+                {
+                    new ConnectionSettingDefinition("host", "Host", "text", true, "BACnet device host name or IP address."),
+                    new ConnectionSettingDefinition("port", "Port", "number", true, "BACnet/IP UDP port, commonly 47808."),
+                    new ConnectionSettingDefinition("deviceInstance", "Device Instance", "number", true, "BACnet device instance identifier."),
+                    new ConnectionSettingDefinition("networkNumber", "Network Number", "number", false, "Optional BACnet network number."),
+                    new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "Timeout in milliseconds.")
+                }, "planned"),
+            "BACnet/IP collection is planned as a protocol adapter. Add a BACnet stack such as BACnet4J.NET or a native adapter before enabling runtime reads."));
+        services.AddSingleton<IDeviceDriver>(_ => new UnsupportedDriver(
+            new DriverMetadata("iec104", DriverType.Iec104, "IEC 60870-5-104", "IEC 60870-5-104 telecontrol collection contract for power and SCADA endpoints.", true, true, true, true,
+                new[]
+                {
+                    new ConnectionSettingDefinition("host", "Host", "text", true, "IEC 104 server host name or IP address."),
+                    new ConnectionSettingDefinition("port", "Port", "number", true, "IEC 104 TCP port, commonly 2404."),
+                    new ConnectionSettingDefinition("commonAddress", "Common Address", "number", true, "ASDU common address."),
+                    new ConnectionSettingDefinition("originatorAddress", "Originator Address", "number", false, "Optional originator address."),
+                    new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "Timeout in milliseconds.")
+                }, "planned"),
+            "IEC 60870-5-104 collection is planned as a protocol adapter. Add an IEC 104 stack before enabling runtime reads."));
+        services.AddSingleton<IDeviceDriver>(_ => new UnsupportedDriver(
+            new DriverMetadata("mqtt", DriverType.Mqtt, "MQTT", "MQTT subscription-based collection contract for topic payload ingestion.", true, false, true, false,
+                new[]
+                {
+                    new ConnectionSettingDefinition("host", "Host", "text", true, "MQTT broker host name or IP address."),
+                    new ConnectionSettingDefinition("port", "Port", "number", true, "MQTT broker port, commonly 1883."),
+                    new ConnectionSettingDefinition("clientId", "Client ID", "text", true, "Client identifier used by the edge collector."),
+                    new ConnectionSettingDefinition("topic", "Topic", "text", true, "Topic or topic filter to subscribe."),
+                    new ConnectionSettingDefinition("qos", "QoS", "select", false, "MQTT quality of service.", new[] { "0", "1", "2" }),
+                    new ConnectionSettingDefinition("username", "Username", "text", false, "Optional broker username."),
+                    new ConnectionSettingDefinition("password", "Password", "password", false, "Optional broker password.")
+                }, "planned"),
+            "MQTT collection is planned as a subscription adapter. The current MQTT implementation is only registered as an upload transport."));
+        services.AddSingleton<IDeviceDriver>(_ => new UnsupportedDriver(
             new DriverMetadata("opc-da", DriverType.OpcDa, "OPC DA", "Windows-only OPC DA Classic COM/DCOM driver contract.", true, true, true, true,
                 new[]
                 {

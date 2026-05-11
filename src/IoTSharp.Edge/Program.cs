@@ -51,7 +51,6 @@ builder.Services.AddScoped<DriverCatalogService>();
 builder.Services.AddScoped<CollectionProtocolCatalogService>();
 builder.Services.AddScoped<GatewayRuntimeService>();
 builder.Services.AddGatewayInfrastructure(builder.Configuration);
-builder.Services.AddHostedService<FrontendDevelopmentServerHostedService>();
 builder.Services.AddSingleton<IEdgeTaskReceiptReporter, EdgeTaskReceiptExample>();
 builder.Services.AddHostedService<GatewayPollingWorker>();
 builder.Services.AddHostedService<GatewayCollectionConfigurationWorker>();
@@ -60,26 +59,8 @@ builder.Services.AddHostedService<EdgeRuntimeReportingWorker>();
 var app = builder.Build();
 app.UseCors();
 
-if (app.Environment.IsDevelopment())
-{
-    app.Use(async (context, next) =>
-    {
-        if (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/health"))
-        {
-            await next();
-            return;
-        }
-
-        if (await FrontendSpaProxy.TryProxyAsync(context))
-        {
-            return;
-        }
-
-        await next();
-    });
-}
-
 app.UseDefaultFiles();
+app.MapStaticAssets();
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = context =>
@@ -120,7 +101,7 @@ app.MapPut("/api/local/configuration", async (
     try
     {
         var apply = !bool.TryParse(context.Request.Query["apply"], out var parsed) || parsed;
-        return Results.Ok(await service.SaveAsync(configuration, apply, updatedBy: "LocalAdmin", ct));
+        return Results.Ok(await service.SaveAsync(configuration, apply, updatedBy: "LocalEdge", ct));
     }
     catch (Exception exception)
     {
@@ -151,12 +132,6 @@ app.MapPost("/api/local/configuration/reset", async (LocalCollectionConfiguratio
         return Results.BadRequest(new { message = exception.Message });
     }
 });
-
-app.MapGet("/api/frontend/config", (HttpContext context) => Results.Ok(new
-{
-    edgeApiBaseUrl = $"{context.Request.Scheme}://{context.Request.Host}",
-    builtAtUtc = DateTime.UtcNow
-}));
 
 app.MapGet("/api/scripts/polling", () => Results.Ok(new
 {
@@ -289,7 +264,7 @@ app.MapGet("/api/diagnostics/summary", async (
     });
 });
 
-app.MapFallbackToFile("index.html");
+app.MapFallbackToFile("/index.html");
 
 app.Run();
 

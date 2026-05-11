@@ -4,12 +4,15 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <ClientAppRoot>$(MSBuildProjectDirectory)\ClientApp</ClientAppRoot>
-    <ClientAppPublishRoot>$(MSBuildProjectDirectory)\wwwroot</ClientAppPublishRoot>
-    <BuildClientApp Condition="'$(BuildClientApp)' == ''">true</BuildClientApp>
+    <SpaRoot>..\VueClient</SpaRoot>
+    <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
+    <SpaProxyServerUrl>http://localhost:5173</SpaProxyServerUrl>
+    <VueClientRoot>$(MSBuildProjectDirectory)\..\VueClient</VueClientRoot>
+    <BuildVueClient Condition="'$(BuildVueClient)' == ''">true</BuildVueClient>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" />
     <ProjectReference Include="..\IoTSharp.Edge.Application\IoTSharp.Edge.Application.csproj" />
     <ProjectReference Include="..\IoTSharp.Edge.Infrastructure\IoTSharp.Edge.Infrastructure.csproj" />
   </ItemGroup>
@@ -22,18 +25,18 @@
     <Content Update="local-collection.docker.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <Target Name="BuildClientApp" BeforeTargets="ComputeFilesToPublish" Condition="'$(BuildClientApp)' == 'true'">
-    <Exec WorkingDirectory="$(ClientAppRoot)" Command="npm ci --no-audit --no-fund" />
-    <Exec WorkingDirectory="$(ClientAppRoot)" Command="npm run build" />
-    <RemoveDir Directories="$(ClientAppPublishRoot)" Condition="Exists('$(ClientAppPublishRoot)')" />
-    <MakeDir Directories="$(ClientAppPublishRoot)" />
+  <Target Name="BuildVueClient" BeforeTargets="ComputeFilesToPublish" Condition="'$(BuildVueClient)' == 'true' and '$(PublishDir)' != ''">
+    <Exec WorkingDirectory="$(VueClientRoot)" Command="npm ci --no-audit --no-fund" />
+    <Exec WorkingDirectory="$(VueClientRoot)" Command="npm run build" />
     <ItemGroup>
-      <ClientAppPublishFiles Include="$(ClientAppRoot)\dist\**\*" />
+      <VueClientPublishFiles Include="$(VueClientRoot)\dist\**\*" />
     </ItemGroup>
+    <RemoveDir Directories="$(PublishDir)wwwroot" Condition="Exists('$(PublishDir)wwwroot')" />
+    <MakeDir Directories="$(PublishDir)wwwroot" />
     <Copy
-      SourceFiles="@(ClientAppPublishFiles)"
-      DestinationFiles="@(ClientAppPublishFiles->'$(ClientAppPublishRoot)\%(RecursiveDir)%(Filename)%(Extension)')"
+      SourceFiles="@(VueClientPublishFiles)"
+      DestinationFiles="@(VueClientPublishFiles->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
       SkipUnchangedFiles="true"
-      Condition="Exists('$(ClientAppRoot)\dist')" />
+      Condition="Exists('$(VueClientRoot)\dist')" />
   </Target>
 </Project>
