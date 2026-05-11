@@ -1,4 +1,5 @@
 global using System.Globalization;
+global using System.IO.Ports;
 global using System.Text;
 global using System.Xml.Linq;
 global using IoTClient;

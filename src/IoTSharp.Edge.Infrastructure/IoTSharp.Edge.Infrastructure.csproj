@@ -13,6 +13,7 @@
     <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Client" />
     <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Configuration" />
     <PackageReference Include="SonnetDB" />
+    <PackageReference Include="System.IO.Ports" />
   </ItemGroup>
 
   <PropertyGroup>

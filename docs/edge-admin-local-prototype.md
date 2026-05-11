@@ -39,7 +39,7 @@ Shows the runtime execution graph:
 - upload channels
 - upload routes
 
-First implementation presents a compact topology summary, a JSON editor, and a structured Modbus connection/point editor. Later iterations should expand the structured editor to every supported protocol and route type.
+First implementation presents a compact topology summary, a JSON editor, and a structured Modbus connection/point editor. Modbus now covers TCP, RTU over TCP, and serial DTU/RTU style collection. Later iterations should expand the structured editor to every supported protocol and route type.
 
 ### Upload Targets
 

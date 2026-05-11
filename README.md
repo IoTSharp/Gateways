@@ -107,7 +107,7 @@ Gateway 会周期性调用：
 
 已接入：
 
-- Modbus
+- Modbus TCP / RTU / 串口 ASCII
 - Siemens S7
 - Mitsubishi
 - Omron FINS

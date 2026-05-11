@@ -317,10 +317,23 @@ internal static class GatewayCollectionConfigurationMapper
         switch (task.Protocol)
         {
             case GatewayCollectionProtocolType.Modbus:
-                settings["transport"] = NormalizeModbusTransport(task.Connection.Transport);
-                settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Modbus.");
-                settings["port"] = (task.Connection.Port ?? 502).ToString(CultureInfo.InvariantCulture);
                 settings["timeout"] = Math.Max(task.Connection.TimeoutMs, 1).ToString(CultureInfo.InvariantCulture);
+                settings["transport"] = NormalizeModbusTransport(
+                    task.Connection.Transport,
+                    FirstString(task.Connection.ProtocolOptions, "transport"));
+
+                if (IsSerialModbusTransport(settings["transport"]))
+                {
+                    var serialPort = task.Connection.SerialPort
+                        ?? FirstString(task.Connection.ProtocolOptions, "serialPort", "portName", "comPort");
+                    settings["serialPort"] = Require(serialPort, $"task '{task.TaskKey}' requires connection.serialPort for Modbus serial transport.");
+                }
+                else
+                {
+                    settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Modbus.");
+                    settings["port"] = (task.Connection.Port ?? 502).ToString(CultureInfo.InvariantCulture);
+                }
+
                 break;
             case GatewayCollectionProtocolType.SiemensS7:
                 settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Siemens S7.");
@@ -697,16 +710,21 @@ internal static class GatewayCollectionConfigurationMapper
         return $"{scheme}://{connection.Host}{port}";
     }
 
-    private static string NormalizeModbusTransport(string? transport)
+    private static string NormalizeModbusTransport(string? transport, string? fallback = null)
     {
-        return transport?.Trim().ToLowerInvariant() switch
+        return NormalizeKey(transport ?? fallback) switch
         {
             "tcp" => "tcp",
             "rtuovertcp" => "rtuOverTcp",
-            "serialrtu" => throw new NotSupportedException("Gateway sync does not support Modbus SerialRtu transport yet."),
-            _ => "tcp"
+            "serialrtu" or "rtu" or "modbusrtu" or "rs485" or "rs232" or "serial" or "serialdtu" or "dtu" => "serialRtu",
+            "serialascii" or "ascii" or "modbusascii" => "serialAscii",
+            "" => "tcp",
+            _ => throw new NotSupportedException($"Gateway sync does not support Modbus transport '{transport ?? fallback}'.")
         };
     }
+
+    private static bool IsSerialModbusTransport(string? transport)
+        => NormalizeKey(transport) is "serialrtu" or "serialascii";
 
     private static byte ResolveModbusFunctionCode(string? sourceType)
     {
@@ -798,6 +816,11 @@ internal static class GatewayCollectionConfigurationMapper
 
     private static string Require(string? value, string message)
         => string.IsNullOrWhiteSpace(value) ? throw new InvalidOperationException(message) : value.Trim();
+
+    private static string NormalizeKey(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 
     private static Guid CreateDeterministicGuid(Guid edgeNodeId, params string[] parts)
     {

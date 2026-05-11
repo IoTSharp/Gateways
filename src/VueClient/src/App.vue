@@ -99,7 +99,7 @@ const fallbackProtocol = computed<CollectionProtocolDescriptor>(() => ({
   driverType: 'Modbus',
   displayName: 'Modbus',
   category: 'PLC',
-  description: 'Modbus TCP / RTU over TCP 采集。',
+  description: 'Modbus TCP / RTU over TCP / 串口 RTU / 串口 ASCII 采集。',
   lifecycle: 'ready',
   supportsRead: true,
   supportsWrite: true,
@@ -107,10 +107,17 @@ const fallbackProtocol = computed<CollectionProtocolDescriptor>(() => ({
   supportsBatchWrite: true,
   riskLevel: 'normal',
   connectionSettings: [
-    { key: 'transport', label: 'Transport', valueType: 'select', required: true, description: 'tcp or rtuOverTcp.', options: ['tcp', 'rtuOverTcp'] },
-    { key: 'host', label: 'Host', valueType: 'text', required: true, description: 'PLC host name or IP.' },
-    { key: 'port', label: 'Port', valueType: 'number', required: true, description: 'PLC port.' },
+    { key: 'transport', label: 'Transport', valueType: 'select', required: true, description: 'tcp, rtuOverTcp, serialRtu, or serialAscii.', options: ['tcp', 'rtuOverTcp', 'serialRtu', 'serialAscii'] },
+    { key: 'host', label: 'Host', valueType: 'text', required: false, description: 'PLC host name or IP for TCP transports.' },
+    { key: 'port', label: 'Port', valueType: 'number', required: false, description: 'PLC TCP port.' },
+    { key: 'serialPort', label: 'Serial Port', valueType: 'text', required: false, description: 'Serial port for Modbus RTU/ASCII.' },
+    { key: 'baudRate', label: 'Baud Rate', valueType: 'number', required: false, description: 'Serial baud rate.' },
+    { key: 'dataBits', label: 'Data Bits', valueType: 'number', required: false, description: 'Serial data bits.' },
+    { key: 'parity', label: 'Parity', valueType: 'select', required: false, description: 'Serial parity.', options: ['None', 'Odd', 'Even', 'Mark', 'Space'] },
+    { key: 'stopBits', label: 'Stop Bits', valueType: 'select', required: false, description: 'Serial stop bits.', options: ['One', 'OnePointFive', 'Two'] },
     { key: 'timeout', label: 'Timeout', valueType: 'number', required: false, description: 'Timeout in milliseconds.' },
+    { key: 'endianFormat', label: 'Endian', valueType: 'select', required: false, description: 'Word/byte order.', options: ['ABCD', 'BADC', 'CDAB', 'DCBA'] },
+    { key: 'plcAddresses', label: 'PLC Addresses', valueType: 'boolean', required: false, description: 'Treat addresses as PLC-style addresses.' },
   ],
 }))
 
@@ -135,6 +142,7 @@ const protocolGroups = computed<ProtocolGroup[]>(() => {
 })
 
 const connectionSettings = computed(() => selectedProtocol.value.connectionSettings ?? [])
+const visibleConnectionSettings = computed(() => connectionSettings.value.filter((setting) => isConnectionSettingVisible(setting, selectedProtocol.value, connectionValues.transport)))
 const protocolFlags = computed(() => [
   selectedProtocol.value.supportsRead ? 'read' : '',
   selectedProtocol.value.supportsWrite ? 'write' : '',
@@ -402,6 +410,7 @@ function applyTopologyForm(configuration: EdgeCollectionConfiguration, protocol:
   const connection = task.connection ?? {}
   const options = asRecord(connection.protocolOptions)
   const defaults = protocolDefaults(protocol)
+  const transport = connectionValues.transport || connection.transport || defaultSettingValue(protocol, { key: 'transport', label: 'Transport', valueType: 'select', required: true, description: '', options: [] })
   const taskKey = topologyForm.taskKey.trim() || defaults.taskKey
   const deviceKey = topologyForm.deviceKey.trim() || defaults.deviceKey
 
@@ -416,9 +425,12 @@ function applyTopologyForm(configuration: EdgeCollectionConfiguration, protocol:
   }
 
   for (const setting of protocol.connectionSettings ?? []) {
-    writeConnectionSetting(task.connection, options, setting, connectionValues[setting.key] ?? '')
+    if (isConnectionSettingVisible(setting, protocol, transport)) {
+      writeConnectionSetting(task.connection, options, setting, connectionValues[setting.key] ?? '')
+    }
   }
 
+  normalizeConnectionForTransport(task.connection, options, protocol, transport)
   task.connection.protocolOptions = pruneEmpty(options)
 
   device.deviceKey = deviceKey
@@ -492,13 +504,16 @@ function ensureLocalTopology(input: EdgeCollectionConfiguration, protocol: Colle
   task.connection.timeoutMs = Math.max(100, toNumber(task.connection.timeoutMs, defaultTimeout(protocol)))
   task.connection.retryCount = Math.max(0, toNumber(task.connection.retryCount, 3))
   task.connection.protocolOptions = asRecord(task.connection.protocolOptions)
+  const transport = readModbusTransport(task.connection, protocol)
 
   for (const setting of protocol.connectionSettings ?? []) {
     const current = readConnectionSetting(task.connection, setting)
-    if (current == null || current === '') {
+    if ((current == null || current === '') && isConnectionSettingVisible(setting, protocol, transport)) {
       writeConnectionSetting(task.connection, task.connection.protocolOptions, setting, defaultSettingValue(protocol, setting))
     }
   }
+
+  normalizeConnectionForTransport(task.connection, task.connection.protocolOptions, protocol, transport)
 
   if (!Array.isArray(task.devices)) {
     task.devices = []
@@ -711,7 +726,19 @@ function defaultSettingValue(protocol: CollectionProtocolDescriptor, setting: Co
   const code = normalizeProtocolKey(protocol.code)
   const key = normalizeProtocolKey(setting.key)
   const explicit: Record<string, Record<string, string>> = {
-    modbus: { transport: 'tcp', host: 'device-simulator', port: '1502', timeout: '3000', endianformat: 'ABCD', plcaddresses: 'true' },
+    modbus: {
+      transport: 'tcp',
+      host: 'device-simulator',
+      port: '1502',
+      serialport: 'COM3',
+      baudrate: '9600',
+      databits: '8',
+      parity: 'None',
+      stopbits: 'One',
+      timeout: '3000',
+      endianformat: 'ABCD',
+      plcaddresses: 'true',
+    },
     opcua: { endpoint: 'opc.tcp://127.0.0.1:4840', usesecurity: 'false', securitymode: 'Auto', securitypolicy: 'Auto', timeout: '3000', sessiontimeout: '60000', autoacceptuntrustedcertificates: 'false' },
     opcda: { progid: 'Matrikon.OPC.Simulation.1', host: '127.0.0.1' },
     mtcnc: { baseurl: 'http://127.0.0.1:5000', timeout: '3000', path: 'current' },
@@ -814,6 +841,24 @@ function isSelectSetting(setting: ConnectionSettingDefinition) {
   return setting.valueType.toLowerCase() === 'select' || (setting.options?.length ?? 0) > 0
 }
 
+function isConnectionSettingVisible(setting: ConnectionSettingDefinition, protocol: CollectionProtocolDescriptor, transportValue?: string) {
+  if (normalizeProtocolKey(protocol.code) !== 'modbus') {
+    return true
+  }
+
+  const key = normalizeProtocolKey(setting.key)
+  if (key === 'transport' || key === 'timeout' || key === 'endianformat' || key === 'plcaddresses') {
+    return true
+  }
+
+  const transport = readModbusTransportValue(transportValue)
+  if (transport === 'serial') {
+    return ['serialport', 'baudrate', 'databits', 'parity', 'stopbits'].includes(key)
+  }
+
+  return ['host', 'port'].includes(key)
+}
+
 function inputType(setting: ConnectionSettingDefinition) {
   const valueType = setting.valueType.toLowerCase()
   if (valueType === 'password') return 'password'
@@ -869,6 +914,68 @@ function normalizeProtocolKey(value: unknown) {
 
 function sameProtocol(left: unknown, right: unknown) {
   return normalizeProtocolKey(left) === normalizeProtocolKey(right)
+}
+
+function readModbusTransport(connection: CollectionTask['connection'], protocol: CollectionProtocolDescriptor) {
+  return normalizeModbusTransportValue(
+    connection?.transport
+    || asRecord(connection?.protocolOptions).transport
+    || defaultSettingValue(protocol, { key: 'transport', label: 'Transport', valueType: 'select', required: true, description: '', options: [] }),
+  )
+}
+
+function readModbusTransportValue(value?: unknown) {
+  const normalized = normalizeProtocolKey(value)
+  if (['serialrtu', 'serialascii', 'rtu', 'ascii', 'dtu', 'serial'].includes(normalized)) {
+    return 'serial'
+  }
+
+  if (['rtuovertcp', 'tcp'].includes(normalized)) {
+    return normalized
+  }
+
+  return 'tcp'
+}
+
+function normalizeModbusTransportValue(value?: unknown) {
+  const normalized = normalizeProtocolKey(value)
+  if (normalized === 'rtuovertcp') return 'rtuOverTcp'
+  if (['serialrtu', 'rtu', 'dtu', 'serial'].includes(normalized)) return 'serialRtu'
+  if (['serialascii', 'ascii'].includes(normalized)) return 'serialAscii'
+  return 'tcp'
+}
+
+function normalizeModbusConnection(connection: NonNullable<CollectionTask['connection']>, options: Record<string, unknown>, transportValue?: string) {
+  const normalizedTransport = readModbusTransportValue(transportValue || connection.transport)
+  if (normalizedTransport === 'serial') {
+    delete connection.host
+    delete connection.port
+    delete options.host
+    delete options.port
+    return
+  }
+
+  delete connection.serialPort
+  delete options.serialPort
+  delete options.baudRate
+  delete options.dataBits
+  delete options.parity
+  delete options.stopBits
+}
+
+function normalizeConnectionForTransport(
+  connection: NonNullable<CollectionTask['connection']>,
+  options: Record<string, unknown>,
+  protocol: CollectionProtocolDescriptor,
+  transportValue?: string,
+) {
+  if (normalizeProtocolKey(protocol.code) !== 'modbus') {
+    return
+  }
+
+  const transport = normalizeModbusTransportValue(transportValue || connection.transport)
+  connection.transport = transport
+  normalizeModbusConnection(connection, options, transport)
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -1065,7 +1172,7 @@ function errorMessage(error: unknown) {
                   <span v-for="flag in protocolFlags" :key="flag">{{ flag }}</span>
                   <span>{{ selectedProtocol.riskLevel }}</span>
                   <span>{{ protocolTaskCount }} task(s)</span>
-                  <span>{{ connectionSettings.length }} setting(s)</span>
+                  <span>{{ visibleConnectionSettings.length }} setting(s)</span>
                 </div>
               </div>
 
@@ -1088,8 +1195,8 @@ function errorMessage(error: unknown) {
                   <h2>连接参数</h2>
                   <span class="badge">schema</span>
                 </div>
-                <div v-if="connectionSettings.length" class="form-grid">
-                  <label v-for="setting in connectionSettings" :key="setting.key" :class="{ 'checkbox-label': isBooleanSetting(setting) }">
+                <div v-if="visibleConnectionSettings.length" class="form-grid">
+                  <label v-for="setting in visibleConnectionSettings" :key="setting.key" :class="{ 'checkbox-label': isBooleanSetting(setting) }">
                     <span>{{ setting.label }}<em v-if="setting.required">*</em></span>
                     <select v-if="isSelectSetting(setting)" v-model="connectionValues[setting.key]" @change="markTopologyDirty">
                       <option v-for="option in setting.options ?? []" :key="option" :value="option">{{ option }}</option>

@@ -6,16 +6,21 @@ internal sealed class ModbusDriver : DeviceDriverBase
         "modbus",
         DriverType.Modbus,
         "Modbus",
-        "Supports Modbus TCP and Modbus RTU over TCP through a unified driver contract.",
+        "Supports Modbus TCP, RTU over TCP, serial RTU, and serial ASCII through a unified driver contract.",
         true,
         true,
         true,
         true,
         new[]
         {
-            new ConnectionSettingDefinition("transport", "Transport", "select", true, "tcp or rtuOverTcp.", new[] { "tcp", "rtuOverTcp" }),
-            new ConnectionSettingDefinition("host", "Host", "text", true, "PLC host name or IP."),
-            new ConnectionSettingDefinition("port", "Port", "number", true, "PLC port, usually 502."),
+            new ConnectionSettingDefinition("transport", "Transport", "select", true, "tcp, rtuOverTcp, serialRtu, or serialAscii.", new[] { "tcp", "rtuOverTcp", "serialRtu", "serialAscii" }),
+            new ConnectionSettingDefinition("host", "Host", "text", false, "PLC host name or IP for TCP transports."),
+            new ConnectionSettingDefinition("port", "Port", "number", false, "PLC TCP port, usually 502."),
+            new ConnectionSettingDefinition("serialPort", "Serial Port", "text", false, "Serial port for Modbus RTU/ASCII, for example COM3 or /dev/ttyUSB0."),
+            new ConnectionSettingDefinition("baudRate", "Baud Rate", "number", false, "Serial baud rate, usually 9600."),
+            new ConnectionSettingDefinition("dataBits", "Data Bits", "number", false, "Serial data bits, usually 8."),
+            new ConnectionSettingDefinition("parity", "Parity", "select", false, "Serial parity.", new[] { "None", "Odd", "Even", "Mark", "Space" }),
+            new ConnectionSettingDefinition("stopBits", "Stop Bits", "select", false, "Serial stop bits.", new[] { "One", "OnePointFive", "Two" }),
             new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "Timeout in milliseconds."),
             new ConnectionSettingDefinition("endianFormat", "Endian", "select", false, "Word/byte order.", Enum.GetNames<EndianFormat>()),
             new ConnectionSettingDefinition("plcAddresses", "PLC Addresses", "boolean", false, "Treat addresses as PLC-style addresses.")
@@ -109,18 +114,118 @@ internal sealed class ModbusDriver : DeviceDriverBase
 
     private static IModbusClient CreateClient(IReadOnlyDictionary<string, string?> settings)
     {
-        var transport = Required(settings, "transport");
-        var host = Required(settings, "host");
-        var port = Int(settings, "port", 502);
+        var transport = NormalizeTransport(Required(settings, "transport"));
         var timeout = Int(settings, "timeout", 1500);
         var endian = ResolveEndian(settings);
         var plcAddresses = Boolean(settings, "plcAddresses", false);
 
-        return transport.ToLowerInvariant() switch
+        return transport switch
         {
-            "tcp" => new ModbusTcpClient(host, port, timeout, endian, plcAddresses),
-            "rtuovertcp" => new ModbusRtuOverTcpClient(host, port, timeout, endian, plcAddresses),
+            "tcp" => new ModbusTcpClient(Required(settings, "host"), Int(settings, "port", 502), timeout, endian, plcAddresses),
+            "rtuOverTcp" => new ModbusRtuOverTcpClient(Required(settings, "host"), Int(settings, "port", 502), timeout, endian, plcAddresses),
+            "serialRtu" => new ModbusRtuClient(
+                RequiredAny(settings, "serialPort", "portName", "comPort"),
+                IntAny(settings, 9600, "baudRate", "baud"),
+                timeout,
+                ParseStopBits(GetAny(settings, "stopBits")),
+                ParseParity(GetAny(settings, "parity")),
+                IntAny(settings, 8, "dataBits"),
+                endian,
+                plcAddresses),
+            "serialAscii" => new ModbusAsciiClient(
+                RequiredAny(settings, "serialPort", "portName", "comPort"),
+                IntAny(settings, 9600, "baudRate", "baud"),
+                timeout,
+                ParseStopBits(GetAny(settings, "stopBits")),
+                ParseParity(GetAny(settings, "parity")),
+                IntAny(settings, 8, "dataBits"),
+                endian,
+                plcAddresses),
             _ => throw new NotSupportedException($"Modbus transport '{transport}' is not supported yet.")
         };
     }
+
+    private static string NormalizeTransport(string transport)
+    {
+        return NormalizeKey(transport) switch
+        {
+            "tcp" or "modbustcp" => "tcp",
+            "rtuovertcp" or "rtutcp" or "modbusrtuovertcp" => "rtuOverTcp",
+            "serialrtu" or "rtu" or "modbusrtu" or "rs485" or "rs232" or "serial" or "serialdtu" or "dtu" => "serialRtu",
+            "serialascii" or "ascii" or "modbusascii" => "serialAscii",
+            var value => throw new NotSupportedException($"Modbus transport '{transport}' is not supported yet.")
+        };
+    }
+
+    private static string RequiredAny(IReadOnlyDictionary<string, string?> values, params string[] keys)
+        => GetAny(values, keys) is { Length: > 0 } value
+            ? value
+            : throw new InvalidOperationException($"One of connection settings '{string.Join("', '", keys)}' is required.");
+
+    private static string? GetAny(IReadOnlyDictionary<string, string?> values, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return null;
+    }
+
+    private static int IntAny(IReadOnlyDictionary<string, string?> values, int defaultValue, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (values.TryGetValue(key, out var value) && int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+            {
+                return parsed;
+            }
+        }
+
+        return defaultValue;
+    }
+
+    private static Parity ParseParity(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Parity.None;
+        }
+
+        return NormalizeKey(value) switch
+        {
+            "0" or "n" or "none" => Parity.None,
+            "1" or "o" or "odd" => Parity.Odd,
+            "2" or "e" or "even" => Parity.Even,
+            "3" or "m" or "mark" => Parity.Mark,
+            "4" or "s" or "space" => Parity.Space,
+            _ when Enum.TryParse<Parity>(value, true, out var parity) => parity,
+            _ => throw new InvalidOperationException("Modbus serial parity must be None, Odd, Even, Mark, or Space.")
+        };
+    }
+
+    private static StopBits ParseStopBits(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return StopBits.One;
+        }
+
+        return NormalizeKey(value) switch
+        {
+            "1" or "one" => StopBits.One,
+            "15" or "onepointfive" or "onepoint5" => StopBits.OnePointFive,
+            "2" or "two" => StopBits.Two,
+            _ when double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) && Math.Abs(parsed - 1.0d) < 0.0000000001d => StopBits.One,
+            _ when double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) && Math.Abs(parsed - 1.5d) < 0.0000000001d => StopBits.OnePointFive,
+            _ when double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) && Math.Abs(parsed - 2.0d) < 0.0000000001d => StopBits.Two,
+            _ => throw new InvalidOperationException("Modbus serial stop bits must be One, OnePointFive, Two, 1, 1.5, or 2.")
+        };
+    }
+
+    private static string NormalizeKey(string value)
+        => new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 }
