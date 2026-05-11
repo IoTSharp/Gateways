@@ -122,6 +122,11 @@ button:disabled {
   padding: 10px 12px;
 }
 
+.nav-group-toggle {
+  position: relative;
+  padding-right: 10px;
+}
+
 .nav-item.active,
 .nav-item:hover {
   background: rgba(255, 255, 255, 0.08);
@@ -131,6 +136,11 @@ button:disabled {
 .nav-chevron {
   margin-left: auto;
   color: #92a4aa;
+  transition: transform 0.18s ease;
+}
+
+.nav-chevron.open {
+  transform: rotate(90deg);
 }
 
 .nav-group {
@@ -138,10 +148,15 @@ button:disabled {
   gap: 6px;
 }
 
+.nav-group.collapsed {
+  gap: 0;
+}
+
 .protocol-nav {
   display: grid;
   gap: 10px;
   padding-left: 12px;
+  padding-top: 2px;
 }
 
 .protocol-nav-group {
@@ -149,10 +164,34 @@ button:disabled {
   gap: 6px;
 }
 
-.protocol-nav-title {
-  padding: 4px 10px 2px;
+.protocol-nav-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
   color: #8da0a6;
+  border-radius: 8px;
+  padding: 6px 10px;
   font-size: 12px;
+}
+
+.protocol-nav-toggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.05);
+  color: #dce7ea;
+}
+
+.protocol-nav-title {
+  justify-content: space-between;
+}
+
+.protocol-nav-items {
+  display: grid;
+  gap: 6px;
+  padding-left: 4px;
 }
 
 .protocol-nav-item {

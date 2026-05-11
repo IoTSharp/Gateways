@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { reactive, ref, toRefs, watchEffect } from 'vue'
 import {
   Activity,
   ChevronRight,
@@ -12,8 +13,9 @@ import {
   Wifi,
 } from 'lucide-vue-next'
 import type { PanelName, ProtocolGroup, StatusTone, UploadProtocolGroup } from '../uiTypes'
+import { normalizeProtocolKey } from '../support/common'
 
-defineProps<{
+const props = defineProps<{
   activePanel: PanelName
   edgeApiBaseUrl: string
   protocolGroups: ProtocolGroup[]
@@ -30,11 +32,81 @@ defineProps<{
   sameUploadProtocol: (left: unknown, right: unknown) => boolean
 }>()
 
+const {
+  activePanel,
+  edgeApiBaseUrl,
+  protocolGroups,
+  selectedProtocolCode,
+  uploadProtocolGroups,
+  selectedUploadProtocolCode,
+  statusText,
+  statusTone,
+  displayProtocolCategory,
+  displayLifecycleLabel,
+  displayStatusText,
+  lifecycleClass,
+  sameProtocol,
+  sameUploadProtocol,
+} = toRefs(props)
+
 const emit = defineEmits<{
   'switch-panel': [panel: PanelName]
   'select-protocol': [code: string]
   'select-upload-protocol': [code: string]
 }>()
+
+const topologyExpanded = ref(true)
+const uploadExpanded = ref(true)
+const topologyCategoryExpanded = reactive<Record<string, boolean>>({})
+const uploadCategoryExpanded = reactive<Record<string, boolean>>({})
+
+watchEffect(() => {
+  for (const group of protocolGroups.value ?? []) {
+    const key = sectionKey('topology', group.category)
+    if (!(key in topologyCategoryExpanded)) {
+      topologyCategoryExpanded[key] = true
+    }
+  }
+
+  for (const group of uploadProtocolGroups.value ?? []) {
+    const key = sectionKey('upload', group.category)
+    if (!(key in uploadCategoryExpanded)) {
+      uploadCategoryExpanded[key] = true
+    }
+  }
+})
+
+function toggleTopologySection() {
+  topologyExpanded.value = !topologyExpanded.value
+  emit('switch-panel', 'topology')
+}
+
+function toggleUploadSection() {
+  uploadExpanded.value = !uploadExpanded.value
+  emit('switch-panel', 'upload')
+}
+
+function sectionKey(prefix: string, category: string) {
+  return `${prefix}:${normalizeProtocolKey(category || 'other')}`
+}
+
+function isTopologyCategoryExpanded(category: string) {
+  return topologyCategoryExpanded[sectionKey('topology', category)] !== false
+}
+
+function isUploadCategoryExpanded(category: string) {
+  return uploadCategoryExpanded[sectionKey('upload', category)] !== false
+}
+
+function toggleTopologyCategory(category: string) {
+  const key = sectionKey('topology', category)
+  topologyCategoryExpanded[key] = !isTopologyCategoryExpanded(category)
+}
+
+function toggleUploadCategory(category: string) {
+  const key = sectionKey('upload', category)
+  uploadCategoryExpanded[key] = !isUploadCategoryExpanded(category)
+}
 </script>
 
 <template>
@@ -55,54 +127,74 @@ const emit = defineEmits<{
         <span>仪表盘</span>
       </button>
 
-      <div class="nav-group" :class="{ active: activePanel === 'topology' }">
-        <button class="nav-item" :class="{ active: activePanel === 'topology' }" type="button" @click="emit('switch-panel', 'topology')">
+      <div class="nav-group" :class="{ active: activePanel === 'topology', collapsed: !topologyExpanded }">
+        <button class="nav-item nav-group-toggle" :class="{ active: activePanel === 'topology' }" type="button" :aria-expanded="topologyExpanded" @click="toggleTopologySection">
           <ListTree :size="17" />
           <span>采集拓扑</span>
-          <ChevronRight class="nav-chevron" :size="16" />
+          <ChevronRight class="nav-chevron" :class="{ open: topologyExpanded }" :size="16" />
         </button>
-        <div class="protocol-nav" aria-label="采集协议">
+        <div v-show="topologyExpanded" class="protocol-nav" aria-label="采集协议">
           <div v-if="!protocolGroups.length" class="nav-empty">协议目录加载中</div>
           <div v-for="group in protocolGroups" :key="group.category" class="protocol-nav-group">
-            <div class="protocol-nav-title">{{ displayProtocolCategory(group.category) }} 采集</div>
             <button
-              v-for="protocol in group.protocols"
-              :key="protocol.code"
-              class="protocol-nav-item"
-              :class="{ active: sameProtocol(protocol.code, selectedProtocolCode) }"
+              class="protocol-nav-title protocol-nav-toggle"
               type="button"
-              :title="protocol.description"
-              @click="emit('select-protocol', protocol.code)"
+              :aria-expanded="isTopologyCategoryExpanded(group.category)"
+              @click="toggleTopologyCategory(group.category)"
             >
-              <span>{{ protocol.displayName }}</span>
-              <small :class="lifecycleClass(protocol.lifecycle)">{{ displayLifecycleLabel(protocol.lifecycle) }}</small>
+              <span>{{ displayProtocolCategory(group.category) }} 采集</span>
+              <ChevronRight class="nav-chevron" :class="{ open: isTopologyCategoryExpanded(group.category) }" :size="14" />
             </button>
+            <div v-show="isTopologyCategoryExpanded(group.category)" class="protocol-nav-items">
+              <button
+                v-for="protocol in group.protocols"
+                :key="protocol.code"
+                class="protocol-nav-item"
+                :class="{ active: sameProtocol(protocol.code, selectedProtocolCode) }"
+                type="button"
+                :title="protocol.description"
+                @click="emit('select-protocol', protocol.code)"
+              >
+                <span>{{ protocol.displayName }}</span>
+                <small :class="lifecycleClass(protocol.lifecycle)">{{ displayLifecycleLabel(protocol.lifecycle) }}</small>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="nav-group" :class="{ active: activePanel === 'upload' }">
-        <button class="nav-item" :class="{ active: activePanel === 'upload' }" type="button" @click="emit('switch-panel', 'upload')">
+      <div class="nav-group" :class="{ active: activePanel === 'upload', collapsed: !uploadExpanded }">
+        <button class="nav-item nav-group-toggle" :class="{ active: activePanel === 'upload' }" type="button" :aria-expanded="uploadExpanded" @click="toggleUploadSection">
           <CloudUpload :size="17" />
           <span>上传目标</span>
-          <ChevronRight class="nav-chevron" :size="16" />
+          <ChevronRight class="nav-chevron" :class="{ open: uploadExpanded }" :size="16" />
         </button>
-        <div class="protocol-nav" aria-label="上传协议">
+        <div v-show="uploadExpanded" class="protocol-nav" aria-label="上传协议">
           <div v-if="!uploadProtocolGroups.length" class="nav-empty">协议目录加载中</div>
           <div v-for="group in uploadProtocolGroups" :key="group.category" class="protocol-nav-group">
-            <div class="protocol-nav-title">{{ group.category }} 上传</div>
             <button
-              v-for="protocol in group.protocols"
-              :key="protocol.code"
-              class="protocol-nav-item"
-              :class="{ active: sameUploadProtocol(protocol.code, selectedUploadProtocolCode) }"
+              class="protocol-nav-title protocol-nav-toggle"
               type="button"
-              :title="protocol.description"
-              @click="emit('select-upload-protocol', protocol.code)"
+              :aria-expanded="isUploadCategoryExpanded(group.category)"
+              @click="toggleUploadCategory(group.category)"
             >
-              <span>{{ protocol.displayName }}</span>
-              <small :class="lifecycleClass(protocol.lifecycle)">{{ displayLifecycleLabel(protocol.lifecycle) }}</small>
+              <span>{{ group.category }} 上传</span>
+              <ChevronRight class="nav-chevron" :class="{ open: isUploadCategoryExpanded(group.category) }" :size="14" />
             </button>
+            <div v-show="isUploadCategoryExpanded(group.category)" class="protocol-nav-items">
+              <button
+                v-for="protocol in group.protocols"
+                :key="protocol.code"
+                class="protocol-nav-item"
+                :class="{ active: sameUploadProtocol(protocol.code, selectedUploadProtocolCode) }"
+                type="button"
+                :title="protocol.description"
+                @click="emit('select-upload-protocol', protocol.code)"
+              >
+                <span>{{ protocol.displayName }}</span>
+                <small :class="lifecycleClass(protocol.lifecycle)">{{ displayLifecycleLabel(protocol.lifecycle) }}</small>
+              </button>
+            </div>
           </div>
         </div>
       </div>
