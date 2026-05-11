@@ -267,9 +267,20 @@ async function saveCurrentDeviceConfiguration() {
 }
 
 async function saveConfiguration(apply: boolean, successMessage: string) {
+  if (jsonParseError.value) {
+    setStatus('请先修正本地 JSON 解析错误', 'warn')
+    return
+  }
+
+  const payload = readMergedConfiguration()
+  const validationError = validateStructuralKeys(payload)
+  if (validationError) {
+    setStatus(validationError, 'warn')
+    return
+  }
+
   isSaving.value = true
   try {
-    const payload = readMergedConfiguration()
     baseConfiguration.value = payload
     writeConfigurationText(payload)
 
@@ -426,7 +437,7 @@ function addPoint() {
   const payload = readMergedConfiguration()
   const { configuration, device } = ensureLocalTopology(payload, selectedProtocol.value, selectedDeviceIndex.value)
   device.points = Array.isArray(device.points) ? device.points : []
-  device.points.push(defaultPoint(device.points.length, selectedProtocol.value))
+  device.points.push(createPoint(selectedProtocol.value, device.points.length, device.points))
 
   baseConfiguration.value = configuration
   writeConfigurationText(configuration)
@@ -491,6 +502,50 @@ function readMergedConfiguration() {
   payload = applyUploadForm(payload)
 
   return payload
+}
+
+function validateStructuralKeys(configuration: EdgeCollectionConfiguration) {
+  const tasks = Array.isArray(configuration.tasks) ? configuration.tasks : []
+  const taskKeys = new Set<string>()
+
+  for (const task of tasks) {
+    const taskKey = normalizeStructuralKey(task.taskKey)
+    if (!taskKey) {
+      return '采集任务键不能为空。'
+    }
+    if (taskKeys.has(taskKey)) {
+      return `采集任务键“${task.taskKey?.trim() ?? ''}”重复。`
+    }
+    taskKeys.add(taskKey)
+
+    const devices = Array.isArray(task.devices) ? task.devices : []
+    const deviceKeys = new Set<string>()
+    for (const device of devices) {
+      const deviceKey = normalizeStructuralKey(device.deviceKey)
+      if (!deviceKey) {
+        return `任务“${task.taskKey?.trim() ?? ''}”包含未设置设备键的设备。`
+      }
+      if (deviceKeys.has(deviceKey)) {
+        return `任务“${task.taskKey?.trim() ?? ''}”中设备键“${device.deviceKey?.trim() ?? ''}”重复。`
+      }
+      deviceKeys.add(deviceKey)
+
+      const points = Array.isArray(device.points) ? device.points : []
+      const pointKeys = new Set<string>()
+      for (const point of points) {
+        const pointKey = normalizeStructuralKey(point.pointKey)
+        if (!pointKey) {
+          return `任务“${task.taskKey?.trim() ?? ''}”、设备“${device.deviceKey?.trim() ?? ''}”包含未设置点位键的点位。`
+        }
+        if (pointKeys.has(pointKey)) {
+          return `任务“${task.taskKey?.trim() ?? ''}”、设备“${device.deviceKey?.trim() ?? ''}”中点位键“${point.pointKey?.trim() ?? ''}”重复。`
+        }
+        pointKeys.add(pointKey)
+      }
+    }
+  }
+
+  return ''
 }
 
 function applyTopologyForm(configuration: EdgeCollectionConfiguration, protocol: CollectionProtocolDescriptor, deviceIndex = selectedDeviceIndex.value) {
@@ -805,6 +860,18 @@ function defaultPoint(index: number, protocol: CollectionProtocolDescriptor): Co
   }
 }
 
+function createPoint(protocol: CollectionProtocolDescriptor, index: number, points: CollectionPoint[] = []) {
+  const point = defaultPoint(index, protocol)
+  point.pointKey = uniquePointKey(points, point.pointKey ?? 'point')
+  point.pointName = point.pointName?.trim() || point.pointKey
+  if (point.mapping) {
+    point.mapping.targetName = uniquePointTargetName(points, point.pointKey ?? 'point')
+    point.mapping.displayName = point.pointName
+  }
+
+  return point
+}
+
 function protocolDefaults(protocol: CollectionProtocolDescriptor) {
   const code = normalizeProtocolKey(protocol.code)
   const device = deviceDefaults(protocol, 0)
@@ -828,13 +895,46 @@ function deviceDefaults(protocol: CollectionProtocolDescriptor, index: number) {
 }
 
 function uniqueDeviceKey(devices: CollectionDevice[], suggested: string) {
-  const existingKeys = new Set(devices.map((device) => normalizeProtocolKey(device.deviceKey)))
-  let candidate = suggested
+  const existingKeys = new Set(devices.map((device) => normalizeStructuralKey(device.deviceKey)).filter(Boolean))
+  const base = suggested.trim() || 'device'
+  let candidate = base
   let counter = 1
 
-  while (existingKeys.has(normalizeProtocolKey(candidate))) {
+  while (existingKeys.has(normalizeStructuralKey(candidate))) {
     counter += 1
-    candidate = `${suggested}-${counter}`
+    candidate = `${base}-${counter}`
+  }
+
+  return candidate
+}
+
+function uniquePointKey(points: CollectionPoint[], suggested: string) {
+  const existingKeys = new Set(points.map((point) => normalizeStructuralKey(point.pointKey)).filter(Boolean))
+  const base = suggested.trim() || 'point'
+  let candidate = base
+  let counter = 1
+
+  while (existingKeys.has(normalizeStructuralKey(candidate))) {
+    counter += 1
+    candidate = `${base}-${counter}`
+  }
+
+  return candidate
+}
+
+function uniquePointTargetName(points: CollectionPoint[], suggested: string) {
+  const existingTargets = new Set(
+    points
+      .map((point) => normalizeStructuralKey(point.mapping?.targetName))
+      .filter(Boolean),
+  )
+  const base = normalizeTargetName(suggested) || 'point'
+  let candidate = base
+  let counter = 1
+
+  while (existingTargets.has(normalizeStructuralKey(candidate))) {
+    counter += 1
+    candidate = `${base}_${counter}`
   }
 
   return candidate
@@ -1496,6 +1596,18 @@ function newGuid() {
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
+
+function normalizeStructuralKey(value: unknown) {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function normalizeTargetName(value: string) {
+  return String(value ?? '')
+    .trim()
+    .replace(/[^a-z0-9]+/gi, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase()
+}
 </script>
 
 <template>
@@ -1590,7 +1702,7 @@ function errorMessage(error: unknown) {
               <RefreshCw :size="16" />
               <span>刷新</span>
             </button>
-            <button type="button" class="primary" :disabled="isSaving" @click="applyConfiguration">
+            <button type="button" class="primary" :disabled="isSaving || !!jsonParseError" @click="applyConfiguration">
               <Save :size="16" />
               <span>应用配置</span>
             </button>
@@ -1644,6 +1756,10 @@ function errorMessage(error: unknown) {
                   <span>{{ protocolTaskCount }} 个任务</span>
                   <span>{{ visibleConnectionSettings.length }} 个字段</span>
                 </div>
+                <div v-if="protocolTaskCount > 1" class="inline-warning">
+                  <AlertTriangle :size="15" />
+                  <span>检测到 {{ protocolTaskCount }} 个同协议任务，当前页面只编辑第一个任务。</span>
+                </div>
               </div>
 
               <div class="panel-section">
@@ -1666,7 +1782,7 @@ function errorMessage(error: unknown) {
                       <Plus :size="15" />
                       <span>新建设备</span>
                     </button>
-                    <button type="button" @click="saveCurrentDeviceConfiguration">
+                    <button type="button" :disabled="isSaving || !!jsonParseError" @click="saveCurrentDeviceConfiguration">
                       <Save :size="15" />
                       <span>保存当前设备配置</span>
                     </button>

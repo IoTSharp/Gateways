@@ -82,6 +82,6 @@ public sealed class GatewayInfrastructureDriverTests
             CancellationToken.None);
 
         Assert.Equal(QualityStatus.Bad, result.Quality);
-        Assert.Contains("read-only", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("只读", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -120,6 +120,7 @@ internal sealed class LocalCollectionConfigurationService
         var filePath = ResolveFilePath();
         var current = await TryReadConfigurationAsync(filePath, cancellationToken);
         var normalized = NormalizeConfiguration(configuration, current?.Version ?? 0, updatedBy);
+        GatewayCollectionConfigurationValidator.ValidateStructuralKeys(normalized);
         await WriteConfigurationAsync(filePath, normalized, cancellationToken);
 
         if (apply)

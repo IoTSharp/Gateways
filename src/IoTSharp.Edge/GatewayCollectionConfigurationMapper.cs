@@ -16,6 +16,8 @@ internal static class GatewayCollectionConfigurationMapper
             throw new InvalidOperationException("采集配置载荷是必填项。");
         }
 
+        GatewayCollectionConfigurationValidator.ValidateStructuralKeys(configuration);
+
         var edgeNodeId = configuration.EdgeNodeId;
         var normalizedBaseUrl = string.IsNullOrWhiteSpace(options.BaseUrl) ? string.Empty : NormalizeBaseUrl(options.BaseUrl);
         var accessToken = options.AccessToken ?? string.Empty;
