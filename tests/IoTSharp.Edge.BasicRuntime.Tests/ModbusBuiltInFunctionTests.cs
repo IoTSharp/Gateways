@@ -109,7 +109,7 @@ public sealed class ModbusBuiltInFunctionTests
             return "unexpected"
             """);
 
-        Assert.Equal("Modbus handle not found.", result.ReturnValue);
+        Assert.Equal("未找到 Modbus 句柄。", result.ReturnValue);
     }
 
     private sealed class LoopbackModbusClientFactory : IBasicModbusClientFactory

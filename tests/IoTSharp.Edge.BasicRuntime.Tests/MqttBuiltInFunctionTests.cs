@@ -83,7 +83,7 @@ public sealed class MqttBuiltInFunctionTests
             return "unexpected"
             """);
 
-        Assert.Equal("MQTT handle not found.", result.ReturnValue);
+        Assert.Equal("未找到 MQTT 句柄。", result.ReturnValue);
     }
 
     private static int GetFreePort()

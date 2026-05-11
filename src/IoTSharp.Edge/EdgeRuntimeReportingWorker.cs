@@ -413,8 +413,12 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             .Concat(uploadChannels.Where(channel => channel.Enabled).Select(channel => channel.Protocol switch
             {
                 UploadProtocol.Http => "http",
-                UploadProtocol.IotSharpMqtt => "mqtt",
+                UploadProtocol.IoTSharp => "iotsharp",
+                UploadProtocol.ThingsBoard => "thingsboard",
                 UploadProtocol.SonnetDb => "sonnetdb",
+                UploadProtocol.InfluxDb => "influxdb",
+                UploadProtocol.IotSharpMqtt => "mqtt",
+                UploadProtocol.IotSharpDeviceHttp => "iotsharpdevicehttp",
                 _ => channel.Protocol.ToString()
             }))
             .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -448,14 +452,34 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             features.Add("http-upload");
         }
 
+        if (uploadChannels.Any(channel => channel.Enabled && channel.Protocol == UploadProtocol.IoTSharp))
+        {
+            features.Add("iotsharp-upload");
+        }
+
+        if (uploadChannels.Any(channel => channel.Enabled && channel.Protocol == UploadProtocol.ThingsBoard))
+        {
+            features.Add("thingsboard-upload");
+        }
+
         if (uploadChannels.Any(channel => channel.Enabled && channel.Protocol == UploadProtocol.IotSharpMqtt))
         {
             features.Add("iotsharp-mqtt-upload");
         }
 
+        if (uploadChannels.Any(channel => channel.Enabled && channel.Protocol == UploadProtocol.IotSharpDeviceHttp))
+        {
+            features.Add("iotsharp-device-http-upload");
+        }
+
         if (uploadChannels.Any(channel => channel.Enabled && channel.Protocol == UploadProtocol.SonnetDb))
         {
             features.Add("sonnetdb-upload");
+        }
+
+        if (uploadChannels.Any(channel => channel.Enabled && channel.Protocol == UploadProtocol.InfluxDb))
+        {
+            features.Add("influxdb-upload");
         }
 
         var pollingTaskNames = pollingTasks.Where(task => task.Enabled)
@@ -479,13 +503,21 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
 
     private EdgeTarget? ResolveEdgeTarget(EdgeReportingOptions options, IReadOnlyCollection<UploadChannel> uploadChannels)
     {
+        var reportingChannels = uploadChannels.Where(channel =>
+            channel.Enabled &&
+            channel.Protocol is UploadProtocol.Http or
+                UploadProtocol.IoTSharp or
+                UploadProtocol.IotSharpMqtt or
+                UploadProtocol.IotSharpDeviceHttp);
+
         var accessToken = FirstNonEmpty(
             options.AccessToken,
-            uploadChannels.Where(channel => channel.Enabled).SelectMany(channel =>
+            reportingChannels.SelectMany(channel =>
             {
                 var settings = GatewayJson.Parse(channel.SettingsJson);
                 return new[]
                 {
+                    GatewayJson.Get(settings, "token"),
                     GatewayJson.Get(settings, "accessToken"),
                     GatewayJson.Get(settings, "gatewayAccessToken"),
                     channel.Protocol == UploadProtocol.IotSharpMqtt ? GatewayJson.Get(settings, "username") : null
@@ -494,7 +526,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
 
         var baseUrl = FirstNonEmpty(
             options.BaseUrl,
-            uploadChannels.Where(channel => channel.Enabled).SelectMany(channel =>
+            reportingChannels.SelectMany(channel =>
             {
                 var settings = GatewayJson.Parse(channel.SettingsJson);
                 var configuredBaseUrl = GatewayJson.Get(settings, "edgeBaseUrl");

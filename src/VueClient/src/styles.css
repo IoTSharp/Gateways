@@ -428,6 +428,62 @@ button:disabled {
   color: var(--muted);
 }
 
+.upload-target-list {
+  display: grid;
+  gap: 8px;
+}
+
+.upload-target-item {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.upload-target-item:hover,
+.upload-target-item.active {
+  border-color: var(--accent);
+  background: #f4fbfc;
+}
+
+.upload-target-main {
+  display: grid;
+  gap: 2px;
+}
+
+.upload-target-main strong {
+  color: var(--text);
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.upload-target-main small {
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.upload-target-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.upload-target-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
 .protocol-flags {
   display: flex;
   flex-wrap: wrap;

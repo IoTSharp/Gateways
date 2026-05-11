@@ -89,7 +89,7 @@ public sealed class SerialBuiltInFunctionTests
             return "unexpected"
             """);
 
-        Assert.Equal("Serial handle not found.", result.ReturnValue);
+        Assert.Equal("未找到串口句柄。", result.ReturnValue);
     }
 
     private sealed class LoopbackSerialPortFactory : IBasicSerialPortFactory

@@ -4,8 +4,8 @@ import {
   Activity,
   AlertTriangle,
   ChevronRight,
+  CloudUpload,
   Cpu,
-  Database,
   FileCode2,
   ListTree,
   Network,
@@ -25,6 +25,7 @@ import type {
   CollectionPoint,
   CollectionProtocolDescriptor,
   CollectionTask,
+  CollectionUpload,
   ConnectionSettingDefinition,
   EdgeCollectionConfiguration,
   LocalConfigurationResponse,
@@ -32,6 +33,8 @@ import type {
   ProtocolCatalogResponse,
   RuntimeSummary,
   ScriptResponse,
+  UploadProtocolCatalogResponse,
+  UploadProtocolDescriptor,
 } from './types'
 
 type PanelName = 'dashboard' | 'topology' | 'upload' | 'script' | 'logs' | 'bootstrap'
@@ -40,6 +43,11 @@ type StatusTone = 'info' | 'ok' | 'warn'
 interface ProtocolGroup {
   category: string
   protocols: CollectionProtocolDescriptor[]
+}
+
+interface UploadProtocolGroup {
+  category: string
+  protocols: UploadProtocolDescriptor[]
 }
 
 interface PointRow {
@@ -66,6 +74,7 @@ const configurationText = ref('{}')
 const jsonParseError = ref('')
 const runtimeSummary = ref<RuntimeSummary | null>(null)
 const protocolCatalog = ref<CollectionProtocolDescriptor[]>([])
+const uploadProtocolCatalog = ref<UploadProtocolDescriptor[]>([])
 const script = ref<ScriptResponse | null>(null)
 const logs = ref<LogsResponse | null>(null)
 const statusText = ref('等待中')
@@ -74,6 +83,8 @@ const isLoading = ref(false)
 const isSaving = ref(false)
 const topologyFormDirty = ref(false)
 const uploadFormDirty = ref(false)
+const selectedUploadProtocolCode = ref('IoTSharp')
+const selectedUploadTargetIndex = ref(-1)
 
 const topologyForm = reactive({
   taskKey: '',
@@ -85,13 +96,14 @@ const topologyForm = reactive({
 
 const connectionValues = reactive<Record<string, string>>({})
 const uploadForm = reactive({
+  targetKey: '',
+  displayName: '',
   endpoint: '',
-  database: '',
-  token: '',
-  measurement: '',
-  field: '',
-  site: '',
+  enabled: true,
+  batchSize: '1',
+  bufferingEnabled: false,
 })
+const uploadSettingValues = reactive<Record<string, string>>({})
 const pointRows = ref<PointRow[]>([])
 
 const fallbackProtocol = computed<CollectionProtocolDescriptor>(() => ({
@@ -122,6 +134,19 @@ const fallbackProtocol = computed<CollectionProtocolDescriptor>(() => ({
   ],
 }))
 
+const fallbackUploadProtocol = computed<UploadProtocolDescriptor>(() => ({
+  code: 'IoTSharp',
+  displayName: 'IoTSharp',
+  category: '平台',
+  description: 'IoTSharp 平台上传目标，支持遥测与属性通道自动展开。',
+  lifecycle: 'ready',
+  connectionSettings: [
+    { key: 'endpoint', label: '端点', valueType: 'text', required: true, description: 'IoTSharp 平台基础地址或完整上报地址。' },
+    { key: 'token', label: '访问令牌', valueType: 'password', required: true, description: 'IoTSharp Edge 访问令牌或设备令牌。' },
+    { key: 'site', label: '站点', valueType: 'text', required: false, description: '可选的站点标识，会作为上传标签写入。' },
+  ],
+}))
+
 const selectedProtocol = computed(() => {
   const normalized = normalizeProtocolKey(selectedProtocolCode.value)
   return protocolCatalog.value.find((item) => normalizeProtocolKey(item.code) === normalized)
@@ -142,6 +167,38 @@ const protocolGroups = computed<ProtocolGroup[]>(() => {
   }))
 })
 
+const selectedUploadProtocol = computed(() => {
+  const normalized = normalizeUploadProtocolKey(selectedUploadProtocolCode.value)
+  return uploadProtocolCatalog.value.find((item) => normalizeUploadProtocolKey(item.code) === normalized)
+    ?? uploadProtocolCatalog.value[0]
+    ?? fallbackUploadProtocol.value
+})
+
+const uploadProtocolGroups = computed<UploadProtocolGroup[]>(() => {
+  const groups = new Map<string, UploadProtocolDescriptor[]>()
+  for (const protocol of uploadProtocolCatalog.value) {
+    const category = protocol.category || '其他'
+    groups.set(category, [...(groups.get(category) ?? []), protocol])
+  }
+
+  return Array.from(groups.entries()).map(([category, protocols]) => ({
+    category,
+    protocols,
+  }))
+})
+
+const uploadTargets = computed(() => getUploadTargets(baseConfiguration.value))
+const selectedUploadTargets = computed(() => uploadTargets.value.filter((target) => sameUploadProtocol(target.protocol, selectedUploadProtocol.value.code)))
+const selectedUploadTarget = computed(() => selectedUploadTargets.value[selectedUploadTargetIndex.value] ?? selectedUploadTargets.value[0] ?? null)
+const selectedUploadTargetCount = computed(() => selectedUploadTargets.value.length)
+const uploadSettings = computed(() => selectedUploadProtocol.value.connectionSettings ?? [])
+const visibleUploadSettings = computed(() => uploadSettings.value.filter((setting) => normalizeProtocolKey(setting.key) !== 'endpoint'))
+const uploadProtocolFlags = computed(() => [
+  selectedUploadTargetCount.value ? `${selectedUploadTargetCount.value} 个目标` : '',
+  displayUploadProtocol(selectedUploadProtocol.value.code),
+  selectedUploadTarget.value?.endpoint ? '已配置端点' : '',
+].filter(Boolean))
+
 const connectionSettings = computed(() => selectedProtocol.value.connectionSettings ?? [])
 const visibleConnectionSettings = computed(() => connectionSettings.value.filter((setting) => isConnectionSettingVisible(setting, selectedProtocol.value, connectionValues.transport)))
 const protocolFlags = computed(() => [
@@ -159,7 +216,6 @@ const topologyDevices = computed(() => Array.isArray(topologyTask.value?.devices
 const selectedDevice = computed(() => topologyDevices.value[selectedDeviceIndex.value] ?? topologyDevices.value[0] ?? null)
 const selectedDeviceCount = computed(() => topologyDevices.value.length)
 const selectedDeviceSummary = computed(() => displayDeviceLabel(selectedDevice.value, selectedDeviceIndex.value))
-const uploadSettings = computed(() => asRecord(baseConfiguration.value.upload?.settings))
 const logLines = computed(() => (logs.value?.entries ?? []).map(formatLogEntry))
 const scriptText = computed(() => script.value?.script ?? '')
 const bootstrapJson = computed(() => JSON.stringify(runtimeSummary.value?.bootstrap ?? {}, null, 2))
@@ -167,8 +223,8 @@ const bootstrapJson = computed(() => JSON.stringify(runtimeSummary.value?.bootst
 const dashboardCards = computed(() => {
   const configuration = baseConfiguration.value
   const summary = runtimeSummary.value
-  const upload = configuration.upload
-  const settings = uploadSettings.value
+  const uploadTargets = getUploadTargets(configuration)
+  const firstUpload = uploadTargets[0]
 
   return [
     {
@@ -183,8 +239,8 @@ const dashboardCards = computed(() => {
     },
     {
       label: '上传目标',
-      value: displayUploadProtocol(upload?.protocol),
-      meta: upload ? `${upload.endpoint || '无端点'} | ${String(settings.database ?? '无数据库')}` : '--',
+      value: displayUploadSummary(configuration),
+      meta: firstUpload ? `${firstUpload.endpoint || '无端点'} | ${displayUploadProtocol(firstUpload.protocol)}` : '--',
     },
     {
       label: '采集拓扑',
@@ -196,7 +252,7 @@ const dashboardCards = computed(() => {
 
 const pageTitle = computed(() => {
   if (activePanel.value === 'topology') return `${selectedProtocol.value.displayName} 采集`
-  if (activePanel.value === 'upload') return '上传链路'
+  if (activePanel.value === 'upload') return `${selectedUploadProtocol.value.displayName} 上传`
   if (activePanel.value === 'script') return 'BASIC 脚本'
   if (activePanel.value === 'logs') return '运行日志'
   if (activePanel.value === 'bootstrap') return '本地配置'
@@ -221,12 +277,13 @@ async function loadAll() {
   setStatus('加载中')
 
   try {
-    const [config, summary, scriptData, logData, protocols] = await Promise.all([
+    const [config, summary, scriptData, logData, protocols, uploadProtocols] = await Promise.all([
       edgeRequest<LocalConfigurationResponse>('/api/local/configuration'),
       edgeRequest<RuntimeSummary>('/api/diagnostics/summary'),
       edgeRequest<ScriptResponse>('/api/scripts/polling'),
       edgeRequest<LogsResponse>('/api/diagnostics/logs?count=100&level=Information'),
       edgeRequest<ProtocolCatalogResponse>('/api/collection/protocols'),
+      edgeRequest<UploadProtocolCatalogResponse>('/api/upload/protocols'),
     ])
 
     localConfiguration.value = config
@@ -234,14 +291,23 @@ async function loadAll() {
     script.value = scriptData
     logs.value = logData
     protocolCatalog.value = protocols.protocols ?? []
+    uploadProtocolCatalog.value = uploadProtocols.protocols ?? []
+    baseConfiguration.value = extractConfiguration(config)
 
     if (!protocolCatalog.value.some((item) => sameProtocol(item.code, selectedProtocolCode.value))) {
       selectedProtocolCode.value = protocolCatalog.value[0]?.code ?? 'modbus'
     }
 
-    baseConfiguration.value = extractConfiguration(config)
+    const configuredUploadProtocol = findConfiguredUploadProtocol(baseConfiguration.value)
+    if (configuredUploadProtocol && uploadProtocolCatalog.value.some((item) => sameUploadProtocol(item.code, configuredUploadProtocol))) {
+      selectedUploadProtocolCode.value = configuredUploadProtocol
+    } else if (!uploadProtocolCatalog.value.some((item) => sameUploadProtocol(item.code, selectedUploadProtocolCode.value))) {
+      selectedUploadProtocolCode.value = uploadProtocolCatalog.value[0]?.code ?? 'IoTSharp'
+    }
+
     writeConfigurationText(baseConfiguration.value)
     populateFormsFromConfiguration(baseConfiguration.value, selectedProtocol.value)
+    populateUploadFormsFromConfiguration(baseConfiguration.value, selectedUploadProtocol.value)
     setStatus(`最近刷新：${formatDate(summary.generatedAtUtc)}`, 'ok')
   } catch (error) {
     setStatus(errorMessage(error), 'warn')
@@ -328,6 +394,17 @@ function selectProtocol(code: string) {
   activePanel.value = 'topology'
 }
 
+function selectUploadProtocol(code: string) {
+  if (topologyFormDirty.value || uploadFormDirty.value) {
+    syncFormsToJson('草稿已同步')
+  }
+
+  selectedUploadProtocolCode.value = code
+  selectedUploadTargetIndex.value = selectedUploadTargets.value.length ? 0 : -1
+  populateUploadFormsFromConfiguration(baseConfiguration.value, selectedUploadProtocol.value, selectedUploadTargetIndex.value)
+  activePanel.value = 'upload'
+}
+
 function markTopologyDirty() {
   topologyFormDirty.value = true
   setStatus('采集拓扑已修改')
@@ -346,6 +423,7 @@ function onJsonInput() {
   topologyFormDirty.value = false
   uploadFormDirty.value = false
   populateFormsFromConfiguration(parsed, selectedProtocol.value, selectedDeviceIndex.value)
+  populateUploadFormsFromConfiguration(parsed, selectedUploadProtocol.value, selectedUploadTargetIndex.value)
   setStatus('JSON 已修改')
 }
 
@@ -354,11 +432,17 @@ function handleBooleanConnectionValue(key: string, event: Event) {
   markTopologyDirty()
 }
 
+function handleUploadSettingBooleanChange(key: string, event: Event) {
+  uploadSettingValues[key] = (event.target as HTMLInputElement).checked ? 'true' : 'false'
+  markUploadDirty()
+}
+
 function syncFormsToJson(message = '表单已同步到 JSON') {
   const payload = readMergedConfiguration()
   baseConfiguration.value = payload
   writeConfigurationText(payload)
   populateFormsFromConfiguration(payload, selectedProtocol.value, selectedDeviceIndex.value)
+  populateUploadFormsFromConfiguration(payload, selectedUploadProtocol.value, selectedUploadTargetIndex.value)
   topologyFormDirty.value = false
   uploadFormDirty.value = false
   setStatus(message, 'ok')
@@ -378,9 +462,80 @@ function selectDevice(index: number) {
   setStatus('设备已切换')
 }
 
+function selectUploadTarget(index: number) {
+  if (Number.isNaN(index) || index < 0 || index >= selectedUploadTargets.value.length || index === selectedUploadTargetIndex.value) {
+    return
+  }
+
+  if (topologyFormDirty.value || uploadFormDirty.value) {
+    syncFormsToJson('草稿已同步')
+  }
+
+  selectedUploadTargetIndex.value = index
+  populateUploadFormsFromConfiguration(baseConfiguration.value, selectedUploadProtocol.value, selectedUploadTargetIndex.value)
+  setStatus('上传目标已切换')
+}
+
 function handleDeviceSelectChange(event: Event) {
   const value = Number((event.target as HTMLSelectElement).value)
   selectDevice(value)
+}
+
+function addUploadTarget() {
+  const payload = readMergedConfiguration()
+  const configuration = clone(payload)
+  const uploads = Array.isArray(configuration.uploads) && configuration.uploads.length > 0
+    ? [...configuration.uploads]
+    : configuration.upload ? [clone(configuration.upload)] : []
+  const newTarget = createUploadTarget(selectedUploadProtocol.value, uploads.length)
+  uploads.push(newTarget)
+
+  configuration.uploads = uploads
+  configuration.upload = uploads[0] ?? undefined
+
+  const nextIndex = uploads
+    .map((upload, index) => ({ upload, index }))
+    .filter((item) => sameUploadProtocol(item.upload.protocol, selectedUploadProtocol.value.code))
+    .length - 1
+
+  baseConfiguration.value = configuration
+  writeConfigurationText(configuration)
+  selectedUploadTargetIndex.value = Math.max(0, nextIndex)
+  populateUploadFormsFromConfiguration(configuration, selectedUploadProtocol.value, selectedUploadTargetIndex.value)
+  topologyFormDirty.value = false
+  uploadFormDirty.value = false
+  setStatus('已新增上传目标', 'ok')
+}
+
+function removeUploadTarget() {
+  const payload = readMergedConfiguration()
+  const configuration = clone(payload)
+  const uploads = Array.isArray(configuration.uploads) && configuration.uploads.length > 0
+    ? [...configuration.uploads]
+    : configuration.upload ? [clone(configuration.upload)] : []
+  const matches = uploads
+    .map((upload, index) => ({ upload, index }))
+    .filter((item) => sameUploadProtocol(item.upload.protocol, selectedUploadProtocol.value.code))
+
+  const target = matches[selectedUploadTargetIndex.value]
+  if (!target) {
+    return
+  }
+
+  uploads.splice(target.index, 1)
+  configuration.uploads = uploads
+  configuration.upload = uploads[0] ?? undefined
+
+  baseConfiguration.value = configuration
+  writeConfigurationText(configuration)
+  const nextMatches = uploads
+    .map((upload, index) => ({ upload, index }))
+    .filter((item) => sameUploadProtocol(item.upload.protocol, selectedUploadProtocol.value.code))
+  selectedUploadTargetIndex.value = nextMatches.length ? Math.min(selectedUploadTargetIndex.value, nextMatches.length - 1) : -1
+  populateUploadFormsFromConfiguration(configuration, selectedUploadProtocol.value, selectedUploadTargetIndex.value)
+  topologyFormDirty.value = false
+  uploadFormDirty.value = false
+  setStatus('上传目标已删除', 'ok')
 }
 
 function addDevice() {
@@ -487,13 +642,27 @@ function populateFormsFromConfiguration(configuration: EdgeCollectionConfigurati
   }
 
   pointRows.value = (Array.isArray(device.points) ? device.points : []).map(toPointRow)
-  const settings = asRecord(configuration.upload?.settings)
-  uploadForm.endpoint = configuration.upload?.endpoint ?? ''
-  uploadForm.database = String(settings.database ?? '')
-  uploadForm.token = String(settings.token ?? '')
-  uploadForm.measurement = String(settings.measurement ?? '')
-  uploadForm.field = String(settings.field ?? '')
-  uploadForm.site = String(settings.site ?? '')
+}
+
+function populateUploadFormsFromConfiguration(configuration: EdgeCollectionConfiguration, protocol: UploadProtocolDescriptor, targetIndex = selectedUploadTargetIndex.value) {
+  const targets = getUploadTargets(configuration).filter((target) => sameUploadProtocol(target.protocol, protocol.code))
+  const resolvedTargetIndex = targets.length ? Math.min(Math.max(0, targetIndex), targets.length - 1) : -1
+  selectedUploadTargetIndex.value = resolvedTargetIndex
+  const target = resolvedTargetIndex >= 0 ? targets[resolvedTargetIndex] : null
+  const defaults = uploadDefaults(protocol, Math.max(resolvedTargetIndex, 0))
+  const settings = asRecord(target?.settings)
+
+  uploadForm.targetKey = target?.targetKey ?? defaults.targetKey
+  uploadForm.displayName = target?.displayName ?? defaults.displayName
+  uploadForm.endpoint = target?.endpoint ?? defaults.endpoint
+  uploadForm.enabled = target?.enabled !== false
+  uploadForm.batchSize = String(target?.batchSize ?? defaults.batchSize)
+  uploadForm.bufferingEnabled = target?.bufferingEnabled === true
+
+  clearRecord(uploadSettingValues)
+  for (const setting of uploadEditableSettings(protocol)) {
+    uploadSettingValues[setting.key] = settingToString(settings[setting.key], defaultUploadSettingValue(protocol, setting))
+  }
 }
 
 function readMergedConfiguration() {
@@ -599,19 +768,48 @@ function applyTopologyForm(configuration: EdgeCollectionConfiguration, protocol:
 
 function applyUploadForm(configuration: EdgeCollectionConfiguration) {
   const next = clone(configuration)
-  const settings = asRecord(next.upload?.settings)
-  settings.database = uploadForm.database.trim()
-  settings.token = uploadForm.token.trim()
-  settings.measurement = uploadForm.measurement.trim()
-  settings.field = uploadForm.field.trim()
-  settings.site = uploadForm.site.trim()
+  const uploads = Array.isArray(next.uploads) && next.uploads.length > 0
+    ? [...next.uploads]
+    : next.upload ? [clone(next.upload)] : []
+  const matches = uploads
+    .map((upload, index) => ({ upload, index }))
+    .filter((item) => sameUploadProtocol(item.upload.protocol, selectedUploadProtocol.value.code))
+  const selected = matches[selectedUploadTargetIndex.value] ?? null
 
-  next.upload = {
-    ...(next.upload ?? {}),
-    protocol: 'SonnetDb',
-    endpoint: uploadForm.endpoint.trim(),
-    settings: pruneEmpty(settings),
+  if (!selected && !uploadFormDirty.value) {
+    next.uploads = uploads
+    next.upload = uploads[0] ?? undefined
+    return next
   }
+
+  let targetIndex = selected?.index ?? -1
+  let target = targetIndex >= 0 ? clone(uploads[targetIndex]) : createUploadTarget(selectedUploadProtocol.value, uploads.length)
+  const settings = asRecord(target.settings)
+
+  target.targetKey = uploadForm.targetKey.trim() || target.targetKey || createUploadTarget(selectedUploadProtocol.value, uploads.length).targetKey
+  target.displayName = uploadForm.displayName.trim() || target.displayName || selectedUploadProtocol.value.displayName
+  target.protocol = selectedUploadProtocol.value.code
+  target.endpoint = uploadForm.endpoint.trim()
+  target.enabled = uploadForm.enabled !== false
+  target.batchSize = Math.max(1, toNumber(uploadForm.batchSize, target.batchSize ?? 1))
+  target.bufferingEnabled = uploadForm.bufferingEnabled
+
+  for (const setting of uploadEditableSettings(selectedUploadProtocol.value)) {
+    settings[setting.key] = uploadSettingValues[setting.key] ?? ''
+  }
+
+  target.settings = pruneEmpty(settings)
+
+  if (targetIndex >= 0) {
+    uploads[targetIndex] = target
+  } else {
+    targetIndex = uploads.length
+    uploads.push(target)
+  }
+
+  next.uploads = uploads
+  next.upload = uploads[0] ?? undefined
+  selectedUploadTargetIndex.value = selected ? selectedUploadTargetIndex.value : Math.max(0, uploads.filter((item) => sameUploadProtocol(item.protocol, selectedUploadProtocol.value.code)).length - 1)
 
   return next
 }
@@ -967,6 +1165,137 @@ function displayDeviceLabel(device?: CollectionDevice | null, index = 0) {
   return key ? `${name} · ${key}` : name
 }
 
+function getUploadTargets(configuration: EdgeCollectionConfiguration): CollectionUpload[] {
+  const uploads = Array.isArray(configuration.uploads) && configuration.uploads.length > 0
+    ? configuration.uploads
+    : configuration.upload
+      ? [configuration.upload]
+      : []
+
+  return uploads.map((upload) => ({
+    ...upload,
+    settings: asRecord(upload.settings),
+  }))
+}
+
+function findConfiguredUploadProtocol(configuration: EdgeCollectionConfiguration) {
+  const targets = getUploadTargets(configuration)
+  return (targets.find((upload) => upload.enabled !== false) ?? targets[0])?.protocol?.trim() ?? ''
+}
+
+function sameUploadProtocol(left: unknown, right: unknown) {
+  return normalizeUploadProtocolKey(left) === normalizeUploadProtocolKey(right)
+}
+
+function normalizeUploadProtocolKey(value: unknown) {
+  const normalized = normalizeProtocolKey(value)
+  if (normalized === 'thingboard') return 'thingsboard'
+  if (normalized === 'iotsharpdevicehttp' || normalized === 'iotsharpmqtt') return 'iotsharp'
+  if (normalized === 'sonnet') return 'sonnetdb'
+  if (normalized === 'influx') return 'influxdb'
+  return normalized
+}
+
+function uploadEditableSettings(protocol: UploadProtocolDescriptor) {
+  return (protocol.connectionSettings ?? []).filter((setting) => normalizeProtocolKey(setting.key) !== 'endpoint')
+}
+
+function uploadDefaults(protocol: UploadProtocolDescriptor, index: number) {
+  const number = String(index + 1).padStart(2, '0')
+  const code = normalizeUploadProtocolKey(protocol.code) || 'upload'
+  return {
+    targetKey: `${code}-${number}`,
+    displayName: `${protocol.displayName || '上传目标'} ${number}`,
+    endpoint: '',
+    batchSize: '1',
+    bufferingEnabled: false,
+  }
+}
+
+function createUploadTarget(protocol: UploadProtocolDescriptor, index: number): CollectionUpload {
+  const defaults = uploadDefaults(protocol, index)
+  return {
+    targetKey: defaults.targetKey,
+    displayName: defaults.displayName,
+    protocol: protocol.code,
+    endpoint: defaults.endpoint,
+    settings: {},
+    enabled: true,
+    batchSize: Number(defaults.batchSize),
+    bufferingEnabled: defaults.bufferingEnabled,
+  }
+}
+
+function defaultUploadSettingValue(protocol: UploadProtocolDescriptor, setting: ConnectionSettingDefinition) {
+  const code = normalizeUploadProtocolKey(protocol.code)
+  const key = normalizeProtocolKey(setting.key)
+  const explicit: Record<string, Record<string, string>> = {
+    iotsharp: {
+      token: '',
+      site: '',
+    },
+    thingsboard: {
+      token: '',
+      site: '',
+    },
+    sonnetdb: {
+      connectionstring: '',
+      database: 'metrics',
+      token: '',
+      measurement: 'edge_modbus',
+      field: 'value',
+      site: '',
+      includerawvalue: 'false',
+      rawfield: 'raw_value',
+      flush: 'async',
+    },
+    influxdb: {
+      token: '',
+      org: '',
+      bucket: 'edge',
+      database: '',
+      measurement: 'edge',
+      field: 'value',
+      precision: 'ms',
+      site: '',
+      includerawvalue: 'false',
+      rawfield: 'raw_value',
+    },
+  }
+
+  if (explicit[code]?.[key] !== undefined) {
+    return explicit[code][key]
+  }
+
+  if (setting.valueType === 'number') return '1'
+  if (setting.valueType === 'boolean') return 'false'
+  if (setting.options?.length) return setting.options[0]
+  return ''
+}
+
+function displayUploadProtocol(value?: string) {
+  if (!value) return '--'
+  const normalized = normalizeUploadProtocolKey(value)
+  return {
+    iotsharp: 'IoTSharp 上传',
+    thingsboard: 'ThingsBoard 上传',
+    sonnetdb: 'SonnetDB 上传',
+    influxdb: 'InfluxDB 上传',
+    http: 'HTTP 上传',
+    iotsharpmqtt: 'IoTSharp MQTT 上传',
+    iotsharpdevicehttp: 'IoTSharp 上传',
+  }[normalized] ?? value
+}
+
+function displayUploadSummary(configuration: EdgeCollectionConfiguration) {
+  const targets = getUploadTargets(configuration)
+  if (!targets.length) return '--'
+  if (targets.length === 1) return displayUploadProtocol(targets[0].protocol)
+
+  const protocolLabels = [...new Set(targets.map((upload) => displayUploadProtocol(upload.protocol)))]
+  return `${targets.length} 个目标 · ${protocolLabels.slice(0, 2).join(' / ')}`
+}
+
 function defaultSettingValue(protocol: CollectionProtocolDescriptor, setting: ConnectionSettingDefinition) {
   const code = normalizeProtocolKey(protocol.code)
   const key = normalizeProtocolKey(setting.key)
@@ -1235,6 +1564,10 @@ const connectionSettingLabels: Record<string, string> = {
   plcaddresses: 'PLC 地址',
   endpoint: '端点',
   baseurl: '基础地址',
+  connectionstring: '连接串',
+  token: '令牌',
+  accesstoken: '访问令牌',
+  devicetoken: '设备令牌',
   path: '路径',
   progid: '程序标识',
   clsid: '类标识',
@@ -1255,6 +1588,21 @@ const connectionSettingLabels: Record<string, string> = {
   model: '型号',
   rack: '机架',
   slot: '槽位',
+  targetkey: '目标键',
+  displayname: '显示名称',
+  enabled: '启用',
+  batchsize: '批大小',
+  bufferingenabled: '启用缓冲',
+  database: '数据库',
+  bucket: 'Bucket',
+  org: '组织',
+  measurement: '测量',
+  field: '字段',
+  site: '站点',
+  includerawvalue: '包含原始值',
+  rawfield: '原始值字段',
+  precision: '精度',
+  retentionpolicy: '保留策略',
 }
 
 const connectionSettingDescriptions: Record<string, string> = {
@@ -1272,6 +1620,10 @@ const connectionSettingDescriptions: Record<string, string> = {
   plcaddresses: '将地址按 PLC 风格处理。',
   endpoint: '协议端点地址。',
   baseurl: '基础地址。',
+  connectionstring: '完整连接串。',
+  token: '访问令牌。',
+  accesstoken: '访问令牌。',
+  devicetoken: '设备令牌。',
   path: '请求路径。',
   progid: 'OPC DA 的程序标识。',
   clsid: 'OPC DA 的类标识。',
@@ -1292,6 +1644,21 @@ const connectionSettingDescriptions: Record<string, string> = {
   model: '设备型号。',
   rack: '机架号。',
   slot: '槽位号。',
+  targetkey: '上传目标键。',
+  displayname: '上传目标显示名称。',
+  enabled: '是否启用该上传目标。',
+  batchsize: '批量写入大小。',
+  bufferingenabled: '是否启用缓冲。',
+  database: '数据库名称。',
+  bucket: 'Bucket 名称。',
+  org: '组织名称。',
+  measurement: '测量名称。',
+  field: '默认字段名称。',
+  site: '站点标识。',
+  includerawvalue: '同时写入原始值。',
+  rawfield: '原始值字段名称。',
+  precision: '时间精度。',
+  retentionpolicy: '保留策略。',
 }
 
 const statusLabels: Record<string, string> = {
@@ -1397,16 +1764,6 @@ function displayConnectionOption(setting: ConnectionSettingDefinition, option: s
   if (!options) return option
 
   return options[normalizeProtocolKey(option)] ?? option
-}
-
-function displayUploadProtocol(value?: string) {
-  if (!value) return '--'
-  return {
-    http: 'HTTP 上传',
-    iotsharpmqtt: 'IoTSharp MQTT 上传',
-    iotsharpdevicehttp: 'IoTSharp 设备 HTTP 上传',
-    sonnetdb: 'SonnetDB 上传',
-  }[normalizeProtocolKey(value)] ?? value
 }
 
 function displaySyncStatus(value?: string) {
@@ -1655,10 +2012,31 @@ function normalizeTargetName(value: string) {
           </div>
         </div>
 
-        <button class="nav-item" :class="{ active: activePanel === 'upload' }" type="button" @click="switchPanel('upload')">
-          <Database :size="17" />
-          <span>SonnetDB</span>
-        </button>
+        <div class="nav-group" :class="{ active: activePanel === 'upload' }">
+          <button class="nav-item" :class="{ active: activePanel === 'upload' }" type="button" @click="switchPanel('upload')">
+            <CloudUpload :size="17" />
+            <span>上传目标</span>
+            <ChevronRight class="nav-chevron" :size="16" />
+          </button>
+          <div class="protocol-nav" aria-label="上传协议">
+            <div v-if="!uploadProtocolGroups.length" class="nav-empty">协议目录加载中</div>
+            <div v-for="group in uploadProtocolGroups" :key="group.category" class="protocol-nav-group">
+              <div class="protocol-nav-title">{{ group.category }} 上传</div>
+              <button
+                v-for="protocol in group.protocols"
+                :key="protocol.code"
+                class="protocol-nav-item"
+                :class="{ active: sameUploadProtocol(protocol.code, selectedUploadProtocolCode) }"
+                type="button"
+                :title="protocol.description"
+                @click="selectUploadProtocol(protocol.code)"
+              >
+                <span>{{ protocol.displayName }}</span>
+                <small :class="lifecycleClass(protocol.lifecycle)">{{ displayLifecycleLabel(protocol.lifecycle) }}</small>
+              </button>
+            </div>
+          </div>
+        </div>
         <button class="nav-item" :class="{ active: activePanel === 'script' }" type="button" @click="switchPanel('script')">
           <FileCode2 :size="17" />
           <span>BASIC 脚本</span>
@@ -1691,12 +2069,12 @@ function normalizeTargetName(value: string) {
           <h1>{{ pageTitle }}</h1>
           <p>本地管理采集配置、上传目标和运行态。</p>
         </div>
-          <div class="topbar-tools">
-            <div class="metrics">
+        <div class="topbar-tools">
+          <div class="metrics">
             <div class="metric">{{ displaySyncStatus(runtimeSummary?.collectionSync?.status) }}</div>
             <div class="metric">{{ displayUpdatedBy(baseConfiguration.updatedBy) }}</div>
-            <div class="metric">{{ displayUploadProtocol(baseConfiguration.upload?.protocol) }}</div>
-            </div>
+            <div class="metric">{{ displayUploadSummary(baseConfiguration) }}</div>
+          </div>
           <div class="actions">
             <button type="button" :disabled="isLoading" @click="loadAll">
               <RefreshCw :size="16" />
@@ -1967,42 +2345,159 @@ function normalizeTargetName(value: string) {
 
         <section v-show="activePanel === 'upload'" class="panel-group">
           <article class="panel split">
-            <div>
-              <div class="panel-head">
-                <h2>SonnetDB</h2>
-                <span class="badge">本地上传</span>
+            <div class="stack">
+              <div class="protocol-summary">
+                <div class="protocol-title">
+                  <div>
+                    <h2>{{ selectedUploadProtocol.displayName }} 上传</h2>
+                    <small>{{ selectedUploadProtocol.category }} · {{ selectedUploadProtocol.code }}</small>
+                  </div>
+                  <span class="badge" :class="lifecycleClass(selectedUploadProtocol.lifecycle)">
+                    {{ displayLifecycleLabel(selectedUploadProtocol.lifecycle) }}
+                  </span>
+                </div>
+                <p>{{ selectedUploadProtocol.description }}</p>
+                <div class="protocol-flags">
+                  <span v-for="flag in uploadProtocolFlags" :key="flag">{{ flag }}</span>
+                  <span>{{ selectedUploadProtocol.connectionSettings.length }} 个字段</span>
+                </div>
               </div>
-              <div class="info-list">
-                <div class="info-row"><span>协议</span><strong>{{ displayUploadProtocol(baseConfiguration.upload?.protocol) }}</strong></div>
-                <div class="info-row"><span>地址</span><strong>{{ baseConfiguration.upload?.endpoint || '--' }}</strong></div>
-                <div class="info-row"><span>数据库</span><strong>{{ uploadSettings.database ?? '--' }}</strong></div>
-                <div class="info-row"><span>测点集</span><strong>{{ uploadSettings.measurement ?? '--' }}</strong></div>
-                <div class="info-row"><span>字段</span><strong>{{ uploadSettings.field ?? '--' }}</strong></div>
-                <div class="info-row"><span>站点</span><strong>{{ uploadSettings.site ?? '--' }}</strong></div>
+
+              <div class="panel-section">
+                <div class="panel-head compact">
+                  <h2>上传目标</h2>
+                  <div class="actions dense">
+                    <button type="button" @click="addUploadTarget">
+                      <Plus :size="15" />
+                      <span>新增目标</span>
+                    </button>
+                    <button type="button" :disabled="!selectedUploadTarget" @click="removeUploadTarget">
+                      <Trash2 :size="15" />
+                      <span>删除目标</span>
+                    </button>
+                  </div>
+                </div>
+                <div v-if="selectedUploadTargetCount" class="upload-target-list">
+                  <button
+                    v-for="(target, index) in selectedUploadTargets"
+                    :key="target.targetKey || index"
+                    class="upload-target-item"
+                    :class="{ active: index === selectedUploadTargetIndex }"
+                    type="button"
+                    @click="selectUploadTarget(index)"
+                  >
+                    <div class="upload-target-main">
+                      <strong>{{ target.displayName || target.targetKey || '未命名目标' }}</strong>
+                      <small>{{ target.targetKey || '--' }}</small>
+                    </div>
+                    <div class="upload-target-meta">
+                      <span>{{ target.enabled === false ? '已禁用' : '启用' }}</span>
+                      <span>{{ displayUploadProtocol(target.protocol) }}</span>
+                      <span>{{ target.batchSize ?? 1 }} 批</span>
+                    </div>
+                  </button>
+                </div>
+                <div v-else class="empty">当前协议还没有上传目标，先新建一个。</div>
               </div>
-            </div>
-            <div>
-              <div class="panel-head">
-                <h2>快速编辑</h2>
-                <span class="badge">设置</span>
+
+              <div class="panel-section">
+                <div class="panel-head compact">
+                  <h2>目标配置</h2>
+                  <span class="badge">{{ selectedUploadTarget ? (selectedUploadTarget.enabled === false ? '已禁用' : '启用') : '新目标草稿' }}</span>
+                </div>
+                <div class="form-grid">
+                  <label>目标键<input v-model="uploadForm.targetKey" type="text" @input="markUploadDirty" /></label>
+                  <label>显示名称<input v-model="uploadForm.displayName" type="text" @input="markUploadDirty" /></label>
+                  <label>端点<input v-model="uploadForm.endpoint" type="text" @input="markUploadDirty" /></label>
+                  <label>批大小<input v-model="uploadForm.batchSize" type="number" min="1" @input="markUploadDirty" /></label>
+                  <label class="checkbox-label">
+                    <span>启用</span>
+                    <input v-model="uploadForm.enabled" type="checkbox" @change="markUploadDirty" />
+                    <small>禁用后不会生成上传通道。</small>
+                  </label>
+                  <label class="checkbox-label">
+                    <span>启用缓冲</span>
+                    <input v-model="uploadForm.bufferingEnabled" type="checkbox" @change="markUploadDirty" />
+                    <small>开启后由运行时缓存后批量发送。</small>
+                  </label>
+                </div>
               </div>
-              <div class="form-grid">
-                <label>地址<input v-model="uploadForm.endpoint" type="text" @input="markUploadDirty" /></label>
-                <label>数据库<input v-model="uploadForm.database" type="text" @input="markUploadDirty" /></label>
-                <label>令牌<input v-model="uploadForm.token" type="password" @input="markUploadDirty" /></label>
-                <label>测点集<input v-model="uploadForm.measurement" type="text" @input="markUploadDirty" /></label>
-                <label>字段<input v-model="uploadForm.field" type="text" @input="markUploadDirty" /></label>
-                <label>站点<input v-model="uploadForm.site" type="text" @input="markUploadDirty" /></label>
+
+              <div class="panel-section">
+                <div class="panel-head compact">
+                  <h2>协议字段</h2>
+                  <span class="badge">{{ visibleUploadSettings.length }} 个字段</span>
+                </div>
+                <div v-if="visibleUploadSettings.length" class="form-grid">
+                  <label
+                    v-for="setting in visibleUploadSettings"
+                    :key="setting.key"
+                    :class="{ 'checkbox-label': isBooleanSetting(setting) }"
+                  >
+                    <span>{{ displayConnectionSettingLabel(setting) }}<em v-if="setting.required">*</em></span>
+                    <select v-if="isSelectSetting(setting)" v-model="uploadSettingValues[setting.key]" @change="markUploadDirty">
+                      <option v-for="option in displayConnectionSettingOptions(setting)" :key="option" :value="option">
+                        {{ displayConnectionOption(setting, option) }}
+                      </option>
+                    </select>
+                    <input
+                      v-else-if="isBooleanSetting(setting)"
+                      type="checkbox"
+                      :checked="uploadSettingValues[setting.key] === 'true'"
+                      @change="handleUploadSettingBooleanChange(setting.key, $event)"
+                    />
+                    <input
+                      v-else
+                      v-model="uploadSettingValues[setting.key]"
+                      :type="inputType(setting)"
+                      :required="setting.required"
+                      @input="markUploadDirty"
+                    />
+                    <small>{{ displayConnectionSettingDescription(setting) }}</small>
+                  </label>
+                </div>
+                <div v-else class="empty">当前协议没有额外字段。</div>
               </div>
+
+              <div class="panel-section">
+                <div class="panel-head compact">
+                  <h2>目标概览</h2>
+                  <span class="badge">快照</span>
+                </div>
+                <div class="info-list">
+                  <div class="info-row"><span>协议</span><strong>{{ displayUploadProtocol(selectedUploadProtocol.code) }}</strong></div>
+                  <div class="info-row"><span>目标键</span><strong>{{ selectedUploadTarget?.targetKey || '--' }}</strong></div>
+                  <div class="info-row"><span>显示名称</span><strong>{{ selectedUploadTarget?.displayName || '--' }}</strong></div>
+                  <div class="info-row"><span>端点</span><strong>{{ selectedUploadTarget?.endpoint || '--' }}</strong></div>
+                  <div class="info-row"><span>状态</span><strong>{{ selectedUploadTarget?.enabled === false ? '已禁用' : '启用' }}</strong></div>
+                  <div class="info-row"><span>批大小</span><strong>{{ selectedUploadTarget?.batchSize ?? '--' }}</strong></div>
+                  <div class="info-row"><span>缓冲</span><strong>{{ selectedUploadTarget?.bufferingEnabled ? '已启用' : '未启用' }}</strong></div>
+                </div>
+              </div>
+
               <div class="actions align-end">
-                <button type="button" @click="syncFormsToJson('SonnetDB 设置已同步到 JSON')">
+                <button type="button" @click="syncFormsToJson('上传配置已同步到 JSON')">
                   <Save :size="16" />
                   <span>同步到 JSON</span>
                 </button>
-                <button type="button" class="primary" :disabled="isSaving" @click="applyConfiguration">
+                <button type="button" class="primary" :disabled="isSaving || !!jsonParseError" @click="applyConfiguration">
                   <Network :size="16" />
                   <span>保存并应用</span>
                 </button>
+              </div>
+            </div>
+
+            <div class="stack">
+              <div class="panel-section stretch">
+                <div class="panel-head compact">
+                  <h2>本地 JSON</h2>
+                  <span class="badge" :class="{ warn: jsonParseError }">{{ jsonParseError ? '有误' : '可编辑' }}</span>
+                </div>
+                <textarea v-model="configurationText" spellcheck="false" @input="onJsonInput"></textarea>
+                <div v-if="jsonParseError" class="inline-warning">
+                  <AlertTriangle :size="15" />
+                  <span>{{ jsonParseError }}</span>
+                </div>
               </div>
             </div>
           </article>

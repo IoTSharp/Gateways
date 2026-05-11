@@ -35,6 +35,27 @@ internal static class GatewayCollectionConfigurationValidator
                 }
             }
         }
+
+        var uploads = configuration.Uploads is { Count: > 0 }
+            ? configuration.Uploads
+            : configuration.Upload is null
+                ? []
+                : [configuration.Upload];
+
+        var uploadKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var upload in uploads)
+        {
+            var uploadKey = upload.TargetKey?.Trim();
+            if (string.IsNullOrWhiteSpace(uploadKey))
+            {
+                continue;
+            }
+
+            if (!uploadKeys.Add(uploadKey))
+            {
+                throw new InvalidOperationException($"上传目标键“{uploadKey}”重复。");
+            }
+        }
     }
 
     private static string RequireKey(string? value, string message)

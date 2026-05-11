@@ -251,6 +251,7 @@ internal sealed class LocalCollectionConfigurationService
         int currentVersion,
         string? updatedBy)
     {
+        var normalizedUploads = NormalizeUploads(configuration.Uploads, configuration.Upload);
         var normalized = configuration with
         {
             EdgeNodeId = configuration.EdgeNodeId == Guid.Empty ? Guid.NewGuid() : configuration.EdgeNodeId,
@@ -259,22 +260,44 @@ internal sealed class LocalCollectionConfigurationService
             UpdatedBy = string.IsNullOrWhiteSpace(updatedBy)
                 ? _optionsMonitor.CurrentValue.DefaultUpdatedBy
                 : updatedBy.Trim(),
-            Upload = NormalizeUpload(configuration.Upload),
+            Upload = normalizedUploads.FirstOrDefault(),
+            Uploads = normalizedUploads,
             Tasks = (configuration.Tasks ?? []).Select(NormalizeTask).ToArray()
         };
 
         return normalized;
     }
 
-    private static CollectionUploadContract? NormalizeUpload(CollectionUploadContract? upload)
+    private static IReadOnlyList<CollectionUploadContract> NormalizeUploads(
+        IReadOnlyList<CollectionUploadContract>? uploads,
+        CollectionUploadContract? legacyUpload)
     {
-        if (upload is null)
+        var source = (uploads is { Count: >0 } ? uploads : legacyUpload is null ? [] : [legacyUpload]).ToArray();
+        if (source.Length == 0)
         {
-            return null;
+            return [];
         }
+
+        return source.Select((upload, index) => NormalizeUpload(upload, index)).ToArray();
+    }
+
+    private static CollectionUploadContract NormalizeUpload(CollectionUploadContract upload, int index)
+    {
+        var protocol = string.IsNullOrWhiteSpace(upload.Protocol) ? "SonnetDb" : upload.Protocol.Trim();
+        var displayName = string.IsNullOrWhiteSpace(upload.DisplayName)
+            ? GetUploadProtocolDisplayName(protocol)
+            : upload.DisplayName.Trim();
+        var targetKey = string.IsNullOrWhiteSpace(upload.TargetKey)
+            ? CreateUploadTargetKey(displayName, protocol, index)
+            : upload.TargetKey.Trim();
 
         return upload with
         {
+            TargetKey = targetKey,
+            DisplayName = displayName,
+            Protocol = protocol,
+            Endpoint = upload.Endpoint?.Trim() ?? string.Empty,
+            BatchSize = Math.Max(upload.BatchSize, 1),
             Settings = upload.Settings.HasValue
                 ? upload.Settings
                 : JsonSerializer.SerializeToElement(new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase), JsonOptions)
@@ -350,10 +373,29 @@ internal sealed class LocalCollectionConfigurationService
             UpdatedBy = _optionsMonitor.CurrentValue.DefaultUpdatedBy,
             Upload = new CollectionUploadContract
             {
+                TargetKey = "sonnetdb-main",
+                DisplayName = "SonnetDB 主目标",
                 Protocol = "SonnetDb",
                 Endpoint = string.Empty,
-                Settings = JsonSerializer.SerializeToElement(new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase), JsonOptions)
+                Settings = JsonSerializer.SerializeToElement(new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase), JsonOptions),
+                Enabled = true,
+                BatchSize = 1,
+                BufferingEnabled = false
             },
+            Uploads =
+            [
+                new CollectionUploadContract
+                {
+                    TargetKey = "sonnetdb-main",
+                    DisplayName = "SonnetDB 主目标",
+                    Protocol = "SonnetDb",
+                    Endpoint = string.Empty,
+                    Settings = JsonSerializer.SerializeToElement(new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase), JsonOptions),
+                    Enabled = true,
+                    BatchSize = 1,
+                    BufferingEnabled = false
+                }
+            ],
             Tasks = []
         };
     }
@@ -394,4 +436,35 @@ internal sealed class LocalCollectionConfigurationService
             return _appliedVersion.HasValue && _appliedVersion.Value == version;
         }
     }
+
+    private static string CreateUploadTargetKey(string displayName, string protocol, int index)
+    {
+        var normalizedDisplayName = NormalizeKey(displayName);
+        if (!string.IsNullOrWhiteSpace(normalizedDisplayName))
+        {
+            return $"{normalizedDisplayName}-{index + 1}";
+        }
+
+        var normalizedProtocol = NormalizeKey(protocol);
+        return !string.IsNullOrWhiteSpace(normalizedProtocol)
+            ? $"{normalizedProtocol}-{index + 1}"
+            : $"upload-target-{index + 1}";
+    }
+
+    private static string GetUploadProtocolDisplayName(string protocol)
+    {
+        return NormalizeKey(protocol) switch
+        {
+            "iotsharp" or "iotsharpdevicehttp" or "iotsharpmqtt" => "IoTSharp",
+            "thingsboard" or "thingboard" => "ThingsBoard",
+            "sonnetdb" or "sonnet" => "SonnetDB",
+            "influxdb" or "influx" => "InfluxDB",
+            _ => string.IsNullOrWhiteSpace(protocol) ? "上传目标" : protocol.Trim()
+        };
+    }
+
+    private static string NormalizeKey(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 }

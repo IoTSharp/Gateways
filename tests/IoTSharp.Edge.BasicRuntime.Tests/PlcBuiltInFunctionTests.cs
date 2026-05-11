@@ -223,7 +223,7 @@ public sealed class PlcBuiltInFunctionTests
             return "unexpected"
             """);
 
-        Assert.Equal("Siemens handle not found.", result.ReturnValue);
+        Assert.Equal("未找到西门子句柄。", result.ReturnValue);
     }
 
     private sealed class LoopbackPlcClientFactory : IBasicPlcClientFactory

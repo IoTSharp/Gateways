@@ -5,6 +5,8 @@
   "updatedAt": "2026-05-11T00:00:00Z",
   "updatedBy": "Docker 模板",
   "upload": {
+    "targetKey": "sonnetdb-main",
+    "displayName": "SonnetDB 主目标",
     "protocol": "SonnetDb",
     "endpoint": "http://sonnetdb:5080",
     "settings": {
@@ -13,8 +15,42 @@
       "measurement": "edge_modbus",
       "field": "value",
       "site": "Docker 编排"
-    }
+    },
+    "enabled": true,
+    "batchSize": 1,
+    "bufferingEnabled": false
   },
+  "uploads": [
+    {
+      "targetKey": "sonnetdb-main",
+      "displayName": "SonnetDB 主目标",
+      "protocol": "SonnetDb",
+      "endpoint": "http://sonnetdb:5080",
+      "settings": {
+        "database": "metrics",
+        "token": "sonnetdb-dev-token",
+        "measurement": "edge_modbus",
+        "field": "value",
+        "site": "Docker 编排"
+      },
+      "enabled": true,
+      "batchSize": 1,
+      "bufferingEnabled": false
+    },
+    {
+      "targetKey": "iotsharp-main",
+      "displayName": "IoTSharp 主目标",
+      "protocol": "IoTSharp",
+      "endpoint": "http://iotsharp:5000",
+      "settings": {
+        "token": "iotsharp-dev-token",
+        "site": "Docker 编排"
+      },
+      "enabled": false,
+      "batchSize": 1,
+      "bufferingEnabled": false
+    }
+  ],
   "tasks": [
     {
       "id": "0f013f70-50ec-45cf-8d7f-19db4c7a5b19",

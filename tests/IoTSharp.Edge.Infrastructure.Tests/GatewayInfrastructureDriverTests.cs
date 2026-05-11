@@ -3,6 +3,7 @@ using IoTSharp.Edge.Domain;
 using IoTSharp.Edge.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace IoTSharp.Edge.Infrastructure.Tests;
 
@@ -51,6 +52,33 @@ public sealed class GatewayInfrastructureDriverTests
         Assert.Equal("CNC", protocols["mt-cnc"].Category);
         Assert.Equal("guarded", protocols["opc-da"].Lifecycle);
         Assert.Equal("guarded", protocols["fanuc-cnc"].Lifecycle);
+    }
+
+    [Fact]
+    public void Upload_protocol_catalog_exposes_prioritized_targets()
+    {
+        var catalog = new UploadProtocolCatalogService();
+        var protocols = catalog.GetProtocols().ToArray();
+
+        Assert.Equal(["IoTSharp", "ThingsBoard", "SonnetDb", "InfluxDb"], protocols.Select(item => item.Code).ToArray());
+        Assert.Equal("平台", protocols[0].Category);
+        Assert.Equal("时序数据库", protocols[2].Category);
+    }
+
+    [Fact]
+    public void Infrastructure_registers_upload_transports()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddGatewayInfrastructure(new ConfigurationBuilder().Build());
+        using var provider = services.BuildServiceProvider();
+
+        var registry = provider.GetRequiredService<IUploadTransportRegistry>();
+
+        Assert.Equal(UploadProtocol.IoTSharp, registry.GetRequiredTransport(UploadProtocol.IoTSharp).Protocol);
+        Assert.Equal(UploadProtocol.ThingsBoard, registry.GetRequiredTransport(UploadProtocol.ThingsBoard).Protocol);
+        Assert.Equal(UploadProtocol.SonnetDb, registry.GetRequiredTransport(UploadProtocol.SonnetDb).Protocol);
+        Assert.Equal(UploadProtocol.InfluxDb, registry.GetRequiredTransport(UploadProtocol.InfluxDb).Protocol);
     }
 
     [Fact]

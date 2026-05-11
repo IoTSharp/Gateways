@@ -82,6 +82,9 @@ public static class GatewayInfrastructureServiceCollectionExtensions
         services.AddSingleton<IDeviceDriverRegistry, DeviceDriverRegistry>();
 
         services.AddSingleton<IUploadTransport, HttpUploadTransport>();
+        services.AddSingleton<IUploadTransport, IoTSharpUploadTransport>();
+        services.AddSingleton<IUploadTransport, ThingsBoardUploadTransport>();
+        services.AddSingleton<IUploadTransport, InfluxDbUploadTransport>();
         services.AddSingleton<IUploadTransport, IotSharpMqttUploadTransport>();
         services.AddSingleton<IUploadTransport, IotSharpDeviceHttpUploadTransport>();
         services.AddSingleton<IUploadTransport, SonnetDbUploadTransport>();

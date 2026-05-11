@@ -49,6 +49,7 @@ builder.Services.AddSingleton<BasicRuntime>(sp =>
 builder.Services.AddSingleton<ValueTransformationService>();
 builder.Services.AddScoped<DriverCatalogService>();
 builder.Services.AddScoped<CollectionProtocolCatalogService>();
+builder.Services.AddScoped<UploadProtocolCatalogService>();
 builder.Services.AddScoped<GatewayRuntimeService>();
 builder.Services.AddGatewayInfrastructure(builder.Configuration);
 builder.Services.AddSingleton<IEdgeTaskReceiptReporter, EdgeTaskReceiptExample>();
@@ -141,6 +142,12 @@ app.MapGet("/api/scripts/polling", () => Results.Ok(new
 }));
 
 app.MapGet("/api/collection/protocols", (CollectionProtocolCatalogService service) => Results.Ok(new
+{
+    generatedAtUtc = DateTime.UtcNow,
+    protocols = service.GetProtocols()
+}));
+
+app.MapGet("/api/upload/protocols", (UploadProtocolCatalogService service) => Results.Ok(new
 {
     generatedAtUtc = DateTime.UtcNow,
     protocols = service.GetProtocols()

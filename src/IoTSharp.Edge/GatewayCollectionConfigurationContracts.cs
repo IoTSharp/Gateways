@@ -76,14 +76,20 @@ internal sealed record EdgeCollectionConfigurationContract
     public DateTime UpdatedAt { get; init; }
     public string UpdatedBy { get; init; } = string.Empty;
     public CollectionUploadContract? Upload { get; init; }
+    public IReadOnlyList<CollectionUploadContract> Uploads { get; init; } = [];
     public IReadOnlyList<CollectionTaskContract> Tasks { get; init; } = [];
 }
 
 internal sealed record CollectionUploadContract
 {
+    public string TargetKey { get; init; } = string.Empty;
+    public string DisplayName { get; init; } = string.Empty;
     public string Protocol { get; init; } = string.Empty;
     public string Endpoint { get; init; } = string.Empty;
     public JsonElement? Settings { get; init; }
+    public bool Enabled { get; init; } = true;
+    public int BatchSize { get; init; } = 1;
+    public bool BufferingEnabled { get; init; }
 }
 
 internal sealed record CollectionTaskContract

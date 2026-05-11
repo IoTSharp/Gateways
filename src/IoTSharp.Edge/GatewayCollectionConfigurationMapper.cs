@@ -21,8 +21,7 @@ internal static class GatewayCollectionConfigurationMapper
         var edgeNodeId = configuration.EdgeNodeId;
         var normalizedBaseUrl = string.IsNullOrWhiteSpace(options.BaseUrl) ? string.Empty : NormalizeBaseUrl(options.BaseUrl);
         var accessToken = options.AccessToken ?? string.Empty;
-        var telemetryUploadChannelId = CreateDeterministicGuid(edgeNodeId, "upload-channel", "telemetry");
-        var attributeUploadChannelId = CreateDeterministicGuid(edgeNodeId, "upload-channel", "attribute");
+        var uploadTargets = ResolveUploadTargets(configuration, normalizedBaseUrl, accessToken);
 
         var channels = new List<GatewayChannel>();
         var devices = new List<Device>();
@@ -30,7 +29,7 @@ internal static class GatewayCollectionConfigurationMapper
         var pollingTasks = new List<PollingTask>();
         var transformRules = new List<TransformRule>();
         var uploadRoutes = new List<UploadRoute>();
-        var requiredUploadProtocols = new HashSet<GatewayCollectionTargetType>();
+        var requiredTargetTypes = new HashSet<GatewayCollectionTargetType>();
 
         foreach (var task in configuration.Tasks ?? [])
         {
@@ -98,16 +97,20 @@ internal static class GatewayCollectionConfigurationMapper
                     }
 
                     var targetType = NormalizeTargetType(pointContract.Mapping.TargetType, pointContract.PointKey);
-                    requiredUploadProtocols.Add(targetType);
-                    uploadRoutes.Add(new UploadRoute
+                    requiredTargetTypes.Add(targetType);
+
+                    foreach (var uploadTarget in uploadTargets.Where(target => target.Enabled))
                     {
-                        Id = CreateDeterministicGuid(edgeNodeId, "upload-route", task.TaskKey, deviceContract.DeviceKey, pointContract.PointKey, pointContract.Mapping.TargetType.ToString()),
-                        PointId = pointId,
-                        UploadChannelId = targetType == GatewayCollectionTargetType.Telemetry ? telemetryUploadChannelId : attributeUploadChannelId,
-                        PayloadTemplate = string.Empty,
-                        Target = pointContract.Mapping.TargetName,
-                        Enabled = pointEnabled
-                    });
+                        uploadRoutes.Add(new UploadRoute
+                        {
+                            Id = CreateDeterministicGuid(edgeNodeId, "upload-route", task.TaskKey, deviceContract.DeviceKey, pointContract.PointKey, uploadTarget.TargetKey, targetType.ToString()),
+                            PointId = pointId,
+                            UploadChannelId = CreateUploadChannelId(edgeNodeId, uploadTarget.TargetKey, targetType),
+                            PayloadTemplate = string.Empty,
+                            Target = pointContract.Mapping.TargetName,
+                            Enabled = pointEnabled
+                        });
+                    }
                 }
 
                 devices.Add(new Device
@@ -129,13 +132,11 @@ internal static class GatewayCollectionConfigurationMapper
         }
 
         var uploadChannels = BuildUploadChannels(
-            requiredUploadProtocols,
-            telemetryUploadChannelId,
-            attributeUploadChannelId,
+            requiredTargetTypes,
+            uploadTargets,
             normalizedBaseUrl,
             accessToken,
-            configuration.EdgeNodeId,
-            configuration.Upload);
+            configuration.EdgeNodeId);
 
         return new GatewayConfigurationSnapshot(
             channels.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray(),
@@ -149,64 +150,142 @@ internal static class GatewayCollectionConfigurationMapper
 
     private static IReadOnlyCollection<UploadChannel> BuildUploadChannels(
         IReadOnlyCollection<GatewayCollectionTargetType> requiredTargetTypes,
-        Guid telemetryUploadChannelId,
-        Guid attributeUploadChannelId,
+        IReadOnlyCollection<ResolvedUploadTarget> uploadTargets,
         string normalizedBaseUrl,
         string accessToken,
-        Guid edgeNodeId,
-        CollectionUploadContract? configuredUpload)
+        Guid edgeNodeId)
     {
         var uploadChannels = new List<UploadChannel>();
-        var uploadProtocol = ResolveUploadProtocol(configuredUpload?.Protocol);
-        var uploadSettings = BuildUploadSettings(configuredUpload, normalizedBaseUrl, accessToken, edgeNodeId);
-
-        if (requiredTargetTypes.Contains(GatewayCollectionTargetType.Telemetry))
+        foreach (var uploadTarget in uploadTargets.Where(target => target.Enabled))
         {
-            uploadChannels.Add(new UploadChannel
+            foreach (var targetType in requiredTargetTypes)
             {
-                Id = telemetryUploadChannelId,
-                Name = uploadProtocol == UploadProtocol.SonnetDb ? "SonnetDB 遥测" : "IoTSharp 遥测",
-                Protocol = uploadProtocol,
-                Endpoint = ResolveUploadEndpoint(configuredUpload, normalizedBaseUrl, accessToken, uploadProtocol, "telemetry"),
-                SettingsJson = GatewayJson.Serialize(uploadSettings),
-                BatchSize = 1,
-                BufferingEnabled = false,
-                Enabled = true
-            });
-        }
-
-        if (requiredTargetTypes.Contains(GatewayCollectionTargetType.Attribute))
-        {
-            uploadChannels.Add(new UploadChannel
-            {
-                Id = attributeUploadChannelId,
-                Name = uploadProtocol == UploadProtocol.SonnetDb ? "SonnetDB 属性" : "IoTSharp 属性",
-                Protocol = uploadProtocol,
-                Endpoint = ResolveUploadEndpoint(configuredUpload, normalizedBaseUrl, accessToken, uploadProtocol, "attributes"),
-                SettingsJson = GatewayJson.Serialize(uploadSettings),
-                BatchSize = 1,
-                BufferingEnabled = false,
-                Enabled = true
-            });
+                var channelSettings = BuildUploadSettings(uploadTarget, normalizedBaseUrl, accessToken, edgeNodeId, targetType);
+                uploadChannels.Add(new UploadChannel
+                {
+                    Id = CreateUploadChannelId(edgeNodeId, uploadTarget.TargetKey, targetType),
+                    Name = BuildUploadChannelName(uploadTarget.DisplayName, targetType),
+                    Protocol = uploadTarget.Protocol,
+                    Endpoint = ResolveUploadChannelEndpoint(uploadTarget, targetType),
+                    SettingsJson = GatewayJson.Serialize(channelSettings),
+                    BatchSize = Math.Max(uploadTarget.BatchSize, 1),
+                    BufferingEnabled = uploadTarget.BufferingEnabled,
+                    Enabled = uploadTarget.Enabled
+                });
+            }
         }
 
         return uploadChannels;
     }
 
     private static Dictionary<string, string?> BuildUploadSettings(
-        CollectionUploadContract? configuredUpload,
+        ResolvedUploadTarget uploadTarget,
         string normalizedBaseUrl,
         string accessToken,
-        Guid edgeNodeId)
+        Guid edgeNodeId,
+        GatewayCollectionTargetType targetType)
     {
-        var settings = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+        var settings = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in uploadTarget.Settings)
         {
-            ["edgeNodeId"] = edgeNodeId == Guid.Empty ? null : edgeNodeId.ToString("D"),
-            ["edgeBaseUrl"] = string.IsNullOrWhiteSpace(normalizedBaseUrl) ? null : normalizedBaseUrl,
-            ["accessToken"] = string.IsNullOrWhiteSpace(accessToken) ? null : accessToken
+            settings[pair.Key] = pair.Value;
+        }
+
+        settings["edgeNodeId"] = edgeNodeId == Guid.Empty ? null : edgeNodeId.ToString("D");
+        settings["edgeBaseUrl"] = string.IsNullOrWhiteSpace(normalizedBaseUrl) ? null : normalizedBaseUrl;
+        settings["accessToken"] = string.IsNullOrWhiteSpace(accessToken) ? null : accessToken;
+        settings["targetKey"] = uploadTarget.TargetKey;
+        settings["targetName"] = uploadTarget.DisplayName;
+        settings["targetProtocol"] = uploadTarget.Protocol.ToString();
+        settings["targetKind"] = targetType switch
+        {
+            GatewayCollectionTargetType.Telemetry => "telemetry",
+            GatewayCollectionTargetType.Attribute => "attributes",
+            _ => targetType.ToString().ToLowerInvariant()
         };
 
-        MergeJsonObject(settings, configuredUpload?.Settings);
+        return settings;
+    }
+
+    private static IReadOnlyCollection<ResolvedUploadTarget> ResolveUploadTargets(
+        EdgeCollectionConfigurationContract configuration,
+        string normalizedBaseUrl,
+        string accessToken)
+    {
+        var configuredUploads = configuration.Uploads is { Count: > 0 }
+            ? configuration.Uploads
+            : configuration.Upload is not null
+                ? [configuration.Upload]
+                : [];
+
+        if (configuredUploads.Count == 0 && !string.IsNullOrWhiteSpace(normalizedBaseUrl) && !string.IsNullOrWhiteSpace(accessToken))
+        {
+            configuredUploads =
+            [
+                new CollectionUploadContract
+                {
+                    TargetKey = "iotsharp-default",
+                    DisplayName = "IoTSharp 默认目标",
+                    Protocol = "IoTSharp",
+                    Endpoint = normalizedBaseUrl,
+                    Settings = JsonSerializer.SerializeToElement(
+                        new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["token"] = accessToken
+                        },
+                        new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                }
+            ];
+        }
+
+        return configuredUploads
+            .Select((upload, index) => ResolveUploadTarget(upload, index, normalizedBaseUrl, accessToken))
+            .ToArray();
+    }
+
+    private static ResolvedUploadTarget ResolveUploadTarget(
+        CollectionUploadContract upload,
+        int index,
+        string normalizedBaseUrl,
+        string accessToken)
+    {
+        var protocol = ResolveUploadProtocol(upload.Protocol);
+        var displayName = string.IsNullOrWhiteSpace(upload.DisplayName)
+            ? GetUploadProtocolDisplayName(protocol)
+            : upload.DisplayName.Trim();
+        var targetKey = string.IsNullOrWhiteSpace(upload.TargetKey)
+            ? CreateUploadTargetKey(displayName, protocol, index)
+            : upload.TargetKey.Trim();
+        var settings = BuildUploadTargetSettings(upload, normalizedBaseUrl, accessToken, targetKey, displayName, protocol);
+
+        return new ResolvedUploadTarget(
+            targetKey,
+            displayName,
+            protocol,
+            ResolveUploadEndpoint(upload, normalizedBaseUrl, accessToken, protocol),
+            settings,
+            Math.Max(upload.BatchSize, 1),
+            upload.BufferingEnabled,
+            upload.Enabled);
+    }
+
+    private static Dictionary<string, string?> BuildUploadTargetSettings(
+        CollectionUploadContract upload,
+        string normalizedBaseUrl,
+        string accessToken,
+        string targetKey,
+        string displayName,
+        UploadProtocol protocol)
+    {
+        var settings = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        MergeJsonObject(settings, upload.Settings);
+
+        settings["targetKey"] = targetKey;
+        settings["targetName"] = displayName;
+        settings["targetProtocol"] = protocol.ToString();
+        settings["edgeBaseUrl"] = string.IsNullOrWhiteSpace(normalizedBaseUrl) ? null : normalizedBaseUrl;
+        settings["accessToken"] = string.IsNullOrWhiteSpace(accessToken) ? null : accessToken;
+
         return settings;
     }
 
@@ -214,39 +293,114 @@ internal static class GatewayCollectionConfigurationMapper
     {
         if (string.IsNullOrWhiteSpace(protocol))
         {
-            return UploadProtocol.IotSharpDeviceHttp;
+            return UploadProtocol.IoTSharp;
         }
 
         return protocol.Trim().ToLowerInvariant() switch
         {
             "http" => UploadProtocol.Http,
             "mqtt" or "iotsharpmqtt" => UploadProtocol.IotSharpMqtt,
-            "devicehttp" or "iotsharpdevicehttp" or "iotsharp" => UploadProtocol.IotSharpDeviceHttp,
+            "devicehttp" or "iotsharpdevicehttp" => UploadProtocol.IotSharpDeviceHttp,
+            "iotsharp" => UploadProtocol.IoTSharp,
+            "thingboard" or "thingsboard" => UploadProtocol.ThingsBoard,
             "sonnet" or "sonnetdb" => UploadProtocol.SonnetDb,
+            "influx" or "influxdb" => UploadProtocol.InfluxDb,
             _ => throw new NotSupportedException($"未配置的上传协议“{protocol}”不受支持。")
         };
     }
 
     private static string ResolveUploadEndpoint(
-        CollectionUploadContract? configuredUpload,
+        CollectionUploadContract upload,
         string normalizedBaseUrl,
         string accessToken,
-        UploadProtocol uploadProtocol,
-        string targetKind)
+        UploadProtocol uploadProtocol)
     {
-        if (configuredUpload is not null && !string.IsNullOrWhiteSpace(configuredUpload.Endpoint))
+        if (!string.IsNullOrWhiteSpace(upload.Endpoint))
         {
-            return configuredUpload.Endpoint;
+            return upload.Endpoint.Trim();
         }
 
         return uploadProtocol switch
         {
-            UploadProtocol.IotSharpDeviceHttp when !string.IsNullOrWhiteSpace(normalizedBaseUrl) && !string.IsNullOrWhiteSpace(accessToken) => new Uri(new Uri(normalizedBaseUrl, UriKind.Absolute), $"api/Devices/{Uri.EscapeDataString(accessToken)}/{char.ToUpperInvariant(targetKind[0])}{targetKind[1..]}").ToString(),
-            UploadProtocol.IotSharpDeviceHttp => throw new InvalidOperationException("IoTSharp 设备 HTTP 上传需要 EdgeReporting.BaseUrl 和 EdgeReporting.AccessToken，或者显式上传地址。"),
-            UploadProtocol.SonnetDb => throw new InvalidOperationException("SonnetDB 上传需要显式地址。"),
-            _ => throw new NotSupportedException($"上传协议“{uploadProtocol}”需要显式地址。")
+            UploadProtocol.IoTSharp when !string.IsNullOrWhiteSpace(normalizedBaseUrl) && !string.IsNullOrWhiteSpace(accessToken) => normalizedBaseUrl,
+            UploadProtocol.IotSharpDeviceHttp when !string.IsNullOrWhiteSpace(normalizedBaseUrl) && !string.IsNullOrWhiteSpace(accessToken) => normalizedBaseUrl,
+            UploadProtocol.SonnetDb or UploadProtocol.InfluxDb => string.Empty,
+            _ => string.Empty
         };
     }
+
+    private static string ResolveUploadChannelEndpoint(ResolvedUploadTarget uploadTarget, GatewayCollectionTargetType targetType)
+    {
+        if (uploadTarget.Protocol != UploadProtocol.IotSharpDeviceHttp)
+        {
+            return uploadTarget.Endpoint;
+        }
+
+        if (string.IsNullOrWhiteSpace(uploadTarget.Endpoint) ||
+            uploadTarget.Endpoint.Contains("/api/Devices/", StringComparison.OrdinalIgnoreCase))
+        {
+            return uploadTarget.Endpoint;
+        }
+
+        var token = FirstNonEmpty(uploadTarget.Settings, "token", "accessToken", "deviceToken");
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return uploadTarget.Endpoint;
+        }
+
+        var targetKind = targetType == GatewayCollectionTargetType.Attribute ? "Attributes" : "Telemetry";
+        return new Uri(new Uri(uploadTarget.Endpoint.Trim().TrimEnd('/') + "/", UriKind.Absolute), $"api/Devices/{Uri.EscapeDataString(token)}/{targetKind}").ToString();
+    }
+
+    private static string BuildUploadChannelName(string displayName, GatewayCollectionTargetType targetType)
+        => targetType switch
+        {
+            GatewayCollectionTargetType.Telemetry => $"{displayName} 遥测",
+            GatewayCollectionTargetType.Attribute => $"{displayName} 属性",
+            _ => $"{displayName} {targetType}"
+        };
+
+    private static Guid CreateUploadChannelId(Guid edgeNodeId, string targetKey, GatewayCollectionTargetType targetType)
+        => CreateDeterministicGuid(edgeNodeId, "upload-channel", targetKey, targetType.ToString());
+
+    private static string CreateUploadTargetKey(string displayName, UploadProtocol protocol, int index)
+    {
+        var key = NormalizeKey(displayName);
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            key = NormalizeKey(GetUploadProtocolDisplayName(protocol));
+        }
+
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            key = NormalizeKey(protocol.ToString());
+        }
+
+        return string.IsNullOrWhiteSpace(key)
+            ? $"upload-target-{index + 1}"
+            : $"{key}-{index + 1}";
+    }
+
+    private static string GetUploadProtocolDisplayName(UploadProtocol protocol)
+        => protocol switch
+        {
+            UploadProtocol.IoTSharp or UploadProtocol.IotSharpDeviceHttp or UploadProtocol.IotSharpMqtt => "IoTSharp",
+            UploadProtocol.ThingsBoard => "ThingsBoard",
+            UploadProtocol.SonnetDb => "SonnetDB",
+            UploadProtocol.InfluxDb => "InfluxDB",
+            UploadProtocol.Http => "HTTP",
+            _ => protocol.ToString()
+        };
+
+    private sealed record ResolvedUploadTarget(
+        string TargetKey,
+        string DisplayName,
+        UploadProtocol Protocol,
+        string Endpoint,
+        IReadOnlyDictionary<string, string?> Settings,
+        int BatchSize,
+        bool BufferingEnabled,
+        bool Enabled);
 
     private static IEnumerable<PollingTask> BuildPollingTasks(
         Guid edgeNodeId,

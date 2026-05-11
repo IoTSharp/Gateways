@@ -28,9 +28,23 @@ export interface CollectionProtocolDescriptor {
   connectionSettings: ConnectionSettingDefinition[]
 }
 
+export interface UploadProtocolDescriptor {
+  code: string
+  displayName: string
+  category: string
+  description: string
+  lifecycle: string
+  connectionSettings: ConnectionSettingDefinition[]
+}
+
 export interface ProtocolCatalogResponse {
   generatedAtUtc: string
   protocols: CollectionProtocolDescriptor[]
+}
+
+export interface UploadProtocolCatalogResponse {
+  generatedAtUtc: string
+  protocols: UploadProtocolDescriptor[]
 }
 
 export interface LocalConfigurationResponse {
@@ -49,14 +63,20 @@ export interface EdgeCollectionConfiguration {
   updatedAt?: string
   updatedBy?: string
   upload?: CollectionUpload
+  uploads?: CollectionUpload[]
   tasks?: CollectionTask[]
   [key: string]: unknown
 }
 
 export interface CollectionUpload {
+  targetKey?: string
+  displayName?: string
   protocol?: string
   endpoint?: string
   settings?: Record<string, unknown>
+  enabled?: boolean
+  batchSize?: number
+  bufferingEnabled?: boolean
   [key: string]: unknown
 }
 

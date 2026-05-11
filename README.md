@@ -40,7 +40,8 @@ Gateway 侧负责：
 
 - 运行态与配置统计
 - 按协议目录驱动的采集拓扑结构化编辑
-- SonnetDB 上传目标结构化编辑
+- 按上传协议分组的多目标上传编辑
+- IoTSharp、ThingsBoard、SonnetDB、InfluxDB 上传协议页
 - 本地 JSON 高级编辑
 - BASIC 采集脚本查看
 - 运行日志查看
@@ -84,7 +85,9 @@ Gateway 会周期性调用：
 
 - 遥测上报到 `POST /api/Devices/{access_token}/Telemetry`
 - 属性上报到 `POST /api/Devices/{access_token}/Attributes`
+- IoTSharp、ThingsBoard 走 HTTP 上传
 - SonnetDB 写入使用 NuGet 包 `SonnetDB` 提供的 ADO.NET provider
+- InfluxDB 写入支持 v2 bucket 和 v1 database
 
 本地闭环示例默认将 Modbus 模拟设备数据写入 SonnetDB 的 `metrics.edge_modbus`。
 

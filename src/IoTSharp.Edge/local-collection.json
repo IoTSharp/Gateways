@@ -5,6 +5,8 @@
   "updatedAt": "2026-05-11T12:51:41.2115759Z",
   "updatedBy": "LocalEdge",
   "upload": {
+    "targetKey": "sonnetdb-main",
+    "displayName": "SonnetDB \u4E3B\u76EE\u6807",
     "protocol": "SonnetDb",
     "endpoint": "http://sonnetdb:5080",
     "settings": {
@@ -13,8 +15,42 @@
       "measurement": "edge_modbus",
       "field": "value",
       "site": "Docker \u7F16\u6392"
-    }
+    },
+    "enabled": true,
+    "batchSize": 1,
+    "bufferingEnabled": false
   },
+  "uploads": [
+    {
+      "targetKey": "sonnetdb-main",
+      "displayName": "SonnetDB \u4E3B\u76EE\u6807",
+      "protocol": "SonnetDb",
+      "endpoint": "http://sonnetdb:5080",
+      "settings": {
+        "database": "metrics",
+        "token": "sonnetdb-dev-token",
+        "measurement": "edge_modbus",
+        "field": "value",
+        "site": "Docker \u7F16\u6392"
+      },
+      "enabled": true,
+      "batchSize": 1,
+      "bufferingEnabled": false
+    },
+    {
+      "targetKey": "iotsharp-main",
+      "displayName": "IoTSharp \u4E3B\u76EE\u6807",
+      "protocol": "IoTSharp",
+      "endpoint": "http://iotsharp:5000",
+      "settings": {
+        "token": "iotsharp-dev-token",
+        "site": "Docker \u7F16\u6392"
+      },
+      "enabled": false,
+      "batchSize": 1,
+      "bufferingEnabled": false
+    }
+  ],
   "tasks": [
     {
       "id": "0f013f70-50ec-45cf-8d7f-19db4c7a5b19",
