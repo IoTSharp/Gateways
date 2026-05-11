@@ -1,9 +1,9 @@
 {
   "contractVersion": "edge-collection-v1",
   "edgeNodeId": "7c7f8e44-646e-4e75-a31d-8c4e4b4f5f39",
-  "version": 1,
-  "updatedAt": "2026-05-11T10:44:50.0945783Z",
-  "updatedBy": "LocalConfiguration",
+  "version": 2,
+  "updatedAt": "2026-05-11T12:51:41.2115759Z",
+  "updatedBy": "LocalEdge",
   "upload": {
     "protocol": "SonnetDb",
     "endpoint": "http://sonnetdb:5080",
@@ -12,7 +12,7 @@
       "token": "sonnetdb-dev-token",
       "measurement": "edge_modbus",
       "field": "value",
-      "site": "docker-compose"
+      "site": "Docker \u7F16\u6392"
     }
   },
   "tasks": [
@@ -24,7 +24,7 @@
       "edgeNodeId": "7c7f8e44-646e-4e75-a31d-8c4e4b4f5f39",
       "connection": {
         "connectionKey": "device-simulator-modbus",
-        "connectionName": "Device Simulator Modbus TCP",
+        "connectionName": "\u8BBE\u5907\u6A21\u62DF\u5668 Modbus TCP \u8FDE\u63A5",
         "protocol": "Modbus",
         "transport": "tcp",
         "host": "device-simulator",
@@ -33,13 +33,13 @@
         "retryCount": 3,
         "protocolOptions": {
           "endianFormat": "ABCD",
-          "plcAddresses": "true"
+          "plcAddresses": true
         }
       },
       "devices": [
         {
           "deviceKey": "device-simulator-01",
-          "deviceName": "Device Simulator 01",
+          "deviceName": "\u8BBE\u5907\u6A21\u62DF\u5668 01",
           "enabled": true,
           "externalKey": "device-simulator-01",
           "protocolOptions": {
@@ -48,7 +48,7 @@
           "points": [
             {
               "pointKey": "temperature",
-              "pointName": "Temperature",
+              "pointName": "\u6E29\u5EA6",
               "sourceType": "HoldingRegister",
               "address": "40001",
               "rawValueType": "Float",
@@ -62,14 +62,14 @@
                 "targetType": "Telemetry",
                 "targetName": "temperature",
                 "valueType": "Double",
-                "displayName": "Temperature",
-                "unit": "C"
+                "displayName": "\u6E29\u5EA6",
+                "unit": "\u2103"
               },
               "protocolOptions": {}
             },
             {
               "pointKey": "pressure",
-              "pointName": "Pressure",
+              "pointName": "\u538B\u529B",
               "sourceType": "HoldingRegister",
               "address": "40003",
               "rawValueType": "Float",
@@ -83,14 +83,14 @@
                 "targetType": "Telemetry",
                 "targetName": "pressure",
                 "valueType": "Double",
-                "displayName": "Pressure",
+                "displayName": "\u538B\u529B",
                 "unit": "bar"
               },
               "protocolOptions": {}
             },
             {
               "pointKey": "motorRpm",
-              "pointName": "Motor RPM",
+              "pointName": "\u7535\u673A\u8F6C\u901F",
               "sourceType": "HoldingRegister",
               "address": "40005",
               "rawValueType": "Int16",
@@ -104,12 +104,49 @@
                 "targetType": "Telemetry",
                 "targetName": "motorRpm",
                 "valueType": "Int32",
-                "displayName": "Motor RPM",
-                "unit": "rpm"
+                "displayName": "\u7535\u673A\u8F6C\u901F",
+                "unit": "\u8F6C/\u5206"
               },
               "protocolOptions": {}
             }
           ]
+        }
+      ],
+      "reportPolicy": {
+        "defaultTrigger": "Always",
+        "includeQuality": true,
+        "includeTimestamp": true
+      }
+    },
+    {
+      "id": "add8e121-dc15-4278-b4aa-592f6a619f1d",
+      "taskKey": "siemenss7-collector",
+      "protocol": "SiemensS7",
+      "version": 1,
+      "edgeNodeId": "7c7f8e44-646e-4e75-a31d-8c4e4b4f5f39",
+      "connection": {
+        "connectionKey": "siemenss7-collector-connection",
+        "connectionName": "Siemens S7 \u8FDE\u63A5",
+        "protocol": "SiemensS7",
+        "transport": "",
+        "host": "127.0.0.1",
+        "port": 102,
+        "timeoutMs": 3000,
+        "retryCount": 3,
+        "protocolOptions": {
+          "model": "None",
+          "rack": 0,
+          "slot": 1
+        }
+      },
+      "devices": [
+        {
+          "deviceKey": "siemenss7-01",
+          "deviceName": "Siemens S7 \u8BBE\u5907 01",
+          "enabled": true,
+          "externalKey": "siemenss7-01",
+          "protocolOptions": {},
+          "points": []
         }
       ],
       "reportPolicy": {

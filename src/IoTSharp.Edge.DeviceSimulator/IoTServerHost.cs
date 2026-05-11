@@ -132,7 +132,7 @@ public sealed class ModbusValueWriter : BackgroundService
                 _state.Update(temperature, pressure, motorRpm);
 
                 _logger.LogInformation(
-                    "Wrote IoTServer Modbus values: temperature={Temperature:F2}, pressure={Pressure:F2}, motorRpm={MotorRpm}.",
+                    "已写入 IoTServer Modbus 数值：温度={Temperature:F2}，压力={Pressure:F2}，电机转速={MotorRpm}。",
                     temperature,
                     pressure,
                     motorRpm);

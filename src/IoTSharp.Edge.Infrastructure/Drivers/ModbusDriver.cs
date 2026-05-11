@@ -5,25 +5,25 @@ internal sealed class ModbusDriver : DeviceDriverBase
     public override DriverMetadata Metadata { get; } = new(
         "modbus",
         DriverType.Modbus,
-        "Modbus",
-        "Supports Modbus TCP, RTU over TCP, serial RTU, and serial ASCII through a unified driver contract.",
+        "Modbus 协议",
+        "通过统一驱动契约支持 Modbus TCP、RTU over TCP、串口 RTU 和串口 ASCII。",
         true,
         true,
         true,
         true,
         new[]
         {
-            new ConnectionSettingDefinition("transport", "Transport", "select", true, "tcp, rtuOverTcp, serialRtu, or serialAscii.", new[] { "tcp", "rtuOverTcp", "serialRtu", "serialAscii" }),
-            new ConnectionSettingDefinition("host", "Host", "text", false, "PLC host name or IP for TCP transports."),
-            new ConnectionSettingDefinition("port", "Port", "number", false, "PLC TCP port, usually 502."),
-            new ConnectionSettingDefinition("serialPort", "Serial Port", "text", false, "Serial port for Modbus RTU/ASCII, for example COM3 or /dev/ttyUSB0."),
-            new ConnectionSettingDefinition("baudRate", "Baud Rate", "number", false, "Serial baud rate, usually 9600."),
-            new ConnectionSettingDefinition("dataBits", "Data Bits", "number", false, "Serial data bits, usually 8."),
-            new ConnectionSettingDefinition("parity", "Parity", "select", false, "Serial parity.", new[] { "None", "Odd", "Even", "Mark", "Space" }),
-            new ConnectionSettingDefinition("stopBits", "Stop Bits", "select", false, "Serial stop bits.", new[] { "One", "OnePointFive", "Two" }),
-            new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "Timeout in milliseconds."),
-            new ConnectionSettingDefinition("endianFormat", "Endian", "select", false, "Word/byte order.", Enum.GetNames<EndianFormat>()),
-            new ConnectionSettingDefinition("plcAddresses", "PLC Addresses", "boolean", false, "Treat addresses as PLC-style addresses.")
+            new ConnectionSettingDefinition("transport", "传输方式", "select", true, "可选 tcp、rtuOverTcp、serialRtu 或 serialAscii。", new[] { "tcp", "rtuOverTcp", "serialRtu", "serialAscii" }),
+            new ConnectionSettingDefinition("host", "主机", "text", false, "TCP 连接使用的 PLC 主机名或 IP 地址。"),
+            new ConnectionSettingDefinition("port", "端口", "number", false, "PLC TCP 端口，通常为 502。"),
+            new ConnectionSettingDefinition("serialPort", "串口", "text", false, "Modbus RTU/ASCII 使用的串口，例如 COM3 或 /dev/ttyUSB0。"),
+            new ConnectionSettingDefinition("baudRate", "波特率", "number", false, "串口波特率，通常为 9600。"),
+            new ConnectionSettingDefinition("dataBits", "数据位", "number", false, "串口数据位，通常为 8。"),
+            new ConnectionSettingDefinition("parity", "校验位", "select", false, "串口校验方式。", new[] { "None", "Odd", "Even", "Mark", "Space" }),
+            new ConnectionSettingDefinition("stopBits", "停止位", "select", false, "串口停止位。", new[] { "One", "OnePointFive", "Two" }),
+            new ConnectionSettingDefinition("timeout", "超时", "number", false, "超时时间，单位毫秒。"),
+            new ConnectionSettingDefinition("endianFormat", "字节序", "select", false, "字和字节的顺序。", Enum.GetNames<EndianFormat>()),
+            new ConnectionSettingDefinition("plcAddresses", "按 PLC 地址", "boolean", false, "将地址按 PLC 风格地址处理。")
         });
 
     public override Task<ConnectionTestResult> TestConnectionAsync(DriverConnectionContext context, CancellationToken cancellationToken)
@@ -70,7 +70,7 @@ internal sealed class ModbusDriver : DeviceDriverBase
                 GatewayDataType.UInt64 => ToReadResult(request.Address, client.ReadUInt64(request.Address, station, functionCode)),
                 GatewayDataType.Float => ToReadResult(request.Address, client.ReadFloat(request.Address, station, functionCode)),
                 GatewayDataType.Double => ToReadResult(request.Address, client.ReadDouble(request.Address, station, functionCode)),
-                _ => new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"Unsupported Modbus data type '{request.DataType}'.")
+                _ => new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"不支持的 Modbus 数据类型“{request.DataType}”。")
             };
 
             return Task.FromResult(result);
@@ -101,7 +101,7 @@ internal sealed class ModbusDriver : DeviceDriverBase
                 GatewayDataType.Float => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToSingle(request.Value), station, functionCode)),
                 GatewayDataType.Double => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToDouble(request.Value), station, functionCode)),
                 GatewayDataType.String => ToWriteResult(request.Address, request.Value, client.Write(request.Address, ResolveEncoding(settings).GetBytes(Convert.ToString(request.Value) ?? string.Empty), station, functionCode, true)),
-                _ => new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, $"Unsupported Modbus data type '{request.DataType}'.")
+                _ => new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, $"不支持的 Modbus 数据类型“{request.DataType}”。")
             };
 
             return Task.FromResult(result);
@@ -141,7 +141,7 @@ internal sealed class ModbusDriver : DeviceDriverBase
                 IntAny(settings, 8, "dataBits"),
                 endian,
                 plcAddresses),
-            _ => throw new NotSupportedException($"Modbus transport '{transport}' is not supported yet.")
+            _ => throw new NotSupportedException($"暂不支持的 Modbus 传输方式“{transport}”。")
         };
     }
 
@@ -153,14 +153,14 @@ internal sealed class ModbusDriver : DeviceDriverBase
             "rtuovertcp" or "rtutcp" or "modbusrtuovertcp" => "rtuOverTcp",
             "serialrtu" or "rtu" or "modbusrtu" or "rs485" or "rs232" or "serial" or "serialdtu" or "dtu" => "serialRtu",
             "serialascii" or "ascii" or "modbusascii" => "serialAscii",
-            var value => throw new NotSupportedException($"Modbus transport '{transport}' is not supported yet.")
+            var value => throw new NotSupportedException($"暂不支持的 Modbus 传输方式“{transport}”。")
         };
     }
 
     private static string RequiredAny(IReadOnlyDictionary<string, string?> values, params string[] keys)
         => GetAny(values, keys) is { Length: > 0 } value
             ? value
-            : throw new InvalidOperationException($"One of connection settings '{string.Join("', '", keys)}' is required.");
+            : throw new InvalidOperationException($"必须提供以下连接参数之一：{string.Join("、", keys)}。");
 
     private static string? GetAny(IReadOnlyDictionary<string, string?> values, params string[] keys)
     {
@@ -203,7 +203,7 @@ internal sealed class ModbusDriver : DeviceDriverBase
             "3" or "m" or "mark" => Parity.Mark,
             "4" or "s" or "space" => Parity.Space,
             _ when Enum.TryParse<Parity>(value, true, out var parity) => parity,
-            _ => throw new InvalidOperationException("Modbus serial parity must be None, Odd, Even, Mark, or Space.")
+            _ => throw new InvalidOperationException("Modbus 串口校验位必须是无校验、奇校验、偶校验、标记校验或空格校验。")
         };
     }
 
@@ -222,7 +222,7 @@ internal sealed class ModbusDriver : DeviceDriverBase
             _ when double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) && Math.Abs(parsed - 1.0d) < 0.0000000001d => StopBits.One,
             _ when double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) && Math.Abs(parsed - 1.5d) < 0.0000000001d => StopBits.OnePointFive,
             _ when double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) && Math.Abs(parsed - 2.0d) < 0.0000000001d => StopBits.Two,
-            _ => throw new InvalidOperationException("Modbus serial stop bits must be One, OnePointFive, Two, 1, 1.5, or 2.")
+            _ => throw new InvalidOperationException("Modbus 串口停止位必须是 1 位、1.5 位、2 位、1、1.5 或 2。")
         };
     }
 

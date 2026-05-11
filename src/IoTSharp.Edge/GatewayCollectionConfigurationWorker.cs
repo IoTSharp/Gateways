@@ -59,7 +59,7 @@ internal sealed class GatewayCollectionConfigurationWorker : BackgroundService
             {
                 var options = _optionsMonitor.CurrentValue;
                 _syncState.MarkError(exception.Message, NormalizeBaseUrlOrNull(options.BaseUrl), !string.IsNullOrWhiteSpace(options.AccessToken));
-                _logger.LogError(exception, "Gateway collection configuration sync failed.");
+                _logger.LogError(exception, "网关采集配置同步失败。");
                 delay = RetryDelay(options);
             }
 
@@ -84,7 +84,7 @@ internal sealed class GatewayCollectionConfigurationWorker : BackgroundService
 
         if (string.IsNullOrWhiteSpace(normalizedBaseUrl) || !hasAccessToken)
         {
-            _syncState.MarkWaitingBootstrap("Bootstrap config must provide EdgeReporting.BaseUrl and EdgeReporting.AccessToken before collection sync can start.", normalizedBaseUrl, hasAccessToken);
+            _syncState.MarkWaitingBootstrap("在采集同步启动前，Bootstrap 配置必须提供 EdgeReporting.BaseUrl 和 EdgeReporting.AccessToken。", normalizedBaseUrl, hasAccessToken);
             return RetryDelay(options);
         }
 
@@ -104,7 +104,7 @@ internal sealed class GatewayCollectionConfigurationWorker : BackgroundService
             applied = true;
 
             _logger.LogInformation(
-                "Applied collection configuration version {Version} for edge node {EdgeNodeId} with {TaskCount} task(s).",
+                "已应用采集配置版本 {Version}，边缘节点 {EdgeNodeId}，共 {TaskCount} 个任务。",
                 configuration.Version,
                 configuration.EdgeNodeId,
                 configuration.Tasks?.Count ?? 0);
@@ -125,12 +125,12 @@ internal sealed class GatewayCollectionConfigurationWorker : BackgroundService
         var apiResult = await response.Content.ReadFromJsonAsync<EdgeApiResult<EdgeCollectionConfigurationContract>>(JsonOptions, cancellationToken);
         if (apiResult is null)
         {
-            throw new InvalidOperationException("IoTSharp returned an empty collection configuration response.");
+            throw new InvalidOperationException("IoTSharp 返回了空的采集配置响应。");
         }
 
         if (apiResult.Code != ApiSuccessCode)
         {
-            throw new InvalidOperationException($"IoTSharp collection configuration pull failed with code {apiResult.Code}: {apiResult.Msg}");
+            throw new InvalidOperationException($"IoTSharp 采集配置拉取失败，代码 {apiResult.Code}：{apiResult.Msg}");
         }
 
         return apiResult.Data ?? new EdgeCollectionConfigurationContract();
@@ -144,7 +144,7 @@ internal sealed class GatewayCollectionConfigurationWorker : BackgroundService
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Failed to cache upstream collection configuration locally.");
+            _logger.LogWarning(exception, "缓存上游采集配置到本地失败。");
         }
     }
 

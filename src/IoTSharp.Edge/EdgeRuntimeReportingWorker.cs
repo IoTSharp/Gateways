@@ -99,7 +99,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
                 _registrationPending = true;
                 _capabilitiesPending = true;
                 delay = RetryDelay(_optionsMonitor.CurrentValue);
-                _logger.LogError(exception, "IoTSharp Edge reporting iteration failed.");
+                _logger.LogError(exception, "IoTSharp Edge 上报迭代失败。");
             }
 
             if (delay > TimeSpan.Zero)
@@ -129,7 +129,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
         {
             if (!_reportingDisabledLogged)
             {
-                _logger.LogInformation("IoTSharp Edge reporting is disabled.");
+                _logger.LogInformation("IoTSharp Edge 上报已禁用。");
                 _reportingDisabledLogged = true;
             }
 
@@ -149,7 +149,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             if (!_missingConfigurationLogged)
             {
                 _missingConfigurationLogged = true;
-                _logger.LogWarning("IoTSharp Edge reporting skipped because base URL or access token is not configured.");
+                _logger.LogWarning("IoTSharp Edge 上报已跳过，因为基础地址或访问令牌未配置。");
             }
             _registrationPending = true;
             _capabilitiesPending = true;
@@ -183,7 +183,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             _registrationPending = false;
             _capabilitiesPending = true;
             _lastRegistrationSignature = registrationSignature;
-            _logger.LogInformation("Registered Gateway runtime to IoTSharp Edge with instance {InstanceId}.", snapshot.Registration.InstanceId);
+            _logger.LogInformation("已向 IoTSharp Edge 注册网关运行时，实例 {InstanceId}。", snapshot.Registration.InstanceId);
         }
 
         if (_capabilitiesPending)
@@ -191,14 +191,14 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             await PostAsync(edgeTarget, "Capabilities", capabilities, cancellationToken);
             _capabilitiesPending = false;
             _lastCapabilitiesSignature = capabilitiesSignature;
-            _logger.LogInformation("Reported Gateway capabilities to IoTSharp Edge.");
+            _logger.LogInformation("已向 IoTSharp Edge 上报网关能力。");
         }
 
         if (!_lastHeartbeatAt.HasValue || DateTimeOffset.UtcNow - _lastHeartbeatAt.Value >= HeartbeatInterval(options))
         {
             await PostAsync(edgeTarget, "Heartbeat", snapshot.Heartbeat, cancellationToken);
             _lastHeartbeatAt = DateTimeOffset.UtcNow;
-            _logger.LogDebug("Sent Gateway heartbeat to IoTSharp Edge.");
+            _logger.LogDebug("已向 IoTSharp Edge 发送网关心跳。");
         }
 
         await EnqueuePendingDispatchesAsync(edgeTarget, cancellationToken);
@@ -243,7 +243,7 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
                 var deviceId = ResolveDeviceId(request.Address.TargetKey);
                 if (deviceId == Guid.Empty)
                 {
-                    await _receiptReporter.ReportCompletedAsync(edgeTarget.BaseUrl, Guid.Empty, runtimeType, snapshot.Registration.InstanceId, request.TaskId, "Failed", "Gateway worker failed to resolve device id from dispatch target.", null, cancellationToken);
+                    await _receiptReporter.ReportCompletedAsync(edgeTarget.BaseUrl, Guid.Empty, runtimeType, snapshot.Registration.InstanceId, request.TaskId, "Failed", "网关工作线程无法从下发目标解析设备 ID。", null, cancellationToken);
                     continue;
                 }
 
@@ -288,13 +288,13 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
     {
         return request.TaskType switch
         {
-            "HealthProbe" => new DispatchExecutionResult("Gateway runtime health probe completed.", new Dictionary<string, object>
+            "HealthProbe" => new DispatchExecutionResult("网关运行时健康探测已完成。", new Dictionary<string, object>
             {
                 ["checkedAtUtc"] = DateTime.UtcNow,
                 ["taskType"] = request.TaskType
             }),
             "ConfigPush" => await ExecuteConfigPushAsync(runtimeService, request, deviceId, points, cancellationToken),
-            _ => throw new InvalidOperationException($"Unsupported task type: {request.TaskType}")
+            _ => throw new InvalidOperationException($"不支持的任务类型：{request.TaskType}")
         };
     }
 
@@ -307,16 +307,16 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
     {
         if (request.Payload is null || !request.Payload.TryGetValue("pointId", out var pointIdText) || !Guid.TryParse(pointIdText?.ToString(), out var pointId))
         {
-            throw new InvalidOperationException("ConfigPush requires payload.pointId.");
+            throw new InvalidOperationException("配置下发任务需要 payload.pointId。");
         }
 
         var point = points.FirstOrDefault(item => item.Id == pointId && item.DeviceId == deviceId)
-            ?? throw new InvalidOperationException($"Point '{pointId}' was not found on device '{deviceId}'.");
+            ?? throw new InvalidOperationException($"设备“{deviceId}”上未找到点位“{pointId}”。");
 
         request.Payload.TryGetValue("value", out var value);
         var writeResult = await runtimeService.ExecutePointWriteAsync(deviceId, point.Id, value, cancellationToken);
         return new DispatchExecutionResult(
-            writeResult.Quality == QualityStatus.Good ? "Config push completed." : "Config push finished with degraded quality.",
+            writeResult.Quality == QualityStatus.Good ? "配置下发已完成。" : "配置下发已完成，但质量降级。",
             new Dictionary<string, object>
             {
                 ["pointId"] = point.Id,
@@ -343,12 +343,12 @@ public sealed class EdgeRuntimeReportingWorker : BackgroundService
             var apiResult = await response.Content.ReadFromJsonAsync<EdgeApiResult>(JsonOptions, cancellationToken);
             if (apiResult is null)
             {
-                throw new InvalidOperationException($"IoTSharp Edge {action} returned an empty response.");
+                throw new InvalidOperationException($"IoTSharp Edge {action} 返回了空响应。");
             }
 
             if (apiResult.Code != ApiSuccessCode)
             {
-                throw new InvalidOperationException($"IoTSharp Edge {action} failed with code {apiResult.Code}: {apiResult.Msg}");
+                throw new InvalidOperationException($"IoTSharp Edge {action} 失败，代码 {apiResult.Code}：{apiResult.Msg}");
             }
         }
         catch (Exception)

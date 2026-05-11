@@ -9,7 +9,7 @@ internal abstract class DeviceDriverBase : IDeviceDriver
 
     public virtual Task<AddressValidationResult> ValidateAddressAsync(DriverReadRequest request, CancellationToken cancellationToken)
         => Task.FromResult(string.IsNullOrWhiteSpace(request.Address)
-            ? new AddressValidationResult(false, "Address is required.")
+            ? new AddressValidationResult(false, "地址为必填项。")
             : new AddressValidationResult(true));
 
     public abstract Task<DriverReadResult> ReadAsync(DriverConnectionContext context, DriverReadRequest request, CancellationToken cancellationToken);
@@ -40,7 +40,7 @@ internal abstract class DeviceDriverBase : IDeviceDriver
     protected static string Required(IReadOnlyDictionary<string, string?> values, string key)
         => values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
             ? value
-            : throw new InvalidOperationException($"Connection setting '{key}' is required.");
+            : throw new InvalidOperationException($"连接参数“{key}”为必填项。");
 
     protected static int Int(IReadOnlyDictionary<string, string?> values, string key, int defaultValue)
         => values.TryGetValue(key, out var value) && int.TryParse(value, out var parsed)
@@ -108,8 +108,8 @@ public sealed class DeviceDriverRegistry : IDeviceDriverRegistry
 
     public IReadOnlyCollection<DriverMetadata> GetMetadata() => _drivers.Values.Select(x => x.Metadata).OrderBy(x => x.DisplayName).ToArray();
 
-    public IDeviceDriver GetRequiredDriver(string code)
+        public IDeviceDriver GetRequiredDriver(string code)
         => _drivers.TryGetValue(code, out var driver)
             ? driver
-            : throw new KeyNotFoundException($"Driver '{code}' is not registered.");
+            : throw new KeyNotFoundException($"驱动“{code}”未注册。");
 }

@@ -143,28 +143,28 @@ internal static class PlcBuiltInFunctions
             runtime,
             runtime.SiemensState,
             "SIEMENS",
-            "Siemens",
+            "西门子",
             args => runtime.PlcClientFactory.OpenSiemens(ParseSiemensOptions(args)));
 
         RegisterProtocol(
             runtime,
             runtime.MitsubishiState,
             "MITSUBISHI",
-            "Mitsubishi",
+            "三菱",
             args => runtime.PlcClientFactory.OpenMitsubishi(ParseMitsubishiOptions(args)));
 
         RegisterProtocol(
             runtime,
             runtime.OmronFinsState,
             "OMRON_FINS",
-            "Omron FINS",
+            "欧姆龙 FINS",
             args => runtime.PlcClientFactory.OpenOmronFins(ParseOmronFinsOptions(args)));
 
         RegisterProtocol(
             runtime,
             runtime.AllenBradleyState,
             "ALLEN_BRADLEY",
-            "Allen-Bradley",
+            "艾伦-布拉德利",
             args => runtime.PlcClientFactory.OpenAllenBradley(ParseAllenBradleyOptions(args)));
     }
 
@@ -207,7 +207,7 @@ internal static class PlcBuiltInFunctions
             if (!opened.Success)
             {
                 session.Dispose();
-                return Fail(state, $"{protocolName} connect failed: {opened.Error ?? "Unknown error"}", BasicValue.FromNumber(0));
+                return Fail(state, $"{protocolName}连接失败：{opened.Error ?? "未知错误"}", BasicValue.FromNumber(0));
             }
 
             var handle = state.Add(session);
@@ -216,7 +216,7 @@ internal static class PlcBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"{protocolName} connect failed: {Unwrap(ex).Message}", BasicValue.FromNumber(0));
+            return Fail(state, $"{protocolName}连接失败：{Unwrap(ex).Message}", BasicValue.FromNumber(0));
         }
     }
 
@@ -233,7 +233,7 @@ internal static class PlcBuiltInFunctions
             var result = session.Close();
             if (!result.Success)
             {
-                return Fail(state, $"{protocolName} close failed: {result.Error ?? "Unknown error"}", BasicValue.FromBoolean(false), session);
+                return Fail(state, $"{protocolName}关闭失败：{result.Error ?? "未知错误"}", BasicValue.FromBoolean(false), session);
             }
 
             state.ClearLastError();
@@ -241,7 +241,7 @@ internal static class PlcBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"{protocolName} close failed: {Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
+            return Fail(state, $"{protocolName}关闭失败：{Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
         }
     }
 
@@ -249,7 +249,7 @@ internal static class PlcBuiltInFunctions
     {
         if (!TryGetSession(state, args, 0, out var session, out _))
         {
-            return Fail(state, $"{protocolName} handle not found.", BasicValue.FromBoolean(false));
+            return Fail(state, $"未找到{protocolName}句柄。", BasicValue.FromBoolean(false));
         }
 
         try
@@ -259,7 +259,7 @@ internal static class PlcBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"{protocolName} connected check failed: {Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
+            return Fail(state, $"{protocolName}连接状态检查失败：{Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
         }
     }
 
@@ -267,7 +267,7 @@ internal static class PlcBuiltInFunctions
     {
         if (!TryGetSession(state, args, 0, out var session, out _))
         {
-            return Fail(state, $"{protocolName} handle not found.", BasicValue.FromString(string.Empty));
+            return Fail(state, $"未找到{protocolName}句柄。", BasicValue.FromString(string.Empty));
         }
 
         try
@@ -277,7 +277,7 @@ internal static class PlcBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"{protocolName} version failed: {Unwrap(ex).Message}", BasicValue.FromString(string.Empty), session);
+            return Fail(state, $"{protocolName}版本读取失败：{Unwrap(ex).Message}", BasicValue.FromString(string.Empty), session);
         }
     }
 
@@ -313,7 +313,7 @@ internal static class PlcBuiltInFunctions
             var result = session.Read(request);
             if (!result.Success)
             {
-                return Fail(state, $"{protocolName} read failed: {result.Error ?? "Unknown error"}", BasicValue.Nil, session);
+                return Fail(state, $"{protocolName}读取失败：{result.Error ?? "未知错误"}", BasicValue.Nil, session);
             }
 
             state.ClearLastError();
@@ -321,7 +321,7 @@ internal static class PlcBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"{protocolName} read failed: {Unwrap(ex).Message}", BasicValue.Nil, session);
+            return Fail(state, $"{protocolName}读取失败：{Unwrap(ex).Message}", BasicValue.Nil, session);
         }
     }
 
@@ -343,7 +343,7 @@ internal static class PlcBuiltInFunctions
             var result = session.Write(request);
             if (!result.Success)
             {
-                return Fail(state, $"{protocolName} write failed: {result.Error ?? "Unknown error"}", BasicValue.FromBoolean(false), session);
+                return Fail(state, $"{protocolName}写入失败：{result.Error ?? "未知错误"}", BasicValue.FromBoolean(false), session);
             }
 
             state.ClearLastError();
@@ -351,7 +351,7 @@ internal static class PlcBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"{protocolName} write failed: {Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
+            return Fail(state, $"{protocolName}写入失败：{Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
         }
     }
 
@@ -368,7 +368,7 @@ internal static class PlcBuiltInFunctions
             var result = session.BatchRead(request);
             if (!result.Success)
             {
-                return Fail(state, $"{protocolName} batch read failed: {result.Error ?? "Unknown error"}", BasicValue.Nil, session);
+                return Fail(state, $"{protocolName}批量读取失败：{result.Error ?? "未知错误"}", BasicValue.Nil, session);
             }
 
             state.ClearLastError();
@@ -376,7 +376,7 @@ internal static class PlcBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"{protocolName} batch read failed: {Unwrap(ex).Message}", BasicValue.Nil, session);
+            return Fail(state, $"{protocolName}批量读取失败：{Unwrap(ex).Message}", BasicValue.Nil, session);
         }
     }
 
@@ -393,7 +393,7 @@ internal static class PlcBuiltInFunctions
             var result = session.BatchWrite(request);
             if (!result.Success)
             {
-                return Fail(state, $"{protocolName} batch write failed: {result.Error ?? "Unknown error"}", BasicValue.FromBoolean(false), session);
+                return Fail(state, $"{protocolName}批量写入失败：{result.Error ?? "未知错误"}", BasicValue.FromBoolean(false), session);
             }
 
             state.ClearLastError();
@@ -401,7 +401,7 @@ internal static class PlcBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"{protocolName} batch write failed: {Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
+            return Fail(state, $"{protocolName}批量写入失败：{Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
         }
     }
 
@@ -419,7 +419,7 @@ internal static class PlcBuiltInFunctions
             var result = session.SendPackage(command);
             if (!result.Success)
             {
-                return Fail(state, $"{protocolName} send package failed: {result.Error ?? "Unknown error"}", BasicValue.Nil, session);
+                return Fail(state, $"{protocolName}发送数据包失败：{result.Error ?? "未知错误"}", BasicValue.Nil, session);
             }
 
             state.ClearLastError();
@@ -427,14 +427,14 @@ internal static class PlcBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"{protocolName} send package failed: {Unwrap(ex).Message}", BasicValue.Nil, session);
+            return Fail(state, $"{protocolName}发送数据包失败：{Unwrap(ex).Message}", BasicValue.Nil, session);
         }
     }
 
     private static BasicPlcReadRequest CreateReadRequest(IReadOnlyList<BasicValue> args, DataTypeEnum? fixedDataType, bool generic)
     {
-        var address = RequiredText(args, 1, "PLC address is required.");
-        var dataType = fixedDataType ?? ParseDataType(RequiredText(args, 2, "PLC data type is required."));
+        var address = RequiredText(args, 1, "需要 PLC 地址。");
+        var dataType = fixedDataType ?? ParseDataType(RequiredText(args, 2, "需要 PLC 数据类型。"));
         var countIndex = generic ? 3 : 2;
         var encodingIndex = generic ? 4 : 3;
 
@@ -443,8 +443,8 @@ internal static class PlcBuiltInFunctions
 
     private static BasicPlcWriteRequest CreateWriteRequest(IReadOnlyList<BasicValue> args, DataTypeEnum? fixedDataType, bool generic)
     {
-        var address = RequiredText(args, 1, "PLC address is required.");
-        var dataType = fixedDataType ?? ParseDataType(RequiredText(args, 2, "PLC data type is required."));
+        var address = RequiredText(args, 1, "需要 PLC 地址。");
+        var dataType = fixedDataType ?? ParseDataType(RequiredText(args, 2, "需要 PLC 数据类型。"));
         var valueIndex = generic ? 3 : 2;
         var encodingIndex = generic ? 4 : 3;
 
@@ -453,7 +453,7 @@ internal static class PlcBuiltInFunctions
 
     private static IReadOnlyDictionary<string, DataTypeEnum> CreateBatchReadMap(BasicValue value)
     {
-        var dictionary = ExpectDictionary(value, "PLC batch read expects a DICT of address -> data type.");
+        var dictionary = ExpectDictionary(value, "PLC 批量读取需要地址到数据类型的字典。");
         var map = new Dictionary<string, DataTypeEnum>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in dictionary.Keys)
         {
@@ -465,7 +465,7 @@ internal static class PlcBuiltInFunctions
 
     private static IReadOnlyDictionary<string, object?> CreateBatchWriteMap(BasicValue value)
     {
-        var dictionary = ExpectDictionary(value, "PLC batch write expects a DICT of address -> value.");
+        var dictionary = ExpectDictionary(value, "PLC 批量写入需要地址到值的字典。");
         var map = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in dictionary.Keys)
         {
@@ -478,7 +478,7 @@ internal static class PlcBuiltInFunctions
     private static BasicSiemensConnectionOptions ParseSiemensOptions(IReadOnlyList<BasicValue> args)
         => new()
         {
-            Host = RequiredText(args, 0, "Siemens host is required.").Trim(),
+            Host = RequiredText(args, 0, "需要西门子主机。").Trim(),
             Port = OptionalInt(args, 1, 102),
             Version = ParseEnum(args, 2, SiemensVersion.S7_1200),
             Rack = OptionalByte(args, 3, 0),
@@ -489,7 +489,7 @@ internal static class PlcBuiltInFunctions
     private static BasicMitsubishiConnectionOptions ParseMitsubishiOptions(IReadOnlyList<BasicValue> args)
         => new()
         {
-            Host = RequiredText(args, 0, "Mitsubishi host is required.").Trim(),
+            Host = RequiredText(args, 0, "需要三菱主机。").Trim(),
             Port = OptionalInt(args, 1, 6_000),
             Version = ParseEnum(args, 2, MitsubishiVersion.Qna_3E),
             TimeoutMs = OptionalInt(args, 3, 1_500)
@@ -498,7 +498,7 @@ internal static class PlcBuiltInFunctions
     private static BasicOmronFinsConnectionOptions ParseOmronFinsOptions(IReadOnlyList<BasicValue> args)
         => new()
         {
-            Host = RequiredText(args, 0, "Omron FINS host is required.").Trim(),
+            Host = RequiredText(args, 0, "需要欧姆龙 FINS 主机。").Trim(),
             Port = OptionalInt(args, 1, 9_600),
             TimeoutMs = OptionalInt(args, 2, 1_500),
             EndianFormat = ParseEnum(args, 3, EndianFormat.ABCD)
@@ -507,7 +507,7 @@ internal static class PlcBuiltInFunctions
     private static BasicAllenBradleyConnectionOptions ParseAllenBradleyOptions(IReadOnlyList<BasicValue> args)
         => new()
         {
-            Host = RequiredText(args, 0, "Allen-Bradley host is required.").Trim(),
+            Host = RequiredText(args, 0, "需要艾伦-布拉德利主机。").Trim(),
             Port = OptionalInt(args, 1, 44_818),
             Slot = OptionalByte(args, 2, 0),
             TimeoutMs = OptionalInt(args, 3, 1_500)
@@ -542,7 +542,7 @@ internal static class PlcBuiltInFunctions
             "string" or "text" => DataTypeEnum.String,
             _ when Enum.TryParse<DataTypeEnum>(value, true, out var parsed) && Enum.IsDefined(typeof(DataTypeEnum), parsed) => parsed,
             _ when int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var raw) && Enum.IsDefined(typeof(DataTypeEnum), raw) => (DataTypeEnum)raw,
-            _ => throw new BasicRuntimeException($"Unsupported PLC data type '{value}'.")
+            _ => throw new BasicRuntimeException($"不支持的 PLC 数据类型“{value}”。")
         };
     }
 
@@ -561,7 +561,7 @@ internal static class PlcBuiltInFunctions
             DataTypeEnum.Float => (float)value.AsNumber(),
             DataTypeEnum.Double => value.AsNumber(),
             DataTypeEnum.String => value.AsString(),
-            _ => throw new BasicRuntimeException($"Unsupported PLC data type '{dataType}'.")
+            _ => throw new BasicRuntimeException($"不支持的 PLC 数据类型“{dataType}”。")
         };
     }
 
@@ -710,7 +710,7 @@ internal static class PlcBuiltInFunctions
         }
         catch (Exception ex)
         {
-            throw new BasicRuntimeException($"Encoding '{name}' is not supported: {ex.Message}");
+            throw new BasicRuntimeException($"编码“{name}”不受支持：{ex.Message}");
         }
     }
 
@@ -733,7 +733,7 @@ internal static class PlcBuiltInFunctions
             return (TEnum)Enum.ToObject(typeof(TEnum), numeric);
         }
 
-        throw new BasicRuntimeException($"Value '{value}' is not a supported {typeof(TEnum).Name}.");
+        throw new BasicRuntimeException($"值“{value}”不是受支持的 {typeof(TEnum).Name}。");
     }
 
     private static BasicDictionary ExpectDictionary(BasicValue value, string message)
@@ -868,13 +868,13 @@ internal static class PlcBuiltInFunctions
 
         if (!TryGetHandle(args, index, out handle))
         {
-            state.SetLastError("PLC handle is required.");
+            state.SetLastError("需要 PLC 句柄。");
             return false;
         }
 
         if (!state.TryGet(handle, out session))
         {
-            state.SetLastError("PLC handle not found.");
+            state.SetLastError("未找到 PLC 句柄。");
             return false;
         }
 
@@ -1010,7 +1010,7 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
         }
         catch (Exception ex)
         {
-            return FailOperation($"PLC open failed: {Unwrap(ex).Message}");
+            return FailOperation($"PLC 打开失败：{Unwrap(ex).Message}");
         }
     }
 
@@ -1026,7 +1026,7 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
             var result = Client.Close();
             if (!result.IsSucceed)
             {
-                return FailOperation($"PLC close failed: {result.Err ?? "Unknown error"}");
+                return FailOperation($"PLC 关闭失败：{result.Err ?? "未知错误"}");
             }
 
             ClearLastError();
@@ -1034,7 +1034,7 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
         }
         catch (Exception ex)
         {
-            return FailOperation($"PLC close failed: {Unwrap(ex).Message}");
+            return FailOperation($"PLC 关闭失败：{Unwrap(ex).Message}");
         }
         finally
         {
@@ -1049,12 +1049,12 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
             EnsureActive();
             if (request.Count > 1)
             {
-                return FailRead("Multi-read count is not supported by this client. Use BATCH_READ instead.");
+                return FailRead("当前客户端不支持多点读取数量，请使用 BATCH_READ。");
             }
 
             if (request.DataType == DataTypeEnum.String && request.Count > 0)
             {
-                return FailRead("String length reads are not supported by this client.");
+                return FailRead("当前客户端不支持指定字符串长度读取。");
             }
 
             var result = request.DataType switch
@@ -1070,7 +1070,7 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
                 DataTypeEnum.Float => ToReadResult(Client.ReadFloat(request.Address)),
                 DataTypeEnum.Double => ToReadResult(Client.ReadDouble(request.Address)),
                 DataTypeEnum.String => ToReadResult(Client.ReadString(request.Address)),
-                _ => FailRead($"Unsupported PLC data type '{request.DataType}'.")
+                _ => FailRead($"不支持的 PLC 数据类型“{request.DataType}”。")
             };
 
             return result;
@@ -1099,7 +1099,7 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
                 DataTypeEnum.Float => ToWriteResult(Client.Write(request.Address, Convert.ToSingle(request.Value, CultureInfo.InvariantCulture))),
                 DataTypeEnum.Double => ToWriteResult(Client.Write(request.Address, Convert.ToDouble(request.Value, CultureInfo.InvariantCulture))),
                 DataTypeEnum.String => ToWriteResult(Client.Write(request.Address, Convert.ToString(request.Value, CultureInfo.InvariantCulture) ?? string.Empty)),
-                _ => FailWrite($"Unsupported PLC data type '{request.DataType}'.")
+                _ => FailWrite($"不支持的 PLC 数据类型“{request.DataType}”。")
             };
 
             return result;
@@ -1119,7 +1119,7 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
             var result = Client.BatchRead(addresses, Math.Max(1, request.BatchNumber));
             if (!result.IsSucceed)
             {
-                return FailRead($"PLC batch read failed: {result.Err ?? "Unknown error"}");
+                return FailRead($"PLC 批量读取失败：{result.Err ?? "未知错误"}");
             }
 
             ClearLastError();
@@ -1127,7 +1127,7 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
         }
         catch (Exception ex)
         {
-            return FailRead($"PLC batch read failed: {Unwrap(ex).Message}");
+            return FailRead($"PLC 批量读取失败：{Unwrap(ex).Message}");
         }
     }
 
@@ -1140,7 +1140,7 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
             var result = Client.BatchWrite(addresses, Math.Max(1, request.BatchNumber));
             if (!result.IsSucceed)
             {
-                return FailWrite($"PLC batch write failed: {result.Err ?? "Unknown error"}");
+                return FailWrite($"PLC 批量写入失败：{result.Err ?? "未知错误"}");
             }
 
             ClearLastError();
@@ -1148,7 +1148,7 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
         }
         catch (Exception ex)
         {
-            return FailWrite($"PLC batch write failed: {Unwrap(ex).Message}");
+            return FailWrite($"PLC 批量写入失败：{Unwrap(ex).Message}");
         }
     }
 
@@ -1160,7 +1160,7 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
             var result = Client.SendPackageSingle(command);
             if (!result.IsSucceed)
             {
-                return FailRead($"PLC send package failed: {result.Err ?? "Unknown error"}");
+                return FailRead($"PLC 发送数据包失败：{result.Err ?? "未知错误"}");
             }
 
             ClearLastError();
@@ -1168,7 +1168,7 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
         }
         catch (Exception ex)
         {
-            return FailRead($"PLC send package failed: {Unwrap(ex).Message}");
+            return FailRead($"PLC 发送数据包失败：{Unwrap(ex).Message}");
         }
     }
 
@@ -1186,20 +1186,20 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
     {
         if (Volatile.Read(ref _disposed) != 0)
         {
-            throw new InvalidOperationException($"PLC session '{Client.Version}' is closed.");
+            throw new InvalidOperationException($"PLC 会话“{Client.Version}”已关闭。");
         }
     }
 
     protected BasicPlcReadResult ToReadResult<T>(Result<T> result)
         => result.IsSucceed
             ? SuccessRead(result.Value)
-            : FailRead(result.Err ?? "PLC read failed.");
+            : FailRead(result.Err ?? "PLC 读取失败。");
 
     protected BasicPlcReadResult ToReadDictionaryResult<T>(Result<List<KeyValuePair<string, T>>> result)
     {
         if (!result.IsSucceed)
         {
-            return FailRead(result.Err ?? "PLC read failed.");
+            return FailRead(result.Err ?? "PLC 读取失败。");
         }
 
         var dictionary = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
@@ -1215,12 +1215,12 @@ internal abstract class SystemBasicPlcClientSession<TClient> : IBasicPlcClientSe
     protected BasicPlcOperationResult ToOperationResult(Result result)
         => result.IsSucceed
             ? SuccessOperation()
-            : FailOperation(result.Err ?? "PLC operation failed.");
+            : FailOperation(result.Err ?? "PLC 操作失败。");
 
     protected BasicPlcWriteResult ToWriteResult(Result result)
         => result.IsSucceed
             ? SuccessWrite()
-            : FailWrite(result.Err ?? "PLC write failed.");
+            : FailWrite(result.Err ?? "PLC 写入失败。");
 
     protected BasicPlcReadResult SuccessRead(object? value)
     {
@@ -1307,7 +1307,7 @@ internal sealed class SiemensPlcClientSession : SystemBasicPlcClientSession<Siem
                 var result = Client.ReadString(request.Address, checked((ushort)request.Count));
                 if (!result.IsSucceed)
                 {
-                    return FailRead(result.Err ?? "PLC read failed.");
+                    return FailRead(result.Err ?? "PLC 读取失败。");
                 }
 
                 var text = request.Encoding.GetString(result.Value ?? Array.Empty<byte>()).TrimEnd('\0');
@@ -1315,7 +1315,7 @@ internal sealed class SiemensPlcClientSession : SystemBasicPlcClientSession<Siem
             }
             catch (Exception ex)
             {
-                return FailRead($"PLC read failed: {Unwrap(ex).Message}");
+                return FailRead($"PLC 读取失败：{Unwrap(ex).Message}");
             }
         }
 
@@ -1338,12 +1338,12 @@ internal sealed class SiemensPlcClientSession : SystemBasicPlcClientSession<Siem
                     DataTypeEnum.UInt64 => ToReadDictionaryResult(Client.ReadUInt64(request.Address, count)),
                     DataTypeEnum.Float => ToReadDictionaryResult(Client.ReadFloat(request.Address, count)),
                     DataTypeEnum.Double => ToReadDictionaryResult(Client.ReadDouble(request.Address, count)),
-                    _ => FailRead($"Siemens multi-read does not support data type '{request.DataType}'.")
+                    _ => FailRead($"西门子批量读取不支持数据类型“{request.DataType}”。")
                 };
             }
             catch (Exception ex)
             {
-                return FailRead($"PLC read failed: {Unwrap(ex).Message}");
+                return FailRead($"PLC 读取失败：{Unwrap(ex).Message}");
             }
 #pragma warning restore CS0618
         }
@@ -1371,12 +1371,12 @@ internal sealed class MitsubishiPlcClientSession : SystemBasicPlcClientSession<M
                 {
                     DataTypeEnum.Bool => ToReadDictionaryResult(Client.ReadBoolean(request.Address, count)),
                     DataTypeEnum.Int16 => ToReadDictionaryResult(Client.ReadInt16(request.Address, count)),
-                    _ => FailRead($"Mitsubishi multi-read does not support data type '{request.DataType}'.")
+                    _ => FailRead($"三菱批量读取不支持数据类型“{request.DataType}”。")
                 };
             }
             catch (Exception ex)
             {
-                return FailRead($"PLC read failed: {Unwrap(ex).Message}");
+                return FailRead($"PLC 读取失败：{Unwrap(ex).Message}");
             }
         }
 

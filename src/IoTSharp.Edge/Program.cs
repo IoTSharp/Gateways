@@ -101,7 +101,7 @@ app.MapPut("/api/local/configuration", async (
     try
     {
         var apply = !bool.TryParse(context.Request.Query["apply"], out var parsed) || parsed;
-        return Results.Ok(await service.SaveAsync(configuration, apply, updatedBy: "LocalEdge", ct));
+        return Results.Ok(await service.SaveAsync(configuration, apply, updatedBy: "本地控制台", ct));
     }
     catch (Exception exception)
     {
@@ -135,7 +135,7 @@ app.MapPost("/api/local/configuration/reset", async (LocalCollectionConfiguratio
 
 app.MapGet("/api/scripts/polling", () => Results.Ok(new
 {
-    name = "Default Gateway Polling Script",
+    name = "默认网关轮询脚本",
     language = "BASIC",
     script = GatewayRuntimeService.DefaultPollingScript
 }));
@@ -156,7 +156,7 @@ app.MapPost("/api/bootstrap/config", async (BootstrapConfigUpdateRequest request
 {
     if (string.IsNullOrWhiteSpace(request.Json))
     {
-        return Results.BadRequest(new { message = "Bootstrap config JSON is required." });
+        return Results.BadRequest(new { message = "Bootstrap 配置 JSON 为必填项。" });
     }
 
     try

@@ -268,7 +268,7 @@ internal sealed class BasicProgram
 
             if (cursor >= statement.Tokens.Count || statement.Tokens[cursor].Kind != TokenKind.CloseParen)
             {
-                throw new BasicRuntimeException("CLASS inheritance expects ')'.", statement.Tokens[cursor - 1].Line, statement.Tokens[cursor - 1].Column);
+                throw new BasicRuntimeException("CLASS 继承需要右括号“)”。", statement.Tokens[cursor - 1].Line, statement.Tokens[cursor - 1].Column);
             }
         }
 
@@ -304,7 +304,7 @@ internal sealed class BasicProgram
     {
         if (statement.Tokens.Count < 2 || statement.Tokens[1].Kind != TokenKind.Identifier)
         {
-            throw new BasicRuntimeException("VAR expects a field name.", statement.FirstToken.Line, statement.FirstToken.Column);
+            throw new BasicRuntimeException("VAR 需要字段名。", statement.FirstToken.Line, statement.FirstToken.Column);
         }
 
         var name = statement.Tokens[1].Text;
@@ -362,7 +362,7 @@ internal sealed class BasicProgram
 
             if (token.Kind != TokenKind.Identifier)
             {
-                throw new BasicRuntimeException($"{owner} parameter list expects identifiers.", token.Line, token.Column);
+                throw new BasicRuntimeException($"{owner} 参数列表需要标识符。", token.Line, token.Column);
             }
 
             parameters.Add(token.Text);

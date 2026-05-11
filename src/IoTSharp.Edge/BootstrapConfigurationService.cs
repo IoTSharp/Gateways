@@ -66,7 +66,7 @@ public sealed class BootstrapConfigurationService
                 {
                     Enabled = true,
                     RuntimeType = "gateway",
-                    RuntimeName = "Gateway Runtime",
+                    RuntimeName = "网关运行时",
                     InstanceId = "",
                     BaseUrl = "http://127.0.0.1:27915/",
                     AccessToken = "",
@@ -82,7 +82,7 @@ public sealed class BootstrapConfigurationService
         using var document = JsonDocument.Parse(json);
         if (document.RootElement.ValueKind != JsonValueKind.Object)
         {
-            throw new InvalidOperationException("Bootstrap config must be a JSON object.");
+            throw new InvalidOperationException("Bootstrap 配置必须是 JSON 对象。");
         }
 
         return JsonSerializer.Serialize(document.RootElement, JsonOptions);

@@ -21,7 +21,7 @@ internal sealed class LocalCollectionConfigurationOptions
 
     public string? TemplatePath { get; set; }
 
-    public string DefaultUpdatedBy { get; set; } = "LocalConfiguration";
+    public string DefaultUpdatedBy { get; set; } = "本地配置";
 }
 
 internal sealed record LocalCollectionConfigurationDocument(
@@ -84,7 +84,7 @@ internal sealed class LocalCollectionConfigurationService
             return;
         }
 
-        await ApplyAsync(document.Configuration, "startup", cancellationToken);
+        await ApplyAsync(document.Configuration, "启动", cancellationToken);
         MarkApplied(document.Configuration.Version);
     }
 
@@ -124,7 +124,7 @@ internal sealed class LocalCollectionConfigurationService
 
         if (apply)
         {
-            await ApplyAsync(normalized, "local-save", cancellationToken);
+            await ApplyAsync(normalized, "本地保存", cancellationToken);
             MarkApplied(normalized.Version);
         }
 
@@ -139,7 +139,7 @@ internal sealed class LocalCollectionConfigurationService
     public async Task<LocalCollectionConfigurationDocument> ApplyCurrentAsync(CancellationToken cancellationToken)
     {
         var document = await EnsureDocumentAsync(cancellationToken);
-        await ApplyAsync(document.Configuration, "local-apply", cancellationToken);
+        await ApplyAsync(document.Configuration, "本地应用", cancellationToken);
         MarkApplied(document.Configuration.Version);
 
         return new LocalCollectionConfigurationDocument(
@@ -162,7 +162,7 @@ internal sealed class LocalCollectionConfigurationService
         };
 
         await WriteConfigurationAsync(filePath, template, cancellationToken);
-        await ApplyAsync(template, "reset", cancellationToken);
+        await ApplyAsync(template, "重置", cancellationToken);
         MarkApplied(template.Version);
 
         return new LocalCollectionConfigurationDocument(
@@ -219,7 +219,7 @@ internal sealed class LocalCollectionConfigurationService
         var repository = scope.ServiceProvider.GetRequiredService<IGatewayRepository>();
         var snapshot = GatewayCollectionConfigurationMapper.Map(configuration, new EdgeReportingOptions());
         await repository.ReplaceConfigurationAsync(snapshot, cancellationToken);
-        _logger.LogInformation("Applied local collection configuration from {Source} with version {Version}.", source, configuration.Version);
+        _logger.LogInformation("已从 {Source} 应用本地采集配置，版本 {Version}。", source, configuration.Version);
     }
 
     private async Task<EdgeCollectionConfigurationContract> ReadConfigurationAsync(string filePath, CancellationToken cancellationToken)
@@ -374,7 +374,7 @@ internal sealed class LocalCollectionConfigurationService
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Failed to load local collection template from {TemplatePath}.", templatePath);
+            _logger.LogWarning(exception, "从 {TemplatePath} 加载本地采集模板失败。", templatePath);
             configuration = new EdgeCollectionConfigurationContract();
             return false;
         }

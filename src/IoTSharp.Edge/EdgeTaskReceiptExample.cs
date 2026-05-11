@@ -32,7 +32,7 @@ public sealed class EdgeTaskReceiptExample : IEdgeTaskReceiptReporter
             runtimeType,
             instanceId,
             status = "Accepted",
-            message = "Gateway worker accepted platform dispatch.",
+            message = "网关工作线程已接受平台下发任务。",
             reportedAt = DateTime.UtcNow,
             progress = 0,
             result = new Dictionary<string, object>(),
@@ -45,7 +45,7 @@ public sealed class EdgeTaskReceiptExample : IEdgeTaskReceiptReporter
         var response = await client.PostAsJsonAsync($"{baseUrl.TrimEnd('/')}/api/EdgeTask/Dispatch/{accessToken}/Accept", payload, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        _logger.LogInformation("Accepted edge task {TaskId} for {TargetKey}", taskId, payload.targetKey);
+        _logger.LogInformation("已接受边缘任务 {TaskId}，目标 {TargetKey}。", taskId, payload.targetKey);
     }
 
     public async Task ReportCompletedAsync(string baseUrl, Guid deviceId, string runtimeType, string instanceId, Guid taskId, string status, string message, Dictionary<string, object>? result, CancellationToken cancellationToken = default)
@@ -73,6 +73,6 @@ public sealed class EdgeTaskReceiptExample : IEdgeTaskReceiptReporter
         var response = await client.PostAsJsonAsync($"{baseUrl.TrimEnd('/')}/api/EdgeTask/Receipt", payload, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        _logger.LogInformation("Reported edge task receipt {TaskId} for {TargetKey}, status {Status}", taskId, payload.targetKey, status);
+        _logger.LogInformation("已上报边缘任务回执 {TaskId}，目标 {TargetKey}，状态 {Status}。", taskId, payload.targetKey, status);
     }
 }

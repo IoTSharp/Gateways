@@ -28,7 +28,7 @@ internal static class MqttBuiltInFunctions
         var endpoint = RequiredText(args, 0);
         if (string.IsNullOrWhiteSpace(endpoint))
         {
-            return Fail(state, "MQTT endpoint is required.");
+            return Fail(state, "需要 MQTT 端点。");
         }
 
         var requestedClientId = OptionalText(args, 2, $"basic-{Guid.NewGuid():N}");
@@ -73,7 +73,7 @@ internal static class MqttBuiltInFunctions
             if (connectResult.ResultCode != MqttClientConnectResultCode.Success)
             {
                 client.Dispose();
-                return Fail(state, $"MQTT connect failed: {connectResult.ResultCode}{FormatReason(connectResult.ReasonString)}");
+                return Fail(state, $"MQTT 连接失败：{connectResult.ResultCode}{FormatReason(connectResult.ReasonString)}");
             }
 
             var clientId = string.IsNullOrWhiteSpace(connectResult.AssignedClientIdentifier)
@@ -87,7 +87,7 @@ internal static class MqttBuiltInFunctions
         catch (Exception ex)
         {
             client?.Dispose();
-            return Fail(state, $"MQTT connect failed: {Unwrap(ex).Message}");
+            return Fail(state, $"MQTT 连接失败：{Unwrap(ex).Message}");
         }
     }
 
@@ -96,7 +96,7 @@ internal static class MqttBuiltInFunctions
         var state = runtime.MqttState;
         if (!TryGetHandle(args, 0, out var handle) || !state.TryRemove(handle, out var session))
         {
-            return Fail(state, "MQTT handle not found.");
+            return Fail(state, "未找到 MQTT 句柄。");
         }
 
         try
@@ -107,7 +107,7 @@ internal static class MqttBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"MQTT disconnect failed: {Unwrap(ex).Message}");
+            return Fail(state, $"MQTT 断开失败：{Unwrap(ex).Message}");
         }
     }
 
@@ -121,7 +121,7 @@ internal static class MqttBuiltInFunctions
 
         if (!session.Client.IsConnected)
         {
-            return Fail(state, "MQTT client is not connected.");
+            return Fail(state, "MQTT 客户端未连接。");
         }
 
         try
@@ -133,7 +133,7 @@ internal static class MqttBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"MQTT ping failed: {Unwrap(ex).Message}", session);
+            return Fail(state, $"MQTT 心跳失败：{Unwrap(ex).Message}", session);
         }
     }
 
@@ -148,12 +148,12 @@ internal static class MqttBuiltInFunctions
         var topic = RequiredText(args, 1);
         if (string.IsNullOrWhiteSpace(topic))
         {
-            return Fail(state, "MQTT topic is required.", session);
+            return Fail(state, "需要 MQTT 主题。", session);
         }
 
         if (!session.Client.IsConnected)
         {
-            return Fail(state, "MQTT client is not connected.", session);
+            return Fail(state, "MQTT 客户端未连接。", session);
         }
 
         var payload = args.Count > 2 ? args[2] : BasicValue.Nil;
@@ -172,7 +172,7 @@ internal static class MqttBuiltInFunctions
             var result = session.Client.PublishAsync(message, CancellationToken.None).GetAwaiter().GetResult();
             if (!result.IsSuccess)
             {
-                return Fail(state, $"MQTT publish failed: {result.ReasonCode}{FormatReason(result.ReasonString)}", session);
+                return Fail(state, $"MQTT 发布失败：{result.ReasonCode}{FormatReason(result.ReasonString)}", session);
             }
 
             state.ClearLastError();
@@ -181,7 +181,7 @@ internal static class MqttBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"MQTT publish failed: {Unwrap(ex).Message}", session);
+            return Fail(state, $"MQTT 发布失败：{Unwrap(ex).Message}", session);
         }
     }
 
@@ -196,12 +196,12 @@ internal static class MqttBuiltInFunctions
         var topic = RequiredText(args, 1);
         if (string.IsNullOrWhiteSpace(topic))
         {
-            return Fail(state, "MQTT topic is required.", session);
+            return Fail(state, "需要 MQTT 主题。", session);
         }
 
         if (!session.Client.IsConnected)
         {
-            return Fail(state, "MQTT client is not connected.", session);
+            return Fail(state, "MQTT 客户端未连接。", session);
         }
 
         var qos = ToQualityOfService(args, 2);
@@ -218,7 +218,7 @@ internal static class MqttBuiltInFunctions
                 var reason = result.Items.FirstOrDefault(item => item.ResultCode is not (MqttClientSubscribeResultCode.GrantedQoS0 or MqttClientSubscribeResultCode.GrantedQoS1 or MqttClientSubscribeResultCode.GrantedQoS2))?.ResultCode.ToString()
                     ?? result.ReasonString
                     ?? "Unknown";
-                return Fail(state, $"MQTT subscribe failed: {reason}", session);
+                return Fail(state, $"MQTT 订阅失败：{reason}", session);
             }
 
             state.ClearLastError();
@@ -227,7 +227,7 @@ internal static class MqttBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"MQTT subscribe failed: {Unwrap(ex).Message}", session);
+            return Fail(state, $"MQTT 订阅失败：{Unwrap(ex).Message}", session);
         }
     }
 
@@ -242,12 +242,12 @@ internal static class MqttBuiltInFunctions
         var topic = RequiredText(args, 1);
         if (string.IsNullOrWhiteSpace(topic))
         {
-            return Fail(state, "MQTT topic is required.", session);
+            return Fail(state, "需要 MQTT 主题。", session);
         }
 
         if (!session.Client.IsConnected)
         {
-            return Fail(state, "MQTT client is not connected.", session);
+            return Fail(state, "MQTT 客户端未连接。", session);
         }
 
         try
@@ -262,7 +262,7 @@ internal static class MqttBuiltInFunctions
                 var reason = result.Items.FirstOrDefault(item => item.ResultCode is not (MqttClientUnsubscribeResultCode.Success or MqttClientUnsubscribeResultCode.NoSubscriptionExisted))?.ResultCode.ToString()
                     ?? result.ReasonString
                     ?? "Unknown";
-                return Fail(state, $"MQTT unsubscribe failed: {reason}", session);
+                return Fail(state, $"MQTT 取消订阅失败：{reason}", session);
             }
 
             state.ClearLastError();
@@ -271,7 +271,7 @@ internal static class MqttBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"MQTT unsubscribe failed: {Unwrap(ex).Message}", session);
+            return Fail(state, $"MQTT 取消订阅失败：{Unwrap(ex).Message}", session);
         }
     }
 
@@ -302,7 +302,7 @@ internal static class MqttBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"MQTT receive failed: {Unwrap(ex).Message}", session);
+            return Fail(state, $"MQTT 接收失败：{Unwrap(ex).Message}", session);
         }
     }
 
@@ -332,13 +332,13 @@ internal static class MqttBuiltInFunctions
         session = null!;
         if (!TryGetHandle(args, index, out var handle))
         {
-            runtime.MqttState.SetLastError("MQTT handle is required.");
+            runtime.MqttState.SetLastError("需要 MQTT 句柄。");
             return false;
         }
 
         if (!runtime.MqttState.TryGet(handle, out session))
         {
-            runtime.MqttState.SetLastError("MQTT handle not found.");
+            runtime.MqttState.SetLastError("未找到 MQTT 句柄。");
             return false;
         }
 

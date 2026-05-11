@@ -201,7 +201,7 @@ internal sealed class ExpressionParser
         {
             if (Match(TokenKind.Dot, out var dot))
             {
-                var member = Expect(TokenKind.Identifier, "Member name expected.", dot);
+                var member = Expect(TokenKind.Identifier, "需要成员名。", dot);
                 value = GetMember(value, member);
                 baseIdentifier = null;
                 isIdentifierBase = false;
@@ -268,7 +268,7 @@ internal sealed class ExpressionParser
         {
             if (identifier.IsKeyword("CALL"))
             {
-                var target = Expect(TokenKind.Identifier, "CALL expects a function name.", identifier);
+                var target = Expect(TokenKind.Identifier, "CALL 需要函数名。", identifier);
                 var arguments = Match(TokenKind.OpenParen, out var callOpen) ? ParseArgumentList(callOpen) : [];
                 return InvokeByName(target.Text, arguments, target);
             }
@@ -298,22 +298,22 @@ internal sealed class ExpressionParser
             return _context.GetVariable(identifier.Text);
         }
 
-        throw Error(Current, "Expression expected.");
+        throw Error(Current, "需要表达式。");
     }
 
     private BasicValue ParseNew(Token anchor)
     {
-        var open = Expect(TokenKind.OpenParen, "NEW expects '(' after class name.", anchor);
+        var open = Expect(TokenKind.OpenParen, "NEW 在类名后需要左括号“(”。", anchor);
         var arguments = ParseArgumentList(open);
         if (arguments.Count != 1)
         {
-            throw Error(anchor, "NEW expects exactly one class or object value.");
+            throw Error(anchor, "NEW 需要且只需要一个类或对象值。");
         }
 
         var source = arguments[0];
         if (source.Kind is not (BasicValueKind.Class or BasicValueKind.Instance))
         {
-            throw Error(anchor, "NEW expects a class or object value.");
+            throw Error(anchor, "NEW 需要类或对象值。");
         }
 
         return BasicValue.FromInstance(source.ObjectValue.CreateInstance());
@@ -323,7 +323,7 @@ internal sealed class ExpressionParser
     {
         if (target.Kind is not (BasicValueKind.Class or BasicValueKind.Instance))
         {
-            throw Error(member, $"Value '{target.AsString()}' has no members.");
+            throw Error(member, $"值“{target.AsString()}”没有成员。");
         }
 
         return target.ObjectValue.TryGetMember(member.Text, _context, out var value)
@@ -348,7 +348,7 @@ internal sealed class ExpressionParser
             return result;
         }
 
-        throw Error(anchor, "Value is neither callable nor indexable.");
+        throw Error(anchor, "值既不能调用，也不能索引。");
     }
 
     private bool TryInvokeByName(string name, IReadOnlyList<BasicValue> arguments, Token anchor, out BasicValue result)
@@ -373,7 +373,7 @@ internal sealed class ExpressionParser
     {
         return TryInvokeByName(name, arguments, anchor, out var result)
             ? result
-            : throw Error(anchor, $"Function '{name}' was not found.");
+            : throw Error(anchor, $"未找到函数“{name}”。");
     }
 
     private static BasicValue GetIndexedValue(BasicValue target, IReadOnlyList<BasicValue> arguments, Token anchor)
@@ -384,7 +384,7 @@ internal sealed class ExpressionParser
             BasicValueKind.List when arguments.Count == 1 => GetListValue(target.List, (int)arguments[0].AsNumber()),
             BasicValueKind.Dictionary when arguments.Count == 1 => target.Dictionary.Get(arguments[0].AsString()),
             BasicValueKind.String when arguments.Count == 1 => GetStringValue(target.Text, (int)arguments[0].AsNumber()),
-            _ => throw Error(anchor, "Value is not indexable.")
+            _ => throw Error(anchor, "值不可索引。")
         };
     }
 

@@ -306,14 +306,14 @@ internal static class BasicProgramRunner
     {
         if (statement.Tokens.Count < 6 || statement.Tokens[1].Kind != TokenKind.Identifier)
         {
-            throw Error(statement, "FOR expects 'FOR variable = start TO end'.");
+            throw Error(statement, "FOR 需要符合“FOR 变量 = 起始值 TO 结束值”的格式。");
         }
 
         var equalsIndex = FindTopLevelOperator(statement.Tokens, "=", 2);
         var toIndex = FindTopLevelKeyword(statement.Tokens, "TO", equalsIndex + 1);
         if (equalsIndex < 0 || toIndex < 0)
         {
-            throw Error(statement, "FOR expects '=' and TO.");
+            throw Error(statement, "FOR 需要“=”和“TO”。");
         }
 
         var stepIndex = FindTopLevelKeyword(statement.Tokens, "STEP", toIndex + 1);
@@ -469,7 +469,7 @@ internal static class BasicProgramRunner
     {
         if (statement.Tokens.Count < 4 || statement.Tokens[1].Kind != TokenKind.Identifier || statement.Tokens[2].Kind != TokenKind.OpenParen)
         {
-            throw Error(statement, "DIM expects 'DIM name(size)'.");
+            throw Error(statement, "DIM 需要符合“DIM 名称(大小)”的格式。");
         }
 
         var closeIndex = FindMatchingCloseParen(statement.Tokens, 2);
@@ -484,7 +484,7 @@ internal static class BasicProgramRunner
         var equalsIndex = FindAssignmentOperator(tokens);
         if (equalsIndex < 0)
         {
-            throw new BasicRuntimeException("Assignment expects '='.", tokens[0].Line, tokens[0].Column);
+            throw new BasicRuntimeException("赋值需要“=”。", tokens[0].Line, tokens[0].Column);
         }
 
         var left = Slice(tokens, 0, equalsIndex);
@@ -575,7 +575,7 @@ internal static class BasicProgramRunner
             {
                 if (index + 1 >= tokens.Count || tokens[index + 1].Kind != TokenKind.Identifier)
                 {
-                    throw new BasicRuntimeException("Member name expected.", tokens[index].Line, tokens[index].Column);
+                    throw new BasicRuntimeException("需要成员名。", tokens[index].Line, tokens[index].Column);
                 }
 
                 var memberName = tokens[index + 1].Text;
@@ -588,7 +588,7 @@ internal static class BasicProgramRunner
 
                 if (!current.ObjectValue.TryGetMember(memberName, context, out var memberValue))
                 {
-                    throw new BasicRuntimeException($"Member '{memberName}' was not found.", tokens[index + 1].Line, tokens[index + 1].Column);
+                    throw new BasicRuntimeException($"未找到成员“{memberName}”。", tokens[index + 1].Line, tokens[index + 1].Column);
                 }
 
                 current = memberValue;
@@ -697,7 +697,7 @@ internal static class BasicProgramRunner
         var tokens = Slice(statement.Tokens, 1, statement.Tokens.Count);
         if (tokens.Count == 0)
         {
-            throw Error(statement, "INPUT expects a variable.");
+            throw Error(statement, "INPUT 需要一个变量。");
         }
 
         string prompt;
@@ -716,7 +716,7 @@ internal static class BasicProgramRunner
 
         if (target.Count != 1 || target[0].Kind != TokenKind.Identifier)
         {
-            throw Error(statement, "INPUT expects a target variable.");
+            throw Error(statement, "INPUT 需要一个目标变量。");
         }
 
         if (!string.IsNullOrEmpty(prompt))
@@ -800,7 +800,7 @@ internal static class BasicProgramRunner
     {
         if (statement.Tokens.Count <= startToken)
         {
-            throw Error(statement, "Label expected.");
+            throw Error(statement, "需要标签。");
         }
 
         string label;
@@ -816,7 +816,7 @@ internal static class BasicProgramRunner
 
         return context.Program.TryGetLabel(label, out var target)
             ? target
-            : throw new BasicRuntimeException($"Label '{label}' was not found.", statement.FirstToken.Line, statement.FirstToken.Column);
+            : throw new BasicRuntimeException($"未找到标签“{label}”。", statement.FirstToken.Line, statement.FirstToken.Column);
     }
 
     private static string ReadFunctionName(Statement statement)

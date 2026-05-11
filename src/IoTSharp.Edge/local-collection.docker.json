@@ -3,7 +3,7 @@
   "edgeNodeId": "7c7f8e44-646e-4e75-a31d-8c4e4b4f5f39",
   "version": 1,
   "updatedAt": "2026-05-11T00:00:00Z",
-  "updatedBy": "LocalDockerTemplate",
+  "updatedBy": "Docker 模板",
   "upload": {
     "protocol": "SonnetDb",
     "endpoint": "http://sonnetdb:5080",
@@ -12,7 +12,7 @@
       "token": "sonnetdb-dev-token",
       "measurement": "edge_modbus",
       "field": "value",
-      "site": "docker-compose"
+      "site": "Docker 编排"
     }
   },
   "tasks": [
@@ -24,7 +24,7 @@
       "edgeNodeId": "7c7f8e44-646e-4e75-a31d-8c4e4b4f5f39",
       "connection": {
         "connectionKey": "device-simulator-modbus",
-        "connectionName": "Device Simulator Modbus TCP",
+        "connectionName": "设备模拟器 Modbus TCP 连接",
         "protocol": "Modbus",
         "transport": "tcp",
         "host": "device-simulator",
@@ -39,7 +39,7 @@
       "devices": [
         {
           "deviceKey": "device-simulator-01",
-          "deviceName": "Device Simulator 01",
+          "deviceName": "设备模拟器 01",
           "enabled": true,
           "externalKey": "device-simulator-01",
           "protocolOptions": {
@@ -48,7 +48,7 @@
           "points": [
             {
               "pointKey": "temperature",
-              "pointName": "Temperature",
+              "pointName": "温度",
               "sourceType": "HoldingRegister",
               "address": "40001",
               "rawValueType": "Float",
@@ -61,13 +61,13 @@
                 "targetType": "Telemetry",
                 "targetName": "temperature",
                 "valueType": "Double",
-                "displayName": "Temperature",
-                "unit": "C"
+                "displayName": "温度",
+                "unit": "℃"
               }
             },
             {
               "pointKey": "pressure",
-              "pointName": "Pressure",
+              "pointName": "压力",
               "sourceType": "HoldingRegister",
               "address": "40003",
               "rawValueType": "Float",
@@ -80,13 +80,13 @@
                 "targetType": "Telemetry",
                 "targetName": "pressure",
                 "valueType": "Double",
-                "displayName": "Pressure",
+                "displayName": "压力",
                 "unit": "bar"
               }
             },
             {
               "pointKey": "motorRpm",
-              "pointName": "Motor RPM",
+              "pointName": "电机转速",
               "sourceType": "HoldingRegister",
               "address": "40005",
               "rawValueType": "Int16",
@@ -99,8 +99,8 @@
                 "targetType": "Telemetry",
                 "targetName": "motorRpm",
                 "valueType": "Int32",
-                "displayName": "Motor RPM",
-                "unit": "rpm"
+                "displayName": "电机转速",
+                "unit": "转/分"
               }
             }
           ]

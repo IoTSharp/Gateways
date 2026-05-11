@@ -122,12 +122,12 @@ public sealed class IotSharpDeviceHttpUploadTransport : IUploadTransport
     {
         if (string.IsNullOrWhiteSpace(channel.Endpoint))
         {
-            throw new InvalidOperationException("IoTSharp device HTTP upload endpoint is required.");
+            throw new InvalidOperationException("IoTSharp 设备 HTTP 上传需要 endpoint。");
         }
 
         if (string.IsNullOrWhiteSpace(envelope.Target))
         {
-            throw new InvalidOperationException("IoTSharp device HTTP upload target is required.");
+            throw new InvalidOperationException("IoTSharp 设备 HTTP 上传需要 target。");
         }
 
         var client = _httpClientFactory.CreateClient(nameof(IotSharpDeviceHttpUploadTransport));
@@ -171,7 +171,7 @@ public sealed class SonnetDbUploadTransport : IUploadTransport
 
         var written = await command.ExecuteNonQueryAsync(cancellationToken);
         _logger.LogInformation(
-            "Uploaded {PointName} from {DeviceName} to SonnetDB measurement {Measurement}; written rows {Written}.",
+            "已将点位 {PointName} 从设备 {DeviceName} 写入 SonnetDB 测点集 {Measurement}，写入行数 {Written}。",
             envelope.PointName,
             envelope.DeviceName,
             measurement,
@@ -188,7 +188,7 @@ public sealed class SonnetDbUploadTransport : IUploadTransport
 
         if (string.IsNullOrWhiteSpace(endpoint))
         {
-            throw new InvalidOperationException("SonnetDB endpoint or settings.connectionString is required.");
+            throw new InvalidOperationException("SonnetDB 需要 endpoint 或 settings.connectionString。");
         }
 
         var trimmedEndpoint = endpoint.Trim();
@@ -305,5 +305,5 @@ public sealed class UploadTransportRegistry : IUploadTransportRegistry
     public IUploadTransport GetRequiredTransport(UploadProtocol protocol)
         => _transports.TryGetValue(protocol, out var transport)
             ? transport
-            : throw new KeyNotFoundException($"Upload transport '{protocol}' is not registered.");
+            : throw new KeyNotFoundException($"上传传输“{protocol}”未注册。");
 }

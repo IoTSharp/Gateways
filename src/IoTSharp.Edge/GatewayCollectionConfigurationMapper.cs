@@ -13,7 +13,7 @@ internal static class GatewayCollectionConfigurationMapper
     {
         if (configuration == null)
         {
-            throw new InvalidOperationException("Collection configuration payload is required.");
+            throw new InvalidOperationException("采集配置载荷是必填项。");
         }
 
         var edgeNodeId = configuration.EdgeNodeId;
@@ -34,7 +34,7 @@ internal static class GatewayCollectionConfigurationMapper
         {
             if (string.IsNullOrWhiteSpace(task.TaskKey))
             {
-                throw new InvalidOperationException("task.taskKey is required.");
+                throw new InvalidOperationException("task.taskKey 为必填项。");
             }
 
             var channelId = CreateDeterministicGuid(edgeNodeId, "channel", task.TaskKey);
@@ -43,7 +43,7 @@ internal static class GatewayCollectionConfigurationMapper
                 Id = channelId,
                 DriverCode = ResolveDriverCode(task.Protocol),
                 Name = string.IsNullOrWhiteSpace(task.Connection?.ConnectionName) ? task.TaskKey : task.Connection.ConnectionName,
-                Description = $"Platform collection task {task.TaskKey}",
+                Description = $"边缘采集任务 {task.TaskKey}",
                 ConnectionJson = GatewayJson.Serialize(BuildConnectionSettings(task)),
                 Enabled = true
             });
@@ -52,7 +52,7 @@ internal static class GatewayCollectionConfigurationMapper
             {
                 if (string.IsNullOrWhiteSpace(deviceContract.DeviceKey))
                 {
-                    throw new InvalidOperationException($"task '{task.TaskKey}' contains a device without deviceKey.");
+                    throw new InvalidOperationException($"任务“{task.TaskKey}”包含未设置 deviceKey 的设备。");
                 }
 
                 var deviceId = CreateDeterministicGuid(edgeNodeId, "device", task.TaskKey, deviceContract.DeviceKey);
@@ -64,12 +64,12 @@ internal static class GatewayCollectionConfigurationMapper
                         string.IsNullOrWhiteSpace(pointContract.PointName) ||
                         string.IsNullOrWhiteSpace(pointContract.Address))
                     {
-                        throw new InvalidOperationException($"task '{task.TaskKey}', device '{deviceContract.DeviceKey}' contains an invalid point definition.");
+                        throw new InvalidOperationException($"任务“{task.TaskKey}”、设备“{deviceContract.DeviceKey}”包含无效的点位定义。");
                     }
 
                     if (pointContract.Mapping == null || string.IsNullOrWhiteSpace(pointContract.Mapping.TargetName))
                     {
-                        throw new InvalidOperationException($"task '{task.TaskKey}', point '{pointContract.PointKey}' requires mapping.targetName.");
+                        throw new InvalidOperationException($"任务“{task.TaskKey}”、点位“{pointContract.PointKey}”需要 mapping.targetName。");
                     }
 
                     var pointId = CreateDeterministicGuid(edgeNodeId, "point", task.TaskKey, deviceContract.DeviceKey, pointContract.PointKey);
@@ -163,7 +163,7 @@ internal static class GatewayCollectionConfigurationMapper
             uploadChannels.Add(new UploadChannel
             {
                 Id = telemetryUploadChannelId,
-                Name = uploadProtocol == UploadProtocol.SonnetDb ? "SonnetDB Telemetry" : "IoTSharp Telemetry",
+                Name = uploadProtocol == UploadProtocol.SonnetDb ? "SonnetDB 遥测" : "IoTSharp 遥测",
                 Protocol = uploadProtocol,
                 Endpoint = ResolveUploadEndpoint(configuredUpload, normalizedBaseUrl, accessToken, uploadProtocol, "telemetry"),
                 SettingsJson = GatewayJson.Serialize(uploadSettings),
@@ -178,7 +178,7 @@ internal static class GatewayCollectionConfigurationMapper
             uploadChannels.Add(new UploadChannel
             {
                 Id = attributeUploadChannelId,
-                Name = uploadProtocol == UploadProtocol.SonnetDb ? "SonnetDB Attributes" : "IoTSharp Attributes",
+                Name = uploadProtocol == UploadProtocol.SonnetDb ? "SonnetDB 属性" : "IoTSharp 属性",
                 Protocol = uploadProtocol,
                 Endpoint = ResolveUploadEndpoint(configuredUpload, normalizedBaseUrl, accessToken, uploadProtocol, "attributes"),
                 SettingsJson = GatewayJson.Serialize(uploadSettings),
@@ -221,7 +221,7 @@ internal static class GatewayCollectionConfigurationMapper
             "mqtt" or "iotsharpmqtt" => UploadProtocol.IotSharpMqtt,
             "devicehttp" or "iotsharpdevicehttp" or "iotsharp" => UploadProtocol.IotSharpDeviceHttp,
             "sonnet" or "sonnetdb" => UploadProtocol.SonnetDb,
-            _ => throw new NotSupportedException($"Configured upload protocol '{protocol}' is not supported.")
+            _ => throw new NotSupportedException($"未配置的上传协议“{protocol}”不受支持。")
         };
     }
 
@@ -240,9 +240,9 @@ internal static class GatewayCollectionConfigurationMapper
         return uploadProtocol switch
         {
             UploadProtocol.IotSharpDeviceHttp when !string.IsNullOrWhiteSpace(normalizedBaseUrl) && !string.IsNullOrWhiteSpace(accessToken) => new Uri(new Uri(normalizedBaseUrl, UriKind.Absolute), $"api/Devices/{Uri.EscapeDataString(accessToken)}/{char.ToUpperInvariant(targetKind[0])}{targetKind[1..]}").ToString(),
-            UploadProtocol.IotSharpDeviceHttp => throw new InvalidOperationException("IoTSharp device HTTP upload requires EdgeReporting.BaseUrl and EdgeReporting.AccessToken or an explicit upload endpoint."),
-            UploadProtocol.SonnetDb => throw new InvalidOperationException("SonnetDB upload requires an explicit endpoint."),
-            _ => throw new NotSupportedException($"Upload protocol '{uploadProtocol}' requires an explicit endpoint.")
+            UploadProtocol.IotSharpDeviceHttp => throw new InvalidOperationException("IoTSharp 设备 HTTP 上传需要 EdgeReporting.BaseUrl 和 EdgeReporting.AccessToken，或者显式上传地址。"),
+            UploadProtocol.SonnetDb => throw new InvalidOperationException("SonnetDB 上传需要显式地址。"),
+            _ => throw new NotSupportedException($"上传协议“{uploadProtocol}”需要显式地址。")
         };
     }
 
@@ -326,39 +326,39 @@ internal static class GatewayCollectionConfigurationMapper
                 {
                     var serialPort = task.Connection.SerialPort
                         ?? FirstString(task.Connection.ProtocolOptions, "serialPort", "portName", "comPort");
-                    settings["serialPort"] = Require(serialPort, $"task '{task.TaskKey}' requires connection.serialPort for Modbus serial transport.");
+                    settings["serialPort"] = Require(serialPort, $"任务“{task.TaskKey}”的 Modbus 串口传输需要 connection.serialPort。");
                 }
                 else
                 {
-                    settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Modbus.");
+                    settings["host"] = Require(task.Connection.Host, $"任务“{task.TaskKey}”的 Modbus 需要 connection.host。");
                     settings["port"] = (task.Connection.Port ?? 502).ToString(CultureInfo.InvariantCulture);
                 }
 
                 break;
             case GatewayCollectionProtocolType.SiemensS7:
-                settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Siemens S7.");
+                settings["host"] = Require(task.Connection.Host, $"任务“{task.TaskKey}”的西门子 S7 需要 connection.host。");
                 settings["port"] = (task.Connection.Port ?? 102).ToString(CultureInfo.InvariantCulture);
                 settings["timeout"] = Math.Max(task.Connection.TimeoutMs, 1).ToString(CultureInfo.InvariantCulture);
                 settings["model"] = FirstString(task.Connection.ProtocolOptions, "model", "plcModel")
-                    ?? throw new InvalidOperationException($"task '{task.TaskKey}' requires protocolOptions.model for Siemens S7.");
+                    ?? throw new InvalidOperationException($"任务“{task.TaskKey}”的西门子 S7 需要 protocolOptions.model。");
                 settings["rack"] = FirstString(task.Connection.ProtocolOptions, "rack") ?? "0";
                 settings["slot"] = FirstString(task.Connection.ProtocolOptions, "slot") ?? "0";
                 break;
             case GatewayCollectionProtocolType.Mitsubishi:
-                settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Mitsubishi.");
+                settings["host"] = Require(task.Connection.Host, $"任务“{task.TaskKey}”的三菱协议需要 connection.host。");
                 settings["port"] = (task.Connection.Port ?? 6000).ToString(CultureInfo.InvariantCulture);
                 settings["timeout"] = Math.Max(task.Connection.TimeoutMs, 1).ToString(CultureInfo.InvariantCulture);
                 settings["model"] = FirstString(task.Connection.ProtocolOptions, "model", "plcModel")
-                    ?? throw new InvalidOperationException($"task '{task.TaskKey}' requires protocolOptions.model for Mitsubishi.");
+                    ?? throw new InvalidOperationException($"任务“{task.TaskKey}”的三菱协议需要 protocolOptions.model。");
                 break;
             case GatewayCollectionProtocolType.OmronFins:
-                settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Omron FINS.");
+                settings["host"] = Require(task.Connection.Host, $"任务“{task.TaskKey}”的欧姆龙 FINS 需要 connection.host。");
                 settings["port"] = (task.Connection.Port ?? 9600).ToString(CultureInfo.InvariantCulture);
                 settings["timeout"] = Math.Max(task.Connection.TimeoutMs, 1).ToString(CultureInfo.InvariantCulture);
                 settings["endianFormat"] = FirstString(task.Connection.ProtocolOptions, "endianFormat", "endian") ?? "ABCD";
                 break;
             case GatewayCollectionProtocolType.AllenBradley:
-                settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Allen-Bradley.");
+                settings["host"] = Require(task.Connection.Host, $"任务“{task.TaskKey}”的艾伦-布拉德利需要 connection.host。");
                 settings["port"] = (task.Connection.Port ?? 44818).ToString(CultureInfo.InvariantCulture);
                 settings["timeout"] = Math.Max(task.Connection.TimeoutMs, 1).ToString(CultureInfo.InvariantCulture);
                 settings["slot"] = FirstString(task.Connection.ProtocolOptions, "slot") ?? "0";
@@ -376,7 +376,7 @@ internal static class GatewayCollectionConfigurationMapper
                 break;
             case GatewayCollectionProtocolType.OpcDa:
                 settings["progId"] = FirstString(task.Connection.ProtocolOptions, "progId", "programId")
-                    ?? throw new InvalidOperationException($"task '{task.TaskKey}' requires protocolOptions.progId for OPC DA.");
+                    ?? throw new InvalidOperationException($"任务“{task.TaskKey}”的 OPC DA 需要 protocolOptions.progId。");
                 if (!string.IsNullOrWhiteSpace(task.Connection.Host))
                 {
                     settings["host"] = task.Connection.Host;
@@ -395,12 +395,12 @@ internal static class GatewayCollectionConfigurationMapper
                 settings["timeout"] = Math.Max(task.Connection.TimeoutMs, 1).ToString(CultureInfo.InvariantCulture);
                 break;
             case GatewayCollectionProtocolType.FanucCnc:
-                settings["host"] = Require(task.Connection.Host, $"task '{task.TaskKey}' requires connection.host for Fanuc CNC.");
+                settings["host"] = Require(task.Connection.Host, $"任务“{task.TaskKey}”的 Fanuc CNC 需要 connection.host。");
                 settings["port"] = (task.Connection.Port ?? 8193).ToString(CultureInfo.InvariantCulture);
                 settings["timeout"] = Math.Max((int)Math.Ceiling(task.Connection.TimeoutMs / 1000d), 1).ToString(CultureInfo.InvariantCulture);
                 break;
             default:
-                throw new NotSupportedException($"Collection protocol '{task.Protocol}' is not supported by Gateway sync.");
+                throw new NotSupportedException($"网关同步不支持采集协议“{task.Protocol}”。");
         }
 
         MergeJsonObject(settings, task.Connection.ProtocolOptions);
@@ -471,11 +471,11 @@ internal static class GatewayCollectionConfigurationMapper
                 ["index"] = RequireInteger(transform.Parameters, "index", "bitOffset", "offset")
             },
             GatewayCollectionTransformType.Expression => BuildExpressionArguments(transform.Parameters),
-            GatewayCollectionTransformType.WordSwap => throw new NotSupportedException("Gateway sync does not support WordSwap transforms yet."),
-            GatewayCollectionTransformType.ByteSwap => throw new NotSupportedException("Gateway sync does not support ByteSwap transforms yet."),
-            GatewayCollectionTransformType.Clamp => throw new NotSupportedException("Gateway sync does not support Clamp transforms yet."),
-            GatewayCollectionTransformType.DefaultOnError => throw new NotSupportedException("Gateway sync does not support DefaultOnError transforms yet."),
-            _ => throw new NotSupportedException($"Gateway sync does not support transform '{transform.TransformType}'.")
+            GatewayCollectionTransformType.WordSwap => throw new NotSupportedException("网关同步暂不支持字交换变换。"),
+            GatewayCollectionTransformType.ByteSwap => throw new NotSupportedException("网关同步暂不支持字节交换变换。"),
+            GatewayCollectionTransformType.Clamp => throw new NotSupportedException("网关同步暂不支持限幅变换。"),
+            GatewayCollectionTransformType.DefaultOnError => throw new NotSupportedException("网关同步暂不支持出错默认值变换。"),
+            _ => throw new NotSupportedException($"网关同步不支持变换“{transform.TransformType}”。")
         };
     }
 
@@ -483,7 +483,7 @@ internal static class GatewayCollectionConfigurationMapper
     {
         if (!parameters.HasValue || parameters.Value.ValueKind != JsonValueKind.Object)
         {
-            throw new InvalidOperationException("EnumMap transform requires object parameters.");
+            throw new InvalidOperationException("枚举映射变换需要对象参数。");
         }
 
         var source = parameters.Value;
@@ -496,7 +496,7 @@ internal static class GatewayCollectionConfigurationMapper
 
         if (source.ValueKind != JsonValueKind.Object)
         {
-            throw new InvalidOperationException("EnumMap transform requires an object mapping.");
+            throw new InvalidOperationException("枚举映射变换需要对象映射。");
         }
 
         var arguments = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
@@ -507,7 +507,7 @@ internal static class GatewayCollectionConfigurationMapper
 
         if (arguments.Count == 0)
         {
-            throw new InvalidOperationException("EnumMap transform requires at least one mapping item.");
+            throw new InvalidOperationException("枚举映射变换至少需要一个映射项。");
         }
 
         return arguments;
@@ -517,7 +517,7 @@ internal static class GatewayCollectionConfigurationMapper
     {
         if (!parameters.HasValue)
         {
-            throw new InvalidOperationException("Expression transform requires parameters.");
+            throw new InvalidOperationException("表达式变换需要参数。");
         }
 
         if (parameters.Value.ValueKind == JsonValueKind.String)
@@ -525,7 +525,7 @@ internal static class GatewayCollectionConfigurationMapper
             var expression = parameters.Value.GetString();
             if (string.IsNullOrWhiteSpace(expression))
             {
-                throw new InvalidOperationException("Expression transform requires a non-empty expression.");
+                throw new InvalidOperationException("表达式变换需要非空表达式。");
             }
 
             return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
@@ -539,7 +539,7 @@ internal static class GatewayCollectionConfigurationMapper
             var expression = ToStringValue(parameters.Value);
             if (string.IsNullOrWhiteSpace(expression))
             {
-                throw new InvalidOperationException("Expression transform requires a non-empty expression.");
+                throw new InvalidOperationException("表达式变换需要非空表达式。");
             }
 
             return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
@@ -557,7 +557,7 @@ internal static class GatewayCollectionConfigurationMapper
         var code = FirstNonEmpty(arguments, "expression", "script", "code", "value");
         if (string.IsNullOrWhiteSpace(code))
         {
-            throw new InvalidOperationException("Expression transform requires 'expression', 'script', or 'code'.");
+            throw new InvalidOperationException("表达式变换需要配置表达式、脚本或代码。");
         }
 
         arguments["expression"] = code;
@@ -569,7 +569,7 @@ internal static class GatewayCollectionConfigurationMapper
         var value = FirstString(parameters, keys);
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new InvalidOperationException($"Transform parameter '{string.Join("' or '", keys)}' is required.");
+            throw new InvalidOperationException($"变换参数 {string.Join(" 或 ", keys)} 为必填项。");
         }
 
         return value;
@@ -580,7 +580,7 @@ internal static class GatewayCollectionConfigurationMapper
         var value = RequireNumber(parameters, keys);
         return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
             ? parsed.ToString(CultureInfo.InvariantCulture)
-            : throw new InvalidOperationException($"Transform parameter '{string.Join("' or '", keys)}' must be an integer.");
+            : throw new InvalidOperationException($"变换参数 {string.Join(" 或 ", keys)} 必须是整数。");
     }
 
     private static ushort ResolvePointLength(CollectionPointContract point)
@@ -606,9 +606,9 @@ internal static class GatewayCollectionConfigurationMapper
         {
             GatewayCollectionTargetType.Telemetry => PointAccessMode.Read,
             GatewayCollectionTargetType.Attribute => PointAccessMode.Read,
-            GatewayCollectionTargetType.AlarmInput => throw new NotSupportedException("Gateway sync does not support AlarmInput target mapping yet."),
-            GatewayCollectionTargetType.CommandFeedback => throw new NotSupportedException("Gateway sync does not support CommandFeedback target mapping yet."),
-            _ => throw new NotSupportedException($"Gateway sync does not support target type '{targetType}'.")
+            GatewayCollectionTargetType.AlarmInput => throw new NotSupportedException("网关同步暂不支持告警输入目标映射。"),
+            GatewayCollectionTargetType.CommandFeedback => throw new NotSupportedException("网关同步暂不支持命令反馈目标映射。"),
+            _ => throw new NotSupportedException($"网关同步不支持目标类型“{targetType}”。")
         };
     }
 
@@ -618,9 +618,9 @@ internal static class GatewayCollectionConfigurationMapper
         {
             GatewayCollectionTargetType.Telemetry => GatewayCollectionTargetType.Telemetry,
             GatewayCollectionTargetType.Attribute => GatewayCollectionTargetType.Attribute,
-            GatewayCollectionTargetType.AlarmInput => throw new NotSupportedException($"Point '{pointKey}' uses unsupported target type AlarmInput."),
-            GatewayCollectionTargetType.CommandFeedback => throw new NotSupportedException($"Point '{pointKey}' uses unsupported target type CommandFeedback."),
-            _ => throw new NotSupportedException($"Point '{pointKey}' uses unsupported target type '{targetType}'.")
+            GatewayCollectionTargetType.AlarmInput => throw new NotSupportedException($"点位“{pointKey}”使用了不受支持的告警输入目标类型。"),
+            GatewayCollectionTargetType.CommandFeedback => throw new NotSupportedException($"点位“{pointKey}”使用了不受支持的命令反馈目标类型。"),
+            _ => throw new NotSupportedException($"点位“{pointKey}”使用了不受支持的目标类型“{targetType}”。")
         };
     }
 
@@ -633,7 +633,7 @@ internal static class GatewayCollectionConfigurationMapper
             GatewayCollectionTransformType.EnumMap => TransformationKind.EnumMap,
             GatewayCollectionTransformType.BitExtract => TransformationKind.BitExtract,
             GatewayCollectionTransformType.Expression => TransformationKind.Expression,
-            _ => throw new NotSupportedException($"Gateway sync does not support transform '{transformType}'.")
+            _ => throw new NotSupportedException($"网关同步不支持变换“{transformType}”。")
         };
     }
 
@@ -653,7 +653,7 @@ internal static class GatewayCollectionConfigurationMapper
             "double" or "float64" => GatewayDataType.Double,
             "decimal" => GatewayDataType.Double,
             "string" or "text" => GatewayDataType.String,
-            _ => throw new NotSupportedException($"Gateway sync does not support rawValueType '{rawValueType}'.")
+            _ => throw new NotSupportedException($"网关同步不支持原始数据类型“{rawValueType}”。")
         };
     }
 
@@ -670,7 +670,7 @@ internal static class GatewayCollectionConfigurationMapper
             GatewayCollectionProtocolType.Mitsubishi => "mitsubishi",
             GatewayCollectionProtocolType.OmronFins => "omron-fins",
             GatewayCollectionProtocolType.AllenBradley => "allen-bradley",
-            _ => throw new NotSupportedException($"Gateway sync does not support collection protocol '{protocol}'.")
+            _ => throw new NotSupportedException($"网关同步不支持采集协议“{protocol}”。")
         };
     }
 
@@ -685,7 +685,7 @@ internal static class GatewayCollectionConfigurationMapper
 
         if (string.IsNullOrWhiteSpace(connection.Host))
         {
-            throw new InvalidOperationException("OPC UA connection requires protocolOptions.endpointUrl or connection.host.");
+            throw new InvalidOperationException("OPC UA 连接需要 protocolOptions.endpointUrl 或 connection.host。");
         }
 
         var port = connection.Port ?? 4840;
@@ -702,7 +702,7 @@ internal static class GatewayCollectionConfigurationMapper
 
         if (string.IsNullOrWhiteSpace(connection.Host))
         {
-            throw new InvalidOperationException("MTConnect connection requires protocolOptions.baseUrl or connection.host.");
+            throw new InvalidOperationException("MTConnect 连接需要 protocolOptions.baseUrl 或 connection.host。");
         }
 
         var scheme = FirstString(connection.ProtocolOptions, "scheme", "protocol") ?? "http";
@@ -719,7 +719,7 @@ internal static class GatewayCollectionConfigurationMapper
             "serialrtu" or "rtu" or "modbusrtu" or "rs485" or "rs232" or "serial" or "serialdtu" or "dtu" => "serialRtu",
             "serialascii" or "ascii" or "modbusascii" => "serialAscii",
             "" => "tcp",
-            _ => throw new NotSupportedException($"Gateway sync does not support Modbus transport '{transport ?? fallback}'.")
+            _ => throw new NotSupportedException($"网关同步不支持 Modbus 传输方式“{transport ?? fallback}”。")
         };
     }
 

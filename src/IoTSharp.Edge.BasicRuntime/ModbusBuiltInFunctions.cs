@@ -160,7 +160,7 @@ internal static class ModbusBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Modbus connect failed: {Unwrap(ex).Message}", BasicValue.FromNumber(0));
+            return Fail(state, $"Modbus 连接失败：{Unwrap(ex).Message}", BasicValue.FromNumber(0));
         }
     }
 
@@ -182,7 +182,7 @@ internal static class ModbusBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Modbus close failed: {Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
+            return Fail(state, $"Modbus 关闭失败：{Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
         }
     }
 
@@ -202,7 +202,7 @@ internal static class ModbusBuiltInFunctions
             var result = session.Read(request);
             if (!result.Success)
             {
-                return Fail(state, $"Modbus read failed: {result.Error ?? "Unknown error"}", BasicValue.Nil, session);
+                return Fail(state, $"Modbus 读取失败：{result.Error ?? "未知错误"}", BasicValue.Nil, session);
             }
 
             state.ClearLastError();
@@ -211,7 +211,7 @@ internal static class ModbusBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Modbus read failed: {Unwrap(ex).Message}", BasicValue.Nil, session);
+            return Fail(state, $"Modbus 读取失败：{Unwrap(ex).Message}", BasicValue.Nil, session);
         }
     }
 
@@ -231,7 +231,7 @@ internal static class ModbusBuiltInFunctions
             var result = session.Write(request);
             if (!result.Success)
             {
-                return Fail(state, $"Modbus write failed: {result.Error ?? "Unknown error"}", BasicValue.FromBoolean(false), session);
+                return Fail(state, $"Modbus 写入失败：{result.Error ?? "未知错误"}", BasicValue.FromBoolean(false), session);
             }
 
             state.ClearLastError();
@@ -240,7 +240,7 @@ internal static class ModbusBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Modbus write failed: {Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
+            return Fail(state, $"Modbus 写入失败：{Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
         }
     }
 
@@ -304,7 +304,7 @@ internal static class ModbusBuiltInFunctions
                 EndianFormat = ParseEndianFormat(args, 6),
                 PlcAddresses = OptionalBool(args, 7, false)
             },
-            _ => throw new BasicRuntimeException("Unsupported Modbus transport.")
+            _ => throw new BasicRuntimeException("不支持的 Modbus 传输方式。")
         };
     }
 
@@ -359,7 +359,7 @@ internal static class ModbusBuiltInFunctions
             "double" or "decimal" => DoubleSpec,
             "string" or "text" => StringSpec,
             "raw" or "bytes" or "binary" => RawSpec,
-            _ => throw new BasicRuntimeException($"Unsupported Modbus data type '{value}'.")
+            _ => throw new BasicRuntimeException($"不支持的 Modbus 数据类型“{value}”。")
         };
     }
 
@@ -387,7 +387,7 @@ internal static class ModbusBuiltInFunctions
             BasicModbusValueKind.Double => value.AsNumber(),
             BasicModbusValueKind.String => value.AsString(),
             BasicModbusValueKind.Raw => ConvertToBytes(value, encoding),
-            _ => throw new BasicRuntimeException($"Unsupported Modbus data type '{spec.Kind}'.")
+            _ => throw new BasicRuntimeException($"不支持的 Modbus 数据类型“{spec.Kind}”。")
         };
     }
 
@@ -515,7 +515,7 @@ internal static class ModbusBuiltInFunctions
         }
         catch (Exception ex)
         {
-            throw new BasicRuntimeException($"Modbus encoding '{name}' is not supported: {ex.Message}");
+            throw new BasicRuntimeException($"Modbus 编码“{name}”不受支持：{ex.Message}");
         }
     }
 
@@ -527,7 +527,7 @@ internal static class ModbusBuiltInFunctions
             return format;
         }
 
-        throw new BasicRuntimeException("Modbus endian format must be ABCD, BADC, CDAB, or DCBA.");
+        throw new BasicRuntimeException("Modbus 字节序必须是 ABCD、BADC、CDAB 或 DCBA。");
     }
 
     private static Parity ParseParity(IReadOnlyList<BasicValue> args, int index)
@@ -547,7 +547,7 @@ internal static class ModbusBuiltInFunctions
             "3" or "m" or "mark" => Parity.Mark,
             "4" or "s" or "space" => Parity.Space,
             _ when int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var raw) && Enum.IsDefined(typeof(Parity), raw) => (Parity)raw,
-            _ => throw new BasicRuntimeException("Modbus parity must be one of N/E/O/M/S or 0-4.")
+            _ => throw new BasicRuntimeException("Modbus 校验位必须是 N/E/O/M/S 或 0-4。")
         };
     }
 
@@ -568,7 +568,7 @@ internal static class ModbusBuiltInFunctions
             _ when double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var raw) && Math.Abs(raw - 1.0) < 0.0000000001d => StopBits.One,
             _ when double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var rawHalf) && Math.Abs(rawHalf - 1.5d) < 0.0000000001d => StopBits.OnePointFive,
             _ when double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var rawTwo) && Math.Abs(rawTwo - 2d) < 0.0000000001d => StopBits.Two,
-            _ => throw new BasicRuntimeException("Modbus stop bits must be 1, 1.5, or 2.")
+            _ => throw new BasicRuntimeException("Modbus 停止位必须是 1、1.5 或 2。")
         };
     }
 
@@ -586,13 +586,13 @@ internal static class ModbusBuiltInFunctions
 
         if (!TryGetHandle(args, index, out handle))
         {
-            runtime.ModbusState.SetLastError("Modbus handle is required.");
+            runtime.ModbusState.SetLastError("需要 Modbus 句柄。");
             return false;
         }
 
         if (!runtime.ModbusState.TryGet(handle, out session))
         {
-            runtime.ModbusState.SetLastError("Modbus handle not found.");
+            runtime.ModbusState.SetLastError("未找到 Modbus 句柄。");
             return false;
         }
 
@@ -801,7 +801,7 @@ internal sealed class ModbusClientSession : IDisposable
     {
         if (Volatile.Read(ref _disposed) != 0)
         {
-            throw new InvalidOperationException("Modbus client is closed.");
+            throw new InvalidOperationException("Modbus 客户端已关闭。");
         }
     }
 }
@@ -849,7 +849,7 @@ internal sealed class SystemBasicModbusClientSession : IBasicModbusClientSession
                 BasicModbusValueKind.Double => ReadTyped(_client.ReadDouble(request.Address, request.StationNumber, request.FunctionCode)),
                 BasicModbusValueKind.String => ReadString(request),
                 BasicModbusValueKind.Raw => ReadRaw(request),
-                _ => new BasicModbusReadResult(false, null, $"Unsupported Modbus data type '{request.ValueKind}'.")
+                _ => new BasicModbusReadResult(false, null, $"不支持的 Modbus 数据类型“{request.ValueKind}”。")
             };
 
             if (!result.Success)
@@ -862,7 +862,7 @@ internal sealed class SystemBasicModbusClientSession : IBasicModbusClientSession
         }
         catch (Exception ex)
         {
-            return FailRead($"Modbus read failed: {Unwrap(ex).Message}");
+            return FailRead($"Modbus 读取失败：{Unwrap(ex).Message}");
         }
     }
 
@@ -884,7 +884,7 @@ internal sealed class SystemBasicModbusClientSession : IBasicModbusClientSession
                 BasicModbusValueKind.Double => ToWriteResult(_client.Write(request.Address, Convert.ToDouble(request.Value, CultureInfo.InvariantCulture), request.StationNumber, request.FunctionCode)),
                 BasicModbusValueKind.String => ToWriteResult(_client.Write(request.Address, ConvertToBytes(request.Value?.ToString() ?? string.Empty, request.Encoding), request.StationNumber, request.FunctionCode, _options.PlcAddresses)),
                 BasicModbusValueKind.Raw => ToWriteResult(_client.Write(request.Address, ConvertToBytes(request.Value, request.Encoding), request.StationNumber, request.FunctionCode, _options.PlcAddresses)),
-                _ => new BasicModbusWriteResult(false, $"Unsupported Modbus data type '{request.ValueKind}'.")
+                _ => new BasicModbusWriteResult(false, $"不支持的 Modbus 数据类型“{request.ValueKind}”。")
             };
 
             if (!result.Success)
@@ -897,7 +897,7 @@ internal sealed class SystemBasicModbusClientSession : IBasicModbusClientSession
         }
         catch (Exception ex)
         {
-            return FailWrite($"Modbus write failed: {Unwrap(ex).Message}");
+            return FailWrite($"Modbus 写入失败：{Unwrap(ex).Message}");
         }
     }
 
@@ -915,7 +915,7 @@ internal sealed class SystemBasicModbusClientSession : IBasicModbusClientSession
                 var result = _client.Close();
                 if (!result.IsSucceed)
                 {
-                    throw new InvalidOperationException(result.Err ?? "Modbus close failed.");
+                    throw new InvalidOperationException(result.Err ?? "Modbus 关闭失败。");
                 }
             }
         }
@@ -945,20 +945,20 @@ internal sealed class SystemBasicModbusClientSession : IBasicModbusClientSession
 
         return result.IsSucceed
             ? new BasicModbusReadResult(true, result.Value, null)
-            : FailRead(result.Err ?? "Modbus bool read failed.");
+            : FailRead(result.Err ?? "Modbus 布尔读取失败。");
     }
 
     private BasicModbusReadResult ReadTyped<T>(IoTClient.Result<T> result)
         => result.IsSucceed
             ? new BasicModbusReadResult(true, result.Value, null)
-            : FailRead(result.Err ?? "Modbus read failed.");
+            : FailRead(result.Err ?? "Modbus 读取失败。");
 
     private BasicModbusReadResult ReadString(BasicModbusReadRequest request)
     {
         var result = _client.Read(request.Address, request.StationNumber, request.FunctionCode, checked((ushort)Math.Max(0, request.Length)), _options.PlcAddresses);
         if (!result.IsSucceed)
         {
-            return FailRead(result.Err ?? "Modbus string read failed.");
+            return FailRead(result.Err ?? "Modbus 字符串读取失败。");
         }
 
         var bytes = result.Value ?? Array.Empty<byte>();
@@ -971,13 +971,13 @@ internal sealed class SystemBasicModbusClientSession : IBasicModbusClientSession
         var result = _client.Read(request.Address, request.StationNumber, request.FunctionCode, checked((ushort)Math.Max(0, request.Length)), _options.PlcAddresses);
         return result.IsSucceed
             ? new BasicModbusReadResult(true, result.Value ?? Array.Empty<byte>(), null)
-            : FailRead(result.Err ?? "Modbus raw read failed.");
+            : FailRead(result.Err ?? "Modbus 原始字节读取失败。");
     }
 
     private static BasicModbusWriteResult ToWriteResult(IoTClient.Result result)
         => result.IsSucceed
             ? new BasicModbusWriteResult(true, null)
-            : new BasicModbusWriteResult(false, result.Err ?? "Modbus write failed.");
+            : new BasicModbusWriteResult(false, result.Err ?? "Modbus 写入失败。");
 
     private BasicModbusReadResult FailRead(string message)
     {
@@ -995,7 +995,7 @@ internal sealed class SystemBasicModbusClientSession : IBasicModbusClientSession
     {
         if (Volatile.Read(ref _disposed) != 0)
         {
-            throw new InvalidOperationException($"Modbus session '{_options.Transport}' is closed.");
+            throw new InvalidOperationException($"Modbus 会话“{_options.Transport}”已关闭。");
         }
 
         if (_client.Connected)
@@ -1006,7 +1006,7 @@ internal sealed class SystemBasicModbusClientSession : IBasicModbusClientSession
         var result = _client.Open();
         if (!result.IsSucceed)
         {
-            throw new InvalidOperationException(result.Err ?? "Modbus connection failed.");
+            throw new InvalidOperationException(result.Err ?? "Modbus 连接失败。");
         }
     }
 
@@ -1018,7 +1018,7 @@ internal sealed class SystemBasicModbusClientSession : IBasicModbusClientSession
             BasicModbusTransport.RtuOverTcp => new ModbusRtuOverTcpClient(options.Host, options.Port, options.TimeoutMs, options.EndianFormat, options.PlcAddresses),
             BasicModbusTransport.Rtu => new ModbusRtuClient(options.PortName, options.BaudRate, options.TimeoutMs, options.StopBits, options.Parity, options.DataBits, options.EndianFormat, options.PlcAddresses),
             BasicModbusTransport.Ascii => new ModbusAsciiClient(options.PortName, options.BaudRate, options.TimeoutMs, options.StopBits, options.Parity, options.DataBits, options.EndianFormat, options.PlcAddresses),
-            _ => throw new BasicRuntimeException("Unsupported Modbus transport.")
+            _ => throw new BasicRuntimeException("不支持的 Modbus 传输方式。")
         };
     }
 

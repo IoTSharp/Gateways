@@ -5,18 +5,18 @@ internal sealed class AllenBradleyDriver : DeviceDriverBase
     public override DriverMetadata Metadata { get; } = new(
         "allen-bradley",
         DriverType.AllenBradley,
-        "Allen-Bradley",
-        "IoTClient-backed Allen-Bradley driver.",
+        "艾伦-布拉德利",
+        "基于 IoTClient 的艾伦-布拉德利驱动。",
         true,
         true,
         true,
         true,
         new[]
         {
-            new ConnectionSettingDefinition("host", "Host", "text", true, "PLC host name or IP."),
-            new ConnectionSettingDefinition("port", "Port", "number", true, "PLC port."),
-            new ConnectionSettingDefinition("slot", "Slot", "number", false, "Backplane slot."),
-            new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "Timeout in milliseconds.")
+            new ConnectionSettingDefinition("host", "主机", "text", true, "PLC 主机名或 IP 地址。"),
+            new ConnectionSettingDefinition("port", "端口", "number", true, "PLC 端口。"),
+            new ConnectionSettingDefinition("slot", "槽位", "number", false, "背板槽位。"),
+            new ConnectionSettingDefinition("timeout", "超时", "number", false, "超时时间，单位毫秒。")
         });
 
     public override Task<ConnectionTestResult> TestConnectionAsync(DriverConnectionContext context, CancellationToken cancellationToken)
@@ -49,7 +49,7 @@ internal sealed class AllenBradleyDriver : DeviceDriverBase
                 GatewayDataType.UInt64 => ToReadResult(request.Address, client.ReadUInt64(request.Address)),
                 GatewayDataType.Float => ToReadResult(request.Address, client.ReadFloat(request.Address)),
                 GatewayDataType.Double => ToReadResult(request.Address, client.ReadDouble(request.Address)),
-                _ => new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"Unsupported Allen-Bradley data type '{request.DataType}'.")
+                _ => new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"不支持的艾伦-布拉德利数据类型“{request.DataType}”。")
             };
 
             return Task.FromResult(result);
@@ -78,7 +78,7 @@ internal sealed class AllenBradleyDriver : DeviceDriverBase
                 GatewayDataType.Float => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToSingle(request.Value))),
                 GatewayDataType.Double => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToDouble(request.Value))),
                 GatewayDataType.String => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToString(request.Value) ?? string.Empty)),
-                _ => new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, $"Unsupported Allen-Bradley data type '{request.DataType}'.")
+                _ => new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, $"不支持的艾伦-布拉德利数据类型“{request.DataType}”。")
             };
 
             return Task.FromResult(result);

@@ -5,18 +5,18 @@ internal sealed class MitsubishiDriver : DeviceDriverBase
     public override DriverMetadata Metadata { get; } = new(
         "mitsubishi",
         DriverType.Mitsubishi,
-        "Mitsubishi",
-        "IoTClient-backed Mitsubishi PLC driver.",
+        "三菱 PLC",
+        "基于 IoTClient 的三菱 PLC 驱动。",
         true,
         true,
         true,
         true,
         new[]
         {
-            new ConnectionSettingDefinition("host", "Host", "text", true, "PLC host name or IP."),
-            new ConnectionSettingDefinition("port", "Port", "number", true, "PLC port."),
-            new ConnectionSettingDefinition("model", "Model", "select", true, "Mitsubishi model.", Enum.GetNames<MitsubishiVersion>()),
-            new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "Timeout in milliseconds.")
+            new ConnectionSettingDefinition("host", "主机", "text", true, "PLC 主机名或 IP 地址。"),
+            new ConnectionSettingDefinition("port", "端口", "number", true, "PLC 端口。"),
+            new ConnectionSettingDefinition("model", "型号", "select", true, "三菱型号。", Enum.GetNames<MitsubishiVersion>()),
+            new ConnectionSettingDefinition("timeout", "超时", "number", false, "超时时间，单位毫秒。")
         });
 
     public override Task<ConnectionTestResult> TestConnectionAsync(DriverConnectionContext context, CancellationToken cancellationToken)
@@ -48,7 +48,7 @@ internal sealed class MitsubishiDriver : DeviceDriverBase
                 GatewayDataType.UInt64 => ToReadResult(request.Address, client.ReadUInt64(request.Address)),
                 GatewayDataType.Float => ToReadResult(request.Address, client.ReadFloat(request.Address)),
                 GatewayDataType.Double => ToReadResult(request.Address, client.ReadDouble(request.Address)),
-                _ => new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"Unsupported Mitsubishi data type '{request.DataType}'.")
+                _ => new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"不支持的三菱数据类型“{request.DataType}”。")
             };
 
             return Task.FromResult(result);
@@ -76,7 +76,7 @@ internal sealed class MitsubishiDriver : DeviceDriverBase
                 GatewayDataType.Float => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToSingle(request.Value))),
                 GatewayDataType.Double => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToDouble(request.Value))),
                 GatewayDataType.String => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToString(request.Value) ?? string.Empty)),
-                _ => new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, $"Unsupported Mitsubishi data type '{request.DataType}'.")
+                _ => new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, $"不支持的三菱数据类型“{request.DataType}”。")
             };
 
             return Task.FromResult(result);

@@ -203,7 +203,7 @@ internal static class BuiltInFunctions
         var value = Arg(args, index);
         if (value.Kind != BasicValueKind.List)
         {
-            throw new BasicRuntimeException("LIST value expected.");
+            throw new BasicRuntimeException("需要 LIST 值。");
         }
 
         return value.List;

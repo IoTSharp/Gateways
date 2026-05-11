@@ -458,6 +458,45 @@ button:disabled {
   grid-template-rows: auto auto auto;
 }
 
+.device-manager {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 12px;
+  align-items: end;
+}
+
+.device-select {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  min-width: 0;
+}
+
+.device-select span {
+  font-weight: 600;
+}
+
+.device-select select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: #fff;
+  padding: 9px 10px;
+  color: var(--text);
+}
+
+.device-actions {
+  justify-content: flex-end;
+}
+
+.device-summary {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -654,6 +693,14 @@ code {
 
   .metrics,
   .actions {
+    justify-content: flex-start;
+  }
+
+  .device-manager {
+    grid-template-columns: 1fr;
+  }
+
+  .device-actions {
     justify-content: flex-start;
   }
 

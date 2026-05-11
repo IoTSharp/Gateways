@@ -5,7 +5,7 @@ public sealed class CollectionConfigurationSyncState
     private readonly object _lock = new();
     private CollectionConfigurationSyncSnapshot _snapshot = new(
         "idle",
-        "Waiting for collection configuration sync.",
+        "等待采集配置同步。",
         null,
         null,
         null,
@@ -25,18 +25,18 @@ public sealed class CollectionConfigurationSyncState
     }
 
     public void MarkDisabled(string? baseUrl, bool hasAccessToken)
-        => Update("disabled", "Edge reporting is disabled; collection config sync is paused.", baseUrl, hasAccessToken);
+        => Update("disabled", "边缘上报已禁用，采集配置同步已暂停。", baseUrl, hasAccessToken);
 
     public void MarkWaitingBootstrap(string message, string? baseUrl, bool hasAccessToken)
         => Update("waiting-bootstrap", message, baseUrl, hasAccessToken);
 
     public void MarkSyncing(string? baseUrl, bool hasAccessToken)
-        => Update("syncing", "Pulling collection configuration from IoTSharp.", baseUrl, hasAccessToken);
+        => Update("syncing", "正在从 IoTSharp 拉取采集配置。", baseUrl, hasAccessToken);
 
     public void MarkSynced(int version, DateTime updatedAtUtc, string updatedBy, string? baseUrl, bool hasAccessToken, bool applied)
         => Update(
             applied ? "synced" : "up-to-date",
-            applied ? "Collection configuration has been applied to the local execution cache." : "Collection configuration is already up to date.",
+            applied ? "采集配置已应用到本地执行缓存。" : "采集配置已是最新。",
             baseUrl,
             hasAccessToken,
             version,

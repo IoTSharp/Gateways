@@ -26,59 +26,59 @@ public static class GatewayInfrastructureServiceCollectionExtensions
         services.AddSingleton<IDeviceDriver, OpcUaDriver>();
         services.AddSingleton<IDeviceDriver, MtConnectDriver>();
         services.AddSingleton<IDeviceDriver>(_ => new UnsupportedDriver(
-            new DriverMetadata("bacnet", DriverType.Bacnet, "BACnet", "BACnet/IP collection contract for building automation devices and object properties.", true, true, true, true,
+            new DriverMetadata("bacnet", DriverType.Bacnet, "BACnet 协议", "BACnet/IP 采集契约，用于楼宇自动化设备和对象属性。", true, true, true, true,
                 new[]
                 {
-                    new ConnectionSettingDefinition("host", "Host", "text", true, "BACnet device host name or IP address."),
-                    new ConnectionSettingDefinition("port", "Port", "number", true, "BACnet/IP UDP port, commonly 47808."),
-                    new ConnectionSettingDefinition("deviceInstance", "Device Instance", "number", true, "BACnet device instance identifier."),
-                    new ConnectionSettingDefinition("networkNumber", "Network Number", "number", false, "Optional BACnet network number."),
-                    new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "Timeout in milliseconds.")
+                    new ConnectionSettingDefinition("host", "主机", "text", true, "BACnet 设备主机名或 IP 地址。"),
+                    new ConnectionSettingDefinition("port", "端口", "number", true, "BACnet/IP UDP 端口，通常为 47808。"),
+                    new ConnectionSettingDefinition("deviceInstance", "设备实例", "number", true, "BACnet 设备实例标识。"),
+                    new ConnectionSettingDefinition("networkNumber", "网络号", "number", false, "可选的 BACnet 网络号。"),
+                    new ConnectionSettingDefinition("timeout", "超时", "number", false, "超时时间，单位毫秒。")
                 }, "planned"),
-            "BACnet/IP collection is planned as a protocol adapter. Add a BACnet stack such as BACnet4J.NET or a native adapter before enabling runtime reads."));
+            "BACnet/IP 采集已规划为协议适配器。启用运行时读取前，请先接入 BACnet 协议栈，例如 BACnet4J.NET 或原生适配器。"));
         services.AddSingleton<IDeviceDriver>(_ => new UnsupportedDriver(
-            new DriverMetadata("iec104", DriverType.Iec104, "IEC 60870-5-104", "IEC 60870-5-104 telecontrol collection contract for power and SCADA endpoints.", true, true, true, true,
+            new DriverMetadata("iec104", DriverType.Iec104, "IEC 104 规约", "IEC 60870-5-104 遥控采集契约，用于电力和 SCADA 终端。", true, true, true, true,
                 new[]
                 {
-                    new ConnectionSettingDefinition("host", "Host", "text", true, "IEC 104 server host name or IP address."),
-                    new ConnectionSettingDefinition("port", "Port", "number", true, "IEC 104 TCP port, commonly 2404."),
-                    new ConnectionSettingDefinition("commonAddress", "Common Address", "number", true, "ASDU common address."),
-                    new ConnectionSettingDefinition("originatorAddress", "Originator Address", "number", false, "Optional originator address."),
-                    new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "Timeout in milliseconds.")
+                    new ConnectionSettingDefinition("host", "主机", "text", true, "IEC 104 服务器主机名或 IP 地址。"),
+                    new ConnectionSettingDefinition("port", "端口", "number", true, "IEC 104 TCP 端口，通常为 2404。"),
+                    new ConnectionSettingDefinition("commonAddress", "公共地址", "number", true, "ASDU 公共地址。"),
+                    new ConnectionSettingDefinition("originatorAddress", "源地址", "number", false, "可选的源地址。"),
+                    new ConnectionSettingDefinition("timeout", "超时", "number", false, "超时时间，单位毫秒。")
                 }, "planned"),
-            "IEC 60870-5-104 collection is planned as a protocol adapter. Add an IEC 104 stack before enabling runtime reads."));
+            "IEC 60870-5-104 采集已规划为协议适配器。启用运行时读取前，请先接入 IEC 104 协议栈。"));
         services.AddSingleton<IDeviceDriver>(_ => new UnsupportedDriver(
-            new DriverMetadata("mqtt", DriverType.Mqtt, "MQTT", "MQTT subscription-based collection contract for topic payload ingestion.", true, false, true, false,
+            new DriverMetadata("mqtt", DriverType.Mqtt, "MQTT 订阅", "MQTT 订阅式采集契约，用于接收主题负载。", true, false, true, false,
                 new[]
                 {
-                    new ConnectionSettingDefinition("host", "Host", "text", true, "MQTT broker host name or IP address."),
-                    new ConnectionSettingDefinition("port", "Port", "number", true, "MQTT broker port, commonly 1883."),
-                    new ConnectionSettingDefinition("clientId", "Client ID", "text", true, "Client identifier used by the edge collector."),
-                    new ConnectionSettingDefinition("topic", "Topic", "text", true, "Topic or topic filter to subscribe."),
-                    new ConnectionSettingDefinition("qos", "QoS", "select", false, "MQTT quality of service.", new[] { "0", "1", "2" }),
-                    new ConnectionSettingDefinition("username", "Username", "text", false, "Optional broker username."),
-                    new ConnectionSettingDefinition("password", "Password", "password", false, "Optional broker password.")
+                    new ConnectionSettingDefinition("host", "主机", "text", true, "MQTT 代理主机名或 IP 地址。"),
+                    new ConnectionSettingDefinition("port", "端口", "number", true, "MQTT 代理端口，通常为 1883。"),
+                    new ConnectionSettingDefinition("clientId", "客户端 ID", "text", true, "边缘采集器使用的客户端标识。"),
+                    new ConnectionSettingDefinition("topic", "主题", "text", true, "要订阅的主题或主题过滤器。"),
+                    new ConnectionSettingDefinition("qos", "服务质量", "select", false, "MQTT 服务质量。", new[] { "0", "1", "2" }),
+                    new ConnectionSettingDefinition("username", "用户名", "text", false, "可选的代理用户名。"),
+                    new ConnectionSettingDefinition("password", "密码", "password", false, "可选的代理密码。")
                 }, "planned"),
-            "MQTT collection is planned as a subscription adapter. The current MQTT implementation is only registered as an upload transport."));
+            "MQTT 采集已规划为订阅适配器。当前 MQTT 实现仅作为上传传输层注册。"));
         services.AddSingleton<IDeviceDriver>(_ => new UnsupportedDriver(
-            new DriverMetadata("opc-da", DriverType.OpcDa, "OPC DA", "Windows-only OPC DA Classic COM/DCOM driver contract.", true, true, true, true,
+            new DriverMetadata("opc-da", DriverType.OpcDa, "OPC DA 协议", "仅限 Windows 的 OPC DA Classic COM/DCOM 驱动契约。", true, true, true, true,
                 new[]
                 {
-                    new ConnectionSettingDefinition("progId", "ProgId", "text", true, "OPC DA server ProgId, for example Matrikon.OPC.Simulation.1."),
-                    new ConnectionSettingDefinition("host", "Host", "text", false, "Optional remote OPC DA host."),
-                    new ConnectionSettingDefinition("clsid", "CLSID", "text", false, "Optional COM CLSID when ProgId is not enough.")
+                    new ConnectionSettingDefinition("progId", "ProgId", "text", true, "OPC DA 服务器 ProgId，例如 Matrikon.OPC.Simulation.1。"),
+                    new ConnectionSettingDefinition("host", "主机", "text", false, "可选的远程 OPC DA 主机。"),
+                    new ConnectionSettingDefinition("clsid", "CLSID", "text", false, "当 ProgId 不足时可选的 COM CLSID。")
                 }, "high"),
-            "OPC DA depends on Windows COM/DCOM. Use a Windows-only adapter package such as TitaniumAS.Opc.Client or bridge OPC DA to OPC UA before enabling it in the cross-platform gateway."));
+            "OPC DA 依赖 Windows COM/DCOM。请使用仅限 Windows 的适配器包，例如 TitaniumAS.Opc.Client，或先将 OPC DA 桥接到 OPC UA。"));
         services.AddSingleton<IDeviceDriver>(_ => new UnsupportedDriver(
-            new DriverMetadata("fanuc-cnc", DriverType.FanucCnc, "Fanuc CNC", "Fanuc FOCAS native SDK driver contract.", true, true, true, true,
+            new DriverMetadata("fanuc-cnc", DriverType.FanucCnc, "发那科 CNC", "发那科 FOCAS 原生 SDK 驱动契约。", true, true, true, true,
                 new[]
                 {
-                    new ConnectionSettingDefinition("host", "Host", "text", true, "CNC IP address or host name."),
-                    new ConnectionSettingDefinition("port", "Port", "number", false, "FOCAS TCP port, commonly 8193."),
-                    new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "FOCAS timeout in seconds."),
-                    new ConnectionSettingDefinition("libraryPath", "FOCAS Library", "text", false, "Optional path to fwlib32/fwlib64 native library.")
+                    new ConnectionSettingDefinition("host", "主机", "text", true, "CNC IP 地址或主机名。"),
+                    new ConnectionSettingDefinition("port", "端口", "number", false, "FOCAS TCP 端口，通常为 8193。"),
+                    new ConnectionSettingDefinition("timeout", "超时", "number", false, "FOCAS 超时时间，单位秒。"),
+                    new ConnectionSettingDefinition("libraryPath", "FOCAS 库", "text", false, "fwlib32/fwlib64 原生库的可选路径。")
                 }, "high"),
-            "Fanuc CNC support requires the licensed Fanuc FOCAS runtime (fwlib32/fwlib64) and architecture-specific native loading. Keep it as an optional adapter boundary."));
+            "Fanuc CNC 支持需要授权的 Fanuc FOCAS 运行时（fwlib32/fwlib64）以及与架构相关的原生加载。请将其保持为可选适配器边界。"));
         services.AddSingleton<IDeviceDriverRegistry, DeviceDriverRegistry>();
 
         services.AddSingleton<IUploadTransport, HttpUploadTransport>();

@@ -5,20 +5,20 @@ internal sealed class SiemensDriver : DeviceDriverBase
     public override DriverMetadata Metadata { get; } = new(
         "siemens-s7",
         DriverType.SiemensS7,
-        "Siemens S7",
-        "IoTClient-backed Siemens S7 driver supporting S7-200/300/400/1200/1500 reads and writes.",
+        "西门子 S7",
+        "基于 IoTClient 的西门子 S7 驱动，支持 S7-200/300/400/1200/1500 的读写。",
         true,
         true,
         true,
         true,
         new[]
         {
-            new ConnectionSettingDefinition("host", "Host", "text", true, "PLC host name or IP."),
-            new ConnectionSettingDefinition("port", "Port", "number", true, "PLC port, usually 102."),
-            new ConnectionSettingDefinition("model", "Model", "select", true, "Siemens PLC model.", Enum.GetNames<SiemensVersion>()),
-            new ConnectionSettingDefinition("rack", "Rack", "number", false, "Rack number."),
-            new ConnectionSettingDefinition("slot", "Slot", "number", false, "Slot number."),
-            new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "Timeout in milliseconds.")
+            new ConnectionSettingDefinition("host", "主机", "text", true, "PLC 主机名或 IP 地址。"),
+            new ConnectionSettingDefinition("port", "端口", "number", true, "PLC 端口，通常为 102。"),
+            new ConnectionSettingDefinition("model", "型号", "select", true, "西门子 PLC 型号。", Enum.GetNames<SiemensVersion>()),
+            new ConnectionSettingDefinition("rack", "机架", "number", false, "机架号。"),
+            new ConnectionSettingDefinition("slot", "槽位", "number", false, "槽位号。"),
+            new ConnectionSettingDefinition("timeout", "超时", "number", false, "超时时间，单位毫秒。")
         });
 
     public override Task<ConnectionTestResult> TestConnectionAsync(DriverConnectionContext context, CancellationToken cancellationToken)
@@ -52,7 +52,7 @@ internal sealed class SiemensDriver : DeviceDriverBase
                 GatewayDataType.Float => ToReadResult(request.Address, client.ReadFloat(request.Address)),
                 GatewayDataType.Double => ToReadResult(request.Address, client.ReadDouble(request.Address)),
                 GatewayDataType.String => ToReadResult(request.Address, client.ReadString(request.Address)),
-                _ => new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"Unsupported Siemens data type '{request.DataType}'.")
+                _ => new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"不支持的西门子数据类型“{request.DataType}”。")
             };
 
             return Task.FromResult(result);
@@ -81,7 +81,7 @@ internal sealed class SiemensDriver : DeviceDriverBase
                 GatewayDataType.Float => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToSingle(request.Value))),
                 GatewayDataType.Double => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToDouble(request.Value))),
                 GatewayDataType.String => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToString(request.Value) ?? string.Empty)),
-                _ => new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, $"Unsupported Siemens data type '{request.DataType}'.")
+                _ => new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, $"不支持的西门子数据类型“{request.DataType}”。")
             };
 
             return Task.FromResult(result);

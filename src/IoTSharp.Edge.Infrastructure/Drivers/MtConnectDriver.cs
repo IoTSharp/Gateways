@@ -5,23 +5,23 @@ internal sealed class MtConnectDriver : DeviceDriverBase
     public override DriverMetadata Metadata { get; } = new(
         "mt-cnc",
         DriverType.MtCnc,
-        "MTConnect CNC",
-        "MTConnect current endpoint driver for machine and CNC telemetry over HTTP/XML.",
+        "MTConnect 数控",
+        "通过 HTTP/XML 读取机床和数控遥测的 MTConnect 当前端点驱动。",
         true,
         false,
         true,
         false,
         new[]
         {
-            new ConnectionSettingDefinition("baseUrl", "Base URL", "text", true, "MTConnect agent base URL, for example http://127.0.0.1:5000."),
-            new ConnectionSettingDefinition("device", "Device", "text", false, "Optional MTConnect device name/path segment."),
-            new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "HTTP timeout in milliseconds."),
-            new ConnectionSettingDefinition("path", "Path", "text", false, "Current endpoint path, defaults to current.")
+            new ConnectionSettingDefinition("baseUrl", "基础地址", "text", true, "MTConnect 代理基础地址，例如 http://127.0.0.1:5000。"),
+            new ConnectionSettingDefinition("device", "设备", "text", false, "可选的 MTConnect 设备名或路径段。"),
+            new ConnectionSettingDefinition("timeout", "超时", "number", false, "HTTP 超时时间，单位毫秒。"),
+            new ConnectionSettingDefinition("path", "路径", "text", false, "当前端点路径，默认使用 current。")
         });
 
     public override Task<AddressValidationResult> ValidateAddressAsync(DriverReadRequest request, CancellationToken cancellationToken)
         => Task.FromResult(string.IsNullOrWhiteSpace(request.Address)
-            ? new AddressValidationResult(false, "MTConnect data item id/name is required.")
+            ? new AddressValidationResult(false, "MTConnect 数据项 ID 或名称是必填项。")
             : new AddressValidationResult(true));
 
     public override async Task<ConnectionTestResult> TestConnectionAsync(DriverConnectionContext context, CancellationToken cancellationToken)
@@ -32,7 +32,7 @@ internal sealed class MtConnectDriver : DeviceDriverBase
             using var response = await httpClient.GetAsync(BuildCurrentUri(context.Settings), cancellationToken);
             return response.IsSuccessStatusCode
                 ? new ConnectionTestResult(true)
-                : new ConnectionTestResult(false, $"MTConnect agent returned HTTP {(int)response.StatusCode}.");
+                : new ConnectionTestResult(false, $"MTConnect 代理返回了 HTTP {(int)response.StatusCode}。");
         }
         catch (Exception exception)
         {
@@ -47,7 +47,7 @@ internal sealed class MtConnectDriver : DeviceDriverBase
             var values = await ReadCurrentValuesAsync(context.Settings, cancellationToken);
             if (!TryResolveValue(values, request.Address, out var rawValue))
             {
-                return new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"MTConnect data item '{request.Address}' was not found.");
+                return new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"未找到 MTConnect 数据项“{request.Address}”。");
             }
 
             var value = CoerceMtConnectValue(rawValue, request.DataType);
@@ -69,7 +69,7 @@ internal sealed class MtConnectDriver : DeviceDriverBase
                 {
                     if (!TryResolveValue(values, item.Address, out var rawValue))
                     {
-                        return new DriverReadResult(item.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"MTConnect data item '{item.Address}' was not found.");
+                        return new DriverReadResult(item.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"未找到 MTConnect 数据项“{item.Address}”。");
                     }
 
                     var value = CoerceMtConnectValue(rawValue, item.DataType);
@@ -86,7 +86,7 @@ internal sealed class MtConnectDriver : DeviceDriverBase
     }
 
     public override Task<DriverWriteResult> WriteAsync(DriverConnectionContext context, DriverWriteRequest request, CancellationToken cancellationToken)
-        => Task.FromResult(new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, "MTConnect current endpoint is read-only."));
+        => Task.FromResult(new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, "MTConnect 当前端点为只读。"));
 
     private static HttpClient CreateClient(IReadOnlyDictionary<string, string?> settings)
         => new()

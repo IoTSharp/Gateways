@@ -7,23 +7,23 @@ internal sealed class OpcUaDriver : DeviceDriverBase
     public override DriverMetadata Metadata { get; } = new(
         "opc-ua",
         DriverType.OpcUa,
-        "OPC UA",
-        "OPC Foundation UA .NET Standard client driver for scalar OPC UA node reads and writes.",
+        "OPC UA 协议",
+        "基于 OPC Foundation UA .NET Standard 的 OPC UA 节点读写驱动。",
         true,
         true,
         true,
         true,
         new[]
         {
-            new ConnectionSettingDefinition("endpoint", "Endpoint", "text", true, "OPC UA endpoint URL, for example opc.tcp://127.0.0.1:4840."),
-            new ConnectionSettingDefinition("useSecurity", "Use Security", "boolean", false, "Discover and prefer a secured endpoint."),
-            new ConnectionSettingDefinition("securityMode", "Security Mode", "select", false, "Requested message security mode.", new[] { "Auto", "None", "Sign", "SignAndEncrypt" }),
-            new ConnectionSettingDefinition("securityPolicy", "Security Policy", "select", false, "Requested security policy.", new[] { "Auto", "None", "Basic256Sha256", "Aes128_Sha256_RsaOaep", "Aes256_Sha256_RsaPss" }),
-            new ConnectionSettingDefinition("username", "Username", "text", false, "Username for authenticated sessions."),
-            new ConnectionSettingDefinition("password", "Password", "password", false, "Password for authenticated sessions."),
-            new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "Operation timeout in milliseconds."),
-            new ConnectionSettingDefinition("sessionTimeout", "Session Timeout", "number", false, "Session timeout in milliseconds."),
-            new ConnectionSettingDefinition("autoAcceptUntrustedCertificates", "Auto Accept Certificates", "boolean", false, "Automatically accept untrusted server certificates.")
+            new ConnectionSettingDefinition("endpoint", "端点", "text", true, "OPC UA 端点 URL，例如 opc.tcp://127.0.0.1:4840。"),
+            new ConnectionSettingDefinition("useSecurity", "启用安全", "boolean", false, "自动发现并优先使用安全端点。"),
+            new ConnectionSettingDefinition("securityMode", "安全模式", "select", false, "请求的消息安全模式。", new[] { "Auto", "None", "Sign", "SignAndEncrypt" }),
+            new ConnectionSettingDefinition("securityPolicy", "安全策略", "select", false, "请求的安全策略。", new[] { "Auto", "None", "Basic256Sha256", "Aes128_Sha256_RsaOaep", "Aes256_Sha256_RsaPss" }),
+            new ConnectionSettingDefinition("username", "用户名", "text", false, "用于认证会话的用户名。"),
+            new ConnectionSettingDefinition("password", "密码", "password", false, "用于认证会话的密码。"),
+            new ConnectionSettingDefinition("timeout", "超时", "number", false, "操作超时时间，单位毫秒。"),
+            new ConnectionSettingDefinition("sessionTimeout", "会话超时", "number", false, "会话超时时间，单位毫秒。"),
+            new ConnectionSettingDefinition("autoAcceptUntrustedCertificates", "自动接受不受信任证书", "boolean", false, "自动接受不受信任的服务器证书。")
         });
 
     public override async Task<ConnectionTestResult> TestConnectionAsync(DriverConnectionContext context, CancellationToken cancellationToken)
@@ -42,7 +42,7 @@ internal sealed class OpcUaDriver : DeviceDriverBase
     public override Task<AddressValidationResult> ValidateAddressAsync(DriverReadRequest request, CancellationToken cancellationToken)
         => Task.FromResult(NodeId.TryParse(request.Address, out _)
             ? new AddressValidationResult(true)
-            : new AddressValidationResult(false, "OPC UA address must be a valid NodeId, for example ns=2;s=Device.Temperature."));
+            : new AddressValidationResult(false, "OPC UA 地址必须是有效的 NodeId，例如 ns=2;s=设备.温度。"));
 
     public override async Task<DriverReadResult> ReadAsync(DriverConnectionContext context, DriverReadRequest request, CancellationToken cancellationToken)
     {
@@ -50,7 +50,7 @@ internal sealed class OpcUaDriver : DeviceDriverBase
         {
             if (!NodeId.TryParse(request.Address, out var nodeId))
             {
-                return new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, "OPC UA address must be a valid NodeId.");
+                return new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, "OPC UA 地址必须是有效的 NodeId。");
             }
 
             await using var session = await OpenSessionAsync(context.Settings, cancellationToken);
@@ -100,7 +100,7 @@ internal sealed class OpcUaDriver : DeviceDriverBase
                 if (!NodeId.TryParse(item.Address, out var nodeId))
                 {
                     return orderedRequests
-                        .Select(invalidItem => new DriverReadResult(invalidItem.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, "OPC UA address must be a valid NodeId."))
+                .Select(invalidItem => new DriverReadResult(invalidItem.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, "OPC UA 地址必须是有效的 NodeId。"))
                         .ToArray();
                 }
 
@@ -144,7 +144,7 @@ internal sealed class OpcUaDriver : DeviceDriverBase
         {
             if (!NodeId.TryParse(request.Address, out var nodeId))
             {
-                return new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, "OPC UA address must be a valid NodeId.");
+                return new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, "OPC UA 地址必须是有效的 NodeId。");
             }
 
             await using var session = await OpenSessionAsync(context.Settings, cancellationToken);
@@ -183,7 +183,7 @@ internal sealed class OpcUaDriver : DeviceDriverBase
                 if (!NodeId.TryParse(item.Address, out var nodeId))
                 {
                     return orderedRequests
-                        .Select(invalidItem => new DriverWriteResult(invalidItem.Address, invalidItem.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, "OPC UA address must be a valid NodeId."))
+                .Select(invalidItem => new DriverWriteResult(invalidItem.Address, invalidItem.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, "OPC UA 地址必须是有效的 NodeId。"))
                         .ToArray();
                 }
 
@@ -384,7 +384,7 @@ internal sealed class OpcUaDriver : DeviceDriverBase
 
         return Enum.TryParse<MessageSecurityMode>(value, true, out var mode)
             ? mode
-            : throw new InvalidOperationException($"OPC UA security mode '{value}' is not supported.");
+            : throw new InvalidOperationException($"不支持的 OPC UA 安全模式“{value}”。");
     }
 
     private static string? ResolveSecurityPolicy(IReadOnlyDictionary<string, string?> settings)
@@ -406,7 +406,7 @@ internal sealed class OpcUaDriver : DeviceDriverBase
             "basic256sha256" => SecurityPolicies.Basic256Sha256,
             "aes128_sha256_rsaoaep" => SecurityPolicies.Aes128_Sha256_RsaOaep,
             "aes256_sha256_rsapss" => SecurityPolicies.Aes256_Sha256_RsaPss,
-            _ => throw new InvalidOperationException($"OPC UA security policy '{value}' is not supported.")
+            _ => throw new InvalidOperationException($"不支持的 OPC UA 安全策略“{value}”。")
         };
     }
 
@@ -472,7 +472,7 @@ internal sealed class OpcUaDriver : DeviceDriverBase
     }
 
     private static string DescribeStatus(StatusCode status)
-        => $"OPC UA status 0x{status.Code:X8}.";
+        => $"OPC UA 状态码 0x{status.Code:X8}。";
 
     private sealed class AsyncSession : IAsyncDisposable
     {

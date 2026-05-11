@@ -58,6 +58,7 @@ interface PointRow {
 
 const activePanel = ref<PanelName>('dashboard')
 const selectedProtocolCode = ref('modbus')
+const selectedDeviceIndex = ref(0)
 const edgeApiBaseUrl = ref(window.location.origin)
 const localConfiguration = ref<LocalConfigurationResponse | null>(null)
 const baseConfiguration = ref<EdgeCollectionConfiguration>({})
@@ -67,7 +68,7 @@ const runtimeSummary = ref<RuntimeSummary | null>(null)
 const protocolCatalog = ref<CollectionProtocolDescriptor[]>([])
 const script = ref<ScriptResponse | null>(null)
 const logs = ref<LogsResponse | null>(null)
-const statusText = ref('waiting')
+const statusText = ref('等待中')
 const statusTone = ref<StatusTone>('info')
 const isLoading = ref(false)
 const isSaving = ref(false)
@@ -99,7 +100,7 @@ const fallbackProtocol = computed<CollectionProtocolDescriptor>(() => ({
   driverType: 'Modbus',
   displayName: 'Modbus',
   category: 'PLC',
-  description: 'Modbus TCP / RTU over TCP / 串口 RTU / 串口 ASCII 采集。',
+  description: 'A unified collection driver for Modbus TCP, RTU over TCP, serial RTU, serial ASCII, and DTU.',
   lifecycle: 'ready',
   supportsRead: true,
   supportsWrite: true,
@@ -107,17 +108,17 @@ const fallbackProtocol = computed<CollectionProtocolDescriptor>(() => ({
   supportsBatchWrite: true,
   riskLevel: 'normal',
   connectionSettings: [
-    { key: 'transport', label: 'Transport', valueType: 'select', required: true, description: 'tcp, rtuOverTcp, serialRtu, or serialAscii.', options: ['tcp', 'rtuOverTcp', 'serialRtu', 'serialAscii'] },
-    { key: 'host', label: 'Host', valueType: 'text', required: false, description: 'PLC host name or IP for TCP transports.' },
-    { key: 'port', label: 'Port', valueType: 'number', required: false, description: 'PLC TCP port.' },
-    { key: 'serialPort', label: 'Serial Port', valueType: 'text', required: false, description: 'Serial port for Modbus RTU/ASCII.' },
-    { key: 'baudRate', label: 'Baud Rate', valueType: 'number', required: false, description: 'Serial baud rate.' },
-    { key: 'dataBits', label: 'Data Bits', valueType: 'number', required: false, description: 'Serial data bits.' },
-    { key: 'parity', label: 'Parity', valueType: 'select', required: false, description: 'Serial parity.', options: ['None', 'Odd', 'Even', 'Mark', 'Space'] },
-    { key: 'stopBits', label: 'Stop Bits', valueType: 'select', required: false, description: 'Serial stop bits.', options: ['One', 'OnePointFive', 'Two'] },
-    { key: 'timeout', label: 'Timeout', valueType: 'number', required: false, description: 'Timeout in milliseconds.' },
-    { key: 'endianFormat', label: 'Endian', valueType: 'select', required: false, description: 'Word/byte order.', options: ['ABCD', 'BADC', 'CDAB', 'DCBA'] },
-    { key: 'plcAddresses', label: 'PLC Addresses', valueType: 'boolean', required: false, description: 'Treat addresses as PLC-style addresses.' },
+    { key: 'transport', label: '传输方式', valueType: 'select', required: true, description: 'TCP, RTU over TCP, serial RTU, serial ASCII, or DTU.', options: ['tcp', 'rtuOverTcp', 'serialRtu', 'serialAscii', 'dtu'] },
+    { key: 'host', label: '主机', valueType: 'text', required: false, description: 'PLC host name or IP address for TCP transports.' },
+    { key: 'port', label: '端口', valueType: 'number', required: false, description: 'PLC TCP port.' },
+    { key: 'serialPort', label: '串口', valueType: 'text', required: false, description: 'Serial port name for Modbus RTU/ASCII/DTU.' },
+    { key: 'baudRate', label: '波特率', valueType: 'number', required: false, description: 'Serial baud rate.' },
+    { key: 'dataBits', label: '数据位', valueType: 'number', required: false, description: 'Serial data bits.' },
+    { key: 'parity', label: '校验位', valueType: 'select', required: false, description: 'Serial parity mode.', options: ['None', 'Odd', 'Even', 'Mark', 'Space'] },
+    { key: 'stopBits', label: '停止位', valueType: 'select', required: false, description: 'Serial stop bits.', options: ['One', 'OnePointFive', 'Two'] },
+    { key: 'timeout', label: '超时', valueType: 'number', required: false, description: 'Timeout in milliseconds.' },
+    { key: 'endianFormat', label: '字节序', valueType: 'select', required: false, description: 'Word and byte order.', options: ['ABCD', 'BADC', 'CDAB', 'DCBA'] },
+    { key: 'plcAddresses', label: 'PLC 地址', valueType: 'boolean', required: false, description: 'Treat addresses as PLC-style addresses.' },
   ],
 }))
 
@@ -153,6 +154,11 @@ const protocolFlags = computed(() => [
 const isModbusProtocol = computed(() => normalizeProtocolKey(selectedProtocol.value.contractProtocol) === 'modbus')
 const protocolTaskCount = computed(() => countTasksForProtocol(baseConfiguration.value, selectedProtocol.value))
 const topologyRows = computed(() => buildTopologyRows(baseConfiguration.value, selectedProtocol.value))
+const topologyTask = computed(() => findTopologyTask(baseConfiguration.value, selectedProtocol.value))
+const topologyDevices = computed(() => Array.isArray(topologyTask.value?.devices) ? topologyTask.value.devices : [])
+const selectedDevice = computed(() => topologyDevices.value[selectedDeviceIndex.value] ?? topologyDevices.value[0] ?? null)
+const selectedDeviceCount = computed(() => topologyDevices.value.length)
+const selectedDeviceSummary = computed(() => displayDeviceLabel(selectedDevice.value, selectedDeviceIndex.value))
 const uploadSettings = computed(() => asRecord(baseConfiguration.value.upload?.settings))
 const logLines = computed(() => (logs.value?.entries ?? []).map(formatLogEntry))
 const scriptText = computed(() => script.value?.script ?? '')
@@ -168,22 +174,22 @@ const dashboardCards = computed(() => {
     {
       label: '运行状态',
       value: summary?.process?.name ?? '--',
-      meta: summary?.process ? `PID ${summary.process.id} | ${summary.process.threadCount} threads` : '--',
+      meta: summary?.process ? `PID ${summary.process.id} | ${summary.process.threadCount} 线程` : '--',
     },
     {
       label: '本地配置',
-      value: localConfiguration.value ? `v${configuration.version ?? '--'} ${localConfiguration.value.applied ? 'applied' : 'loaded'}` : '--',
+      value: localConfiguration.value ? `v${configuration.version ?? '--'} ${localConfiguration.value.applied ? '已应用' : '已加载'}` : '--',
       meta: localConfiguration.value?.filePath ?? '--',
     },
     {
       label: '上传目标',
-      value: upload?.protocol ?? '--',
-      meta: upload ? `${upload.endpoint || 'no endpoint'} | ${String(settings.database ?? 'no database')}` : '--',
+      value: displayUploadProtocol(upload?.protocol),
+      meta: upload ? `${upload.endpoint || '无端点'} | ${String(settings.database ?? '无数据库')}` : '--',
     },
     {
       label: '采集拓扑',
-      value: `${summary?.counts?.enabledDeviceCount ?? 0} device(s)`,
-      meta: `${summary?.counts?.enabledPointCount ?? 0} point(s) | ${summary?.counts?.enabledUploadRouteCount ?? 0} route(s)`,
+      value: `${summary?.counts?.enabledDeviceCount ?? 0} 设备`,
+      meta: `${summary?.counts?.enabledPointCount ?? 0} 点位 | ${summary?.counts?.enabledUploadRouteCount ?? 0} 路由`,
     },
   ]
 })
@@ -194,7 +200,7 @@ const pageTitle = computed(() => {
   if (activePanel.value === 'script') return 'BASIC 脚本'
   if (activePanel.value === 'logs') return '运行日志'
   if (activePanel.value === 'bootstrap') return '本地配置'
-  return 'Edge Local Console'
+  return '边缘本地控制台'
 })
 
 let logsTimer: number | undefined
@@ -212,7 +218,7 @@ onBeforeUnmount(() => {
 
 async function loadAll() {
   isLoading.value = true
-  setStatus('loading')
+  setStatus('加载中')
 
   try {
     const [config, summary, scriptData, logData, protocols] = await Promise.all([
@@ -236,7 +242,7 @@ async function loadAll() {
     baseConfiguration.value = extractConfiguration(config)
     writeConfigurationText(baseConfiguration.value)
     populateFormsFromConfiguration(baseConfiguration.value, selectedProtocol.value)
-    setStatus(`last refresh ${formatDate(summary.generatedAtUtc)}`, 'ok')
+    setStatus(`最近刷新：${formatDate(summary.generatedAtUtc)}`, 'ok')
   } catch (error) {
     setStatus(errorMessage(error), 'warn')
   } finally {
@@ -248,18 +254,26 @@ async function refreshLogs() {
   try {
     logs.value = await edgeRequest<LogsResponse>('/api/diagnostics/logs?count=100&level=Information')
   } catch {
-    // Keep the last visible log snapshot while the Edge API is restarting.
+    // API 重启时保留最后一次可见的日志快照。
   }
 }
 
 async function applyConfiguration() {
+  await saveConfiguration(true, '配置已保存并应用')
+}
+
+async function saveCurrentDeviceConfiguration() {
+  await saveConfiguration(false, '当前设备配置已保存')
+}
+
+async function saveConfiguration(apply: boolean, successMessage: string) {
   isSaving.value = true
   try {
     const payload = readMergedConfiguration()
     baseConfiguration.value = payload
     writeConfigurationText(payload)
 
-    await edgeRequest<LocalConfigurationResponse>('/api/local/configuration?apply=true', {
+    await edgeRequest<LocalConfigurationResponse>(`/api/local/configuration?apply=${apply ? 'true' : 'false'}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     })
@@ -267,7 +281,7 @@ async function applyConfiguration() {
     topologyFormDirty.value = false
     uploadFormDirty.value = false
     await loadAll()
-    setStatus('configuration saved and applied', 'ok')
+    setStatus(successMessage, 'ok')
   } catch (error) {
     setStatus(errorMessage(error), 'warn')
   } finally {
@@ -280,7 +294,7 @@ async function resetConfiguration() {
   try {
     await edgeRequest<LocalConfigurationResponse>('/api/local/configuration/reset', { method: 'POST' })
     await loadAll()
-    setStatus('configuration reset', 'ok')
+    setStatus('配置已重置', 'ok')
   } catch (error) {
     setStatus(errorMessage(error), 'warn')
   } finally {
@@ -294,22 +308,23 @@ function switchPanel(panel: PanelName) {
 
 function selectProtocol(code: string) {
   if (topologyFormDirty.value || uploadFormDirty.value) {
-    syncFormsToJson('draft synced')
+    syncFormsToJson('草稿已同步')
   }
 
   selectedProtocolCode.value = code
-  populateFormsFromConfiguration(baseConfiguration.value, selectedProtocol.value)
+  selectedDeviceIndex.value = 0
+  populateFormsFromConfiguration(baseConfiguration.value, selectedProtocol.value, selectedDeviceIndex.value)
   activePanel.value = 'topology'
 }
 
 function markTopologyDirty() {
   topologyFormDirty.value = true
-  setStatus('topology changed')
+  setStatus('采集拓扑已修改')
 }
 
 function markUploadDirty() {
   uploadFormDirty.value = true
-  setStatus('upload changed')
+  setStatus('上传配置已修改')
 }
 
 function onJsonInput() {
@@ -319,8 +334,8 @@ function onJsonInput() {
   baseConfiguration.value = parsed
   topologyFormDirty.value = false
   uploadFormDirty.value = false
-  populateFormsFromConfiguration(parsed, selectedProtocol.value)
-  setStatus('JSON changed')
+  populateFormsFromConfiguration(parsed, selectedProtocol.value, selectedDeviceIndex.value)
+  setStatus('JSON 已修改')
 }
 
 function handleBooleanConnectionValue(key: string, event: Event) {
@@ -328,26 +343,97 @@ function handleBooleanConnectionValue(key: string, event: Event) {
   markTopologyDirty()
 }
 
-function syncFormsToJson(message = 'forms synced to JSON') {
+function syncFormsToJson(message = '表单已同步到 JSON') {
   const payload = readMergedConfiguration()
   baseConfiguration.value = payload
   writeConfigurationText(payload)
-  populateFormsFromConfiguration(payload, selectedProtocol.value)
+  populateFormsFromConfiguration(payload, selectedProtocol.value, selectedDeviceIndex.value)
   topologyFormDirty.value = false
   uploadFormDirty.value = false
   setStatus(message, 'ok')
 }
 
+function selectDevice(index: number) {
+  if (Number.isNaN(index) || index < 0 || index >= selectedDeviceCount.value || index === selectedDeviceIndex.value) {
+    return
+  }
+
+  if (topologyFormDirty.value || uploadFormDirty.value) {
+    syncFormsToJson('草稿已同步')
+  }
+
+  selectedDeviceIndex.value = index
+  populateFormsFromConfiguration(baseConfiguration.value, selectedProtocol.value, selectedDeviceIndex.value)
+  setStatus('设备已切换')
+}
+
+function handleDeviceSelectChange(event: Event) {
+  const value = Number((event.target as HTMLSelectElement).value)
+  selectDevice(value)
+}
+
+function addDevice() {
+  const previousTask = findTopologyTask(baseConfiguration.value, selectedProtocol.value)
+  const previousDeviceCount = Array.isArray(previousTask?.devices) ? previousTask.devices.length : 0
+  const hasDraftChanges = topologyFormDirty.value || uploadFormDirty.value
+  const payload = previousDeviceCount > 0 || hasDraftChanges
+    ? readMergedConfiguration()
+    : clone(baseConfiguration.value)
+  const { configuration, task } = ensureLocalTopology(payload, selectedProtocol.value, selectedDeviceIndex.value)
+  const devices = Array.isArray(task.devices) ? task.devices : (task.devices = [])
+
+  if (previousDeviceCount === 0 && !hasDraftChanges) {
+    task.devices = [createDevice(selectedProtocol.value, 0, [])]
+    selectedDeviceIndex.value = 0
+  } else {
+    const device = createDevice(selectedProtocol.value, devices.length, devices)
+    devices.push(device)
+    selectedDeviceIndex.value = devices.length - 1
+  }
+
+  baseConfiguration.value = configuration
+  writeConfigurationText(configuration)
+  populateFormsFromConfiguration(configuration, selectedProtocol.value, selectedDeviceIndex.value)
+  topologyFormDirty.value = false
+  uploadFormDirty.value = false
+  setStatus('已新建设备', 'ok')
+}
+
+function removeDevice() {
+  const payload = readMergedConfiguration()
+  const { configuration, task, deviceIndex } = ensureLocalTopology(payload, selectedProtocol.value, selectedDeviceIndex.value)
+  const devices = Array.isArray(task.devices) ? task.devices : (task.devices = [])
+
+  if (!devices.length) {
+    return
+  }
+
+  devices.splice(deviceIndex, 1)
+  if (devices.length === 0) {
+    devices.push(createDevice(selectedProtocol.value, 0, []))
+  }
+
+  selectedDeviceIndex.value = Math.min(deviceIndex, devices.length - 1)
+  baseConfiguration.value = configuration
+  writeConfigurationText(configuration)
+  populateFormsFromConfiguration(configuration, selectedProtocol.value, selectedDeviceIndex.value)
+  topologyFormDirty.value = false
+  uploadFormDirty.value = false
+  setStatus('设备已删除', 'ok')
+}
+
 function addPoint() {
   const payload = readMergedConfiguration()
-  const { configuration, device } = ensureLocalTopology(payload, selectedProtocol.value)
+  const { configuration, device } = ensureLocalTopology(payload, selectedProtocol.value, selectedDeviceIndex.value)
   device.points = Array.isArray(device.points) ? device.points : []
   device.points.push(defaultPoint(device.points.length, selectedProtocol.value))
 
   baseConfiguration.value = configuration
   writeConfigurationText(configuration)
-  populateFormsFromConfiguration(configuration, selectedProtocol.value)
-  setStatus('point added')
+  populateFormsFromConfiguration(configuration, selectedProtocol.value, selectedDeviceIndex.value)
+  topologyFormDirty.value = false
+  uploadFormDirty.value = false
+  setStatus('已新增点位')
 }
 
 function removePoint(index: number) {
@@ -365,8 +451,9 @@ function extractConfiguration(document: LocalConfigurationResponse | null): Edge
   return configuration && typeof configuration === 'object' ? clone(configuration) : {}
 }
 
-function populateFormsFromConfiguration(configuration: EdgeCollectionConfiguration, protocol: CollectionProtocolDescriptor) {
-  const { task, device } = ensureLocalTopology(configuration, protocol)
+function populateFormsFromConfiguration(configuration: EdgeCollectionConfiguration, protocol: CollectionProtocolDescriptor, deviceIndex = selectedDeviceIndex.value) {
+  const { task, device, deviceIndex: resolvedDeviceIndex } = ensureLocalTopology(configuration, protocol, deviceIndex)
+  selectedDeviceIndex.value = resolvedDeviceIndex
   const connection = task.connection ?? {}
   const deviceOptions = asRecord(device.protocolOptions)
   const defaults = protocolDefaults(protocol)
@@ -379,7 +466,13 @@ function populateFormsFromConfiguration(configuration: EdgeCollectionConfigurati
 
   clearRecord(connectionValues)
   for (const setting of protocol.connectionSettings ?? []) {
-    connectionValues[setting.key] = settingToString(readConnectionSetting(connection, setting), defaultSettingValue(protocol, setting))
+    const rawValue = readConnectionSetting(connection, setting)
+    if (normalizeProtocolKey(protocol.contractProtocol) === 'modbus' && normalizeProtocolKey(setting.key) === 'transport') {
+      connectionValues[setting.key] = normalizeModbusTransportValue(rawValue ?? defaultSettingValue(protocol, setting))
+      continue
+    }
+
+    connectionValues[setting.key] = settingToString(rawValue, defaultSettingValue(protocol, setting))
   }
 
   pointRows.value = (Array.isArray(device.points) ? device.points : []).map(toPointRow)
@@ -394,23 +487,18 @@ function populateFormsFromConfiguration(configuration: EdgeCollectionConfigurati
 
 function readMergedConfiguration() {
   let payload = clone(baseConfiguration.value)
-  if (topologyFormDirty.value) {
-    payload = applyTopologyForm(payload, selectedProtocol.value)
-  }
-
-  if (uploadFormDirty.value) {
-    payload = applyUploadForm(payload)
-  }
+  payload = applyTopologyForm(payload, selectedProtocol.value, selectedDeviceIndex.value)
+  payload = applyUploadForm(payload)
 
   return payload
 }
 
-function applyTopologyForm(configuration: EdgeCollectionConfiguration, protocol: CollectionProtocolDescriptor) {
-  const { configuration: next, task, device } = ensureLocalTopology(configuration, protocol)
+function applyTopologyForm(configuration: EdgeCollectionConfiguration, protocol: CollectionProtocolDescriptor, deviceIndex = selectedDeviceIndex.value) {
+  const { configuration: next, task, device } = ensureLocalTopology(configuration, protocol, deviceIndex)
   const connection = task.connection ?? {}
   const options = asRecord(connection.protocolOptions)
   const defaults = protocolDefaults(protocol)
-  const transport = connectionValues.transport || connection.transport || defaultSettingValue(protocol, { key: 'transport', label: 'Transport', valueType: 'select', required: true, description: '', options: [] })
+  const transport = connectionValues.transport || connection.transport || defaultSettingValue(protocol, { key: 'transport', label: '传输方式', valueType: 'select', required: true, description: '', options: [] })
   const taskKey = topologyForm.taskKey.trim() || defaults.taskKey
   const deviceKey = topologyForm.deviceKey.trim() || defaults.deviceKey
 
@@ -473,14 +561,14 @@ function applyUploadForm(configuration: EdgeCollectionConfiguration) {
   return next
 }
 
-function ensureLocalTopology(input: EdgeCollectionConfiguration, protocol: CollectionProtocolDescriptor) {
+function ensureLocalTopology(input: EdgeCollectionConfiguration, protocol: CollectionProtocolDescriptor, deviceIndex = 0) {
   const configuration = clone(input ?? {})
   const defaults = protocolDefaults(protocol)
   configuration.contractVersion ||= 'edge-collection-v1'
   configuration.edgeNodeId ||= newGuid()
   configuration.version = Math.max(1, toNumber(configuration.version, 1))
   configuration.updatedAt ||= new Date().toISOString()
-  configuration.updatedBy ||= 'LocalEdge'
+  configuration.updatedBy ||= '本地控制台'
 
   if (!Array.isArray(configuration.tasks)) {
     configuration.tasks = []
@@ -523,7 +611,8 @@ function ensureLocalTopology(input: EdgeCollectionConfiguration, protocol: Colle
     task.devices.push({})
   }
 
-  const device = task.devices[0]
+  const resolvedDeviceIndex = Math.min(Math.max(0, toNumber(deviceIndex, 0)), task.devices.length - 1)
+  const device = task.devices[resolvedDeviceIndex]
   device.deviceKey ||= defaults.deviceKey
   device.deviceName ||= defaults.deviceName
   device.enabled = device.enabled !== false
@@ -537,7 +626,7 @@ function ensureLocalTopology(input: EdgeCollectionConfiguration, protocol: Colle
     device.points = []
   }
 
-  return { configuration, task, device }
+  return { configuration, task, device, deviceIndex: resolvedDeviceIndex }
 }
 
 function readConnectionSetting(connection: CollectionTask['connection'], setting: ConnectionSettingDefinition) {
@@ -603,7 +692,7 @@ function tryParseConfigurationText() {
     return parsed
   } catch (error) {
     jsonParseError.value = errorMessage(error)
-    setStatus('JSON parse error', 'warn')
+    setStatus('JSON 解析错误', 'warn')
     return null
   }
 }
@@ -611,6 +700,11 @@ function tryParseConfigurationText() {
 function writeConfigurationText(configuration: EdgeCollectionConfiguration) {
   configurationText.value = JSON.stringify(configuration ?? {}, null, 2)
   jsonParseError.value = ''
+}
+
+function findTopologyTask(configuration: EdgeCollectionConfiguration, protocol: CollectionProtocolDescriptor) {
+  const tasks = Array.isArray(configuration.tasks) ? configuration.tasks : []
+  return tasks.find((task) => sameProtocol(task.protocol, protocol.contractProtocol))
 }
 
 function buildTopologyRows(configuration: EdgeCollectionConfiguration, protocol: CollectionProtocolDescriptor) {
@@ -693,7 +787,7 @@ function defaultPoint(index: number, protocol: CollectionProtocolDescriptor): Co
   const number = index + 1
   return {
     pointKey: `point-${number}`,
-    pointName: `Point ${number}`,
+    pointName: `点位 ${number}`,
     sourceType: pointSourceOptions(protocol)[0],
     address: defaultPointAddress(protocol, index),
     rawValueType: 'Float',
@@ -706,20 +800,71 @@ function defaultPoint(index: number, protocol: CollectionProtocolDescriptor): Co
       targetType: 'Telemetry',
       targetName: `point_${number}`,
       valueType: 'Double',
-      displayName: `Point ${number}`,
+      displayName: `点位 ${number}`,
     },
   }
 }
 
 function protocolDefaults(protocol: CollectionProtocolDescriptor) {
   const code = normalizeProtocolKey(protocol.code)
+  const device = deviceDefaults(protocol, 0)
   return {
     taskKey: code === 'modbus' ? 'modbus-device-simulator' : `${code || 'protocol'}-collector`,
-    connectionName: protocol.displayName ? `${protocol.displayName} Connection` : 'Protocol Connection',
-    deviceKey: code === 'modbus' ? 'device-simulator-01' : `${code || 'protocol'}-01`,
-    deviceName: protocol.displayName ? `${protocol.displayName} 01` : 'Device 01',
+    connectionName: protocol.displayName ? `${protocol.displayName} 连接` : '采集连接',
+    deviceKey: device.deviceKey,
+    deviceName: device.deviceName,
     stationNumber: '1',
   }
+}
+
+function deviceDefaults(protocol: CollectionProtocolDescriptor, index: number) {
+  const code = normalizeProtocolKey(protocol.code)
+  const number = String(index + 1).padStart(2, '0')
+  return {
+    deviceKey: code === 'modbus' ? `device-simulator-${number}` : `${code || 'protocol'}-${number}`,
+    deviceName: protocol.displayName ? `${protocol.displayName} 设备 ${number}` : `设备 ${number}`,
+    stationNumber: '1',
+  }
+}
+
+function uniqueDeviceKey(devices: CollectionDevice[], suggested: string) {
+  const existingKeys = new Set(devices.map((device) => normalizeProtocolKey(device.deviceKey)))
+  let candidate = suggested
+  let counter = 1
+
+  while (existingKeys.has(normalizeProtocolKey(candidate))) {
+    counter += 1
+    candidate = `${suggested}-${counter}`
+  }
+
+  return candidate
+}
+
+function createDevice(protocol: CollectionProtocolDescriptor, index: number, devices: CollectionDevice[] = []): CollectionDevice {
+  const defaults = deviceDefaults(protocol, index)
+  const deviceKey = uniqueDeviceKey(devices, defaults.deviceKey)
+  const protocolOptions: Record<string, unknown> = {}
+
+  if (normalizeProtocolKey(protocol.contractProtocol) === 'modbus') {
+    protocolOptions.stationNumber = defaults.stationNumber
+  }
+
+  return {
+    deviceKey,
+    deviceName: defaults.deviceName,
+    enabled: true,
+    externalKey: deviceKey,
+    protocolOptions: pruneEmpty(protocolOptions),
+    points: [],
+  }
+}
+
+function displayDeviceLabel(device?: CollectionDevice | null, index = 0) {
+  if (!device) return '新设备草稿'
+  const number = String(index + 1).padStart(2, '0')
+  const name = device.deviceName?.trim() || `设备 ${number}`
+  const key = device.deviceKey?.trim()
+  return key ? `${name} · ${key}` : name
 }
 
 function defaultSettingValue(protocol: CollectionProtocolDescriptor, setting: ConnectionSettingDefinition) {
@@ -866,8 +1011,332 @@ function inputType(setting: ConnectionSettingDefinition) {
   return 'text'
 }
 
+const capabilityLabels: Record<string, string> = {
+  read: '读取',
+  write: '写入',
+  batchread: '批量读',
+  batchwrite: '批量写',
+}
+
+const lifecycleLabels: Record<string, string> = {
+  ready: '可用',
+  guarded: '受限',
+  planned: '规划中',
+}
+
+const riskLabels: Record<string, string> = {
+  normal: '常规',
+  high: '高风险',
+  planned: '规划中',
+}
+
+const syncStatusLabels: Record<string, string> = {
+  offline: '离线',
+  online: '在线',
+  waiting: '等待中',
+  loading: '加载中',
+  disabled: '已禁用',
+  syncing: '同步中',
+  synced: '已同步',
+  uptodate: '已是最新',
+  waitingbootstrap: '等待启动配置',
+  error: '错误',
+  connected: '已连接',
+  disconnected: '已断开',
+  applied: '已应用',
+  loaded: '已加载',
+}
+
+const protocolCategoryLabels: Record<string, string> = {
+  plc: 'PLC',
+  cnc: '数控',
+  other: '其他协议',
+}
+
+const valueTypeLabels: Record<string, string> = {
+  float: '浮点数',
+  double: '双精度',
+  int16: '16 位整数',
+  int32: '32 位整数',
+  boolean: '布尔',
+  string: '字符串',
+}
+
+const pointSourceLabels: Record<string, string> = {
+  holdingregister: '保持寄存器',
+  inputregister: '输入寄存器',
+  coil: '线圈',
+  discreteinput: '离散输入',
+  nodeid: '节点标识',
+  tag: '标签',
+  dataitem: '数据项',
+  address: '地址',
+  datablock: '数据块',
+  deviceregister: '设备寄存器',
+  objectproperty: '对象属性',
+  informationobject: '信息对象',
+  topic: '主题',
+  jsonpath: 'JSON 路径',
+}
+
+const connectionOptionLabels: Record<string, Record<string, string>> = {
+  transport: {
+    tcp: 'TCP',
+    rtuovertcp: 'RTU 透传 TCP',
+    serialrtu: '串口 RTU',
+    serialascii: '串口 ASCII',
+    dtu: '串口 DTU',
+    serialdtu: '串口 DTU',
+  },
+  parity: {
+    none: '无',
+    odd: '奇校验',
+    even: '偶校验',
+    mark: '标记校验',
+    space: '空格校验',
+  },
+  stopbits: {
+    one: '1 位',
+    onepointfive: '1.5 位',
+    two: '2 位',
+  },
+  securitymode: {
+    auto: '自动',
+    none: '无',
+    sign: '签名',
+    signandencrypt: '签名并加密',
+  },
+  securitypolicy: {
+    auto: '自动',
+    none: '无',
+    basic256sha256: '基础 256 位 SHA-256',
+    aes128sha256rsaoaep: 'AES-128 / SHA-256 / RSA-OAEP',
+    aes256sha256rsapss: 'AES-256 / SHA-256 / RSA-PSS',
+  },
+  qos: {
+    0: '服务质量 0',
+    1: '服务质量 1',
+    2: '服务质量 2',
+  },
+}
+
+const connectionSettingLabels: Record<string, string> = {
+  transport: '传输方式',
+  host: '主机',
+  port: '端口',
+  serialport: '串口',
+  baudrate: '波特率',
+  databits: '数据位',
+  parity: '校验位',
+  stopbits: '停止位',
+  timeout: '超时',
+  timeoutms: '超时',
+  endianformat: '字节序',
+  plcaddresses: 'PLC 地址',
+  endpoint: '端点',
+  baseurl: '基础地址',
+  path: '路径',
+  progid: '程序标识',
+  clsid: '类标识',
+  usesecurity: '启用安全',
+  securitymode: '安全模式',
+  securitypolicy: '安全策略',
+  sessiontimeout: '会话超时',
+  autoacceptuntrustedcertificates: '自动接受未知证书',
+  deviceinstance: '设备实例',
+  networknumber: '网络号',
+  commonaddress: '公共地址',
+  originatoraddress: '源地址',
+  clientid: '客户端 ID',
+  topic: '主题',
+  qos: 'QoS',
+  username: '用户名',
+  password: '密码',
+  model: '型号',
+  rack: '机架',
+  slot: '槽位',
+}
+
+const connectionSettingDescriptions: Record<string, string> = {
+  transport: '选择 TCP、RTU over TCP、串口 RTU、串口 ASCII 或 DTU。',
+  host: 'TCP 连接的主机名或 IP 地址。',
+  port: 'TCP 端口。',
+  serialport: '串口设备名。',
+  baudrate: '串口波特率。',
+  databits: '串口数据位。',
+  parity: '串口校验方式。',
+  stopbits: '串口停止位。',
+  timeout: '超时时间，单位毫秒。',
+  timeoutms: '超时时间，单位毫秒。',
+  endianformat: '字节和字的排列顺序。',
+  plcaddresses: '将地址按 PLC 风格处理。',
+  endpoint: '协议端点地址。',
+  baseurl: '基础地址。',
+  path: '请求路径。',
+  progid: 'OPC DA 的程序标识。',
+  clsid: 'OPC DA 的类标识。',
+  usesecurity: '是否启用安全连接。',
+  securitymode: '安全模式。',
+  securitypolicy: '安全策略。',
+  sessiontimeout: '会话超时时间，单位毫秒。',
+  autoacceptuntrustedcertificates: '自动接受不受信任的证书。',
+  deviceinstance: '设备实例号。',
+  networknumber: '网络号。',
+  commonaddress: '公共地址。',
+  originatoraddress: '源地址。',
+  clientid: '客户端 ID。',
+  topic: '订阅主题。',
+  qos: 'QoS 等级。',
+  username: '用户名。',
+  password: '密码。',
+  model: '设备型号。',
+  rack: '机架号。',
+  slot: '槽位号。',
+}
+
+const statusLabels: Record<string, string> = {
+  waiting: '等待中',
+  loading: '加载中',
+  configurationsavedandapplied: '配置已保存并应用',
+  configurationreset: '配置已重置',
+  topologychanged: '采集拓扑已修改',
+  uploadchanged: '上传配置已修改',
+  jsonchanged: 'JSON 已修改',
+  jsonparseerror: 'JSON 解析错误',
+  pointadded: '已新增点位',
+  draftsynced: '草稿已同步',
+  formssyncedtojson: '表单已同步到 JSON',
+  topologysyncedtojson: '采集拓扑已同步到 JSON',
+  sonnetdbsettingssyncedtojson: 'SonnetDB 设置已同步到 JSON',
+}
+
+function displayStatusText(value: string) {
+  const raw = value?.trim() ?? ''
+  if (!raw) return '等待中'
+  if (raw.startsWith('最近刷新：')) return raw
+  return statusLabels[normalizeProtocolKey(raw)] ?? raw
+}
+
+function displayCapability(value: string) {
+  return capabilityLabels[normalizeProtocolKey(value)] ?? value
+}
+
+function displayLifecycleLabel(value: string) {
+  return lifecycleLabels[normalizeProtocolKey(value)] ?? '可用'
+}
+
+function displayRiskLabel(value: string) {
+  return riskLabels[normalizeProtocolKey(value)] ?? value
+}
+
+function displayProtocolCategory(value: string) {
+  const raw = value?.trim() ?? ''
+  if (!raw) return '其他协议'
+  if (raw === '其他协议') return raw
+  return protocolCategoryLabels[normalizeProtocolKey(raw)] ?? raw
+}
+
+function displayValueType(value: string) {
+  return valueTypeLabels[normalizeProtocolKey(value)] ?? value
+}
+
+function displayPointSource(value: string) {
+  return pointSourceLabels[normalizeProtocolKey(value)] ?? value
+}
+
+function displayConnectionSettingLabel(setting: ConnectionSettingDefinition) {
+  const key = normalizeProtocolKey(setting.key)
+  return connectionSettingLabels[key] ?? setting.label
+}
+
+function displayConnectionSettingDescription(setting: ConnectionSettingDefinition) {
+  const key = normalizeProtocolKey(setting.key)
+  return connectionSettingDescriptions[key] ?? setting.description
+}
+
+function normalizeConnectionSettingOption(setting: ConnectionSettingDefinition, option: string) {
+  const key = normalizeProtocolKey(setting.key)
+  if (key !== 'transport') {
+    return option
+  }
+
+  const normalized = normalizeProtocolKey(option)
+  if (normalized === 'tcp') return 'tcp'
+  if (normalized === 'rtuovertcp') return 'rtuOverTcp'
+  if (normalized === 'serialrtu' || normalized === 'rtu' || normalized === 'serial') return 'serialRtu'
+  if (normalized === 'serialascii' || normalized === 'ascii') return 'serialAscii'
+  if (normalized === 'serialdtu' || normalized === 'dtu') return 'dtu'
+  return option
+}
+
+function displayConnectionSettingOptions(setting: ConnectionSettingDefinition) {
+  const options = [...(setting.options ?? [])]
+  if (normalizeProtocolKey(selectedProtocol.value.contractProtocol) === 'modbus' && normalizeProtocolKey(setting.key) === 'transport') {
+    if (options.length === 0) {
+      options.push('tcp', 'rtuOverTcp', 'serialRtu', 'dtu', 'serialAscii')
+    }
+
+    if (!options.some((option) => ['dtu', 'serialdtu'].includes(normalizeProtocolKey(option)))) {
+      const insertAt = options.findIndex((option) => normalizeProtocolKey(option) === 'serialascii')
+      if (insertAt >= 0) {
+        options.splice(insertAt, 0, 'dtu')
+      } else {
+        options.push('dtu')
+      }
+    }
+  }
+
+  return options
+    .map((option) => normalizeConnectionSettingOption(setting, option))
+    .filter((option, index, items) => items.indexOf(option) === index)
+}
+
+function displayConnectionOption(setting: ConnectionSettingDefinition, option: string) {
+  const key = normalizeProtocolKey(setting.key)
+  const options = connectionOptionLabels[key]
+  if (!options) return option
+
+  return options[normalizeProtocolKey(option)] ?? option
+}
+
+function displayUploadProtocol(value?: string) {
+  if (!value) return '--'
+  return {
+    http: 'HTTP 上传',
+    iotsharpmqtt: 'IoTSharp MQTT 上传',
+    iotsharpdevicehttp: 'IoTSharp 设备 HTTP 上传',
+    sonnetdb: 'SonnetDB 上传',
+  }[normalizeProtocolKey(value)] ?? value
+}
+
+function displaySyncStatus(value?: string) {
+  if (!value) return '离线'
+  return syncStatusLabels[normalizeProtocolKey(value)] ?? value
+}
+
+function displayLogLevel(value: string) {
+  return {
+    trace: '跟踪',
+    debug: '调试',
+    information: '信息',
+    info: '信息',
+    warning: '警告',
+    error: '错误',
+    critical: '严重',
+  }[normalizeProtocolKey(value)] ?? value
+}
+
+function displayUpdatedBy(value?: string) {
+  const raw = value?.trim() ?? ''
+  if (!raw) return '本地'
+  const normalized = normalizeProtocolKey(raw)
+  if (normalized === 'local' || normalized === 'localedge' || normalized === 'localconfiguration') return '本地'
+  if (normalized === 'localdockertemplate') return 'Docker 模板'
+  return raw
+}
+
 function lifecycleLabel(value: string) {
-  return value || 'ready'
+  return displayLifecycleLabel(value)
 }
 
 function lifecycleClass(value: string) {
@@ -884,7 +1353,7 @@ function resolveMappingValueType(rawValueType: string) {
 
 function formatLogEntry(entry: { timestampUtc: string; level: string; category: string; message: string; exception?: string }) {
   const exception = entry.exception ? `\n${entry.exception}` : ''
-  return `[${formatDate(entry.timestampUtc)}] ${entry.level} ${entry.category}\n${entry.message}${exception}`
+  return `[${formatDate(entry.timestampUtc)}] ${displayLogLevel(entry.level)} ${entry.category}\n${entry.message}${exception}`
 }
 
 function formatDate(value?: string) {
@@ -920,13 +1389,13 @@ function readModbusTransport(connection: CollectionTask['connection'], protocol:
   return normalizeModbusTransportValue(
     connection?.transport
     || asRecord(connection?.protocolOptions).transport
-    || defaultSettingValue(protocol, { key: 'transport', label: 'Transport', valueType: 'select', required: true, description: '', options: [] }),
+    || defaultSettingValue(protocol, { key: 'transport', label: '传输方式', valueType: 'select', required: true, description: '', options: [] }),
   )
 }
 
 function readModbusTransportValue(value?: unknown) {
   const normalized = normalizeProtocolKey(value)
-  if (['serialrtu', 'serialascii', 'rtu', 'ascii', 'dtu', 'serial'].includes(normalized)) {
+  if (['serialrtu', 'serialascii', 'serialdtu', 'rtu', 'ascii', 'dtu', 'serial'].includes(normalized)) {
     return 'serial'
   }
 
@@ -940,7 +1409,8 @@ function readModbusTransportValue(value?: unknown) {
 function normalizeModbusTransportValue(value?: unknown) {
   const normalized = normalizeProtocolKey(value)
   if (normalized === 'rtuovertcp') return 'rtuOverTcp'
-  if (['serialrtu', 'rtu', 'dtu', 'serial'].includes(normalized)) return 'serialRtu'
+  if (['serialrtu', 'rtu', 'serial'].includes(normalized)) return 'serialRtu'
+  if (normalized === 'serialdtu' || normalized === 'dtu') return 'dtu'
   if (['serialascii', 'ascii'].includes(normalized)) return 'serialAscii'
   return 'tcp'
 }
@@ -1037,7 +1507,7 @@ function errorMessage(error: unknown) {
         </div>
         <div>
           <div class="brand-title">IoTSharp Edge</div>
-          <div class="brand-subtitle">Local Console</div>
+          <div class="brand-subtitle">本地控制台</div>
         </div>
       </div>
 
@@ -1056,7 +1526,7 @@ function errorMessage(error: unknown) {
           <div class="protocol-nav" aria-label="采集协议">
             <div v-if="!protocolGroups.length" class="nav-empty">协议目录加载中</div>
             <div v-for="group in protocolGroups" :key="group.category" class="protocol-nav-group">
-              <div class="protocol-nav-title">{{ group.category }} 采集</div>
+              <div class="protocol-nav-title">{{ displayProtocolCategory(group.category) }} 采集</div>
               <button
                 v-for="protocol in group.protocols"
                 :key="protocol.code"
@@ -1067,7 +1537,7 @@ function errorMessage(error: unknown) {
                 @click="selectProtocol(protocol.code)"
               >
                 <span>{{ protocol.displayName }}</span>
-                <small :class="lifecycleClass(protocol.lifecycle)">{{ lifecycleLabel(protocol.lifecycle) }}</small>
+                <small :class="lifecycleClass(protocol.lifecycle)">{{ displayLifecycleLabel(protocol.lifecycle) }}</small>
               </button>
             </div>
           </div>
@@ -1094,11 +1564,11 @@ function errorMessage(error: unknown) {
       <div class="sidebar-foot">
         <div class="foot-row">
           <Wifi :size="15" />
-          <span>API: {{ edgeApiBaseUrl }}</span>
+          <span>接口：{{ edgeApiBaseUrl }}</span>
         </div>
         <div class="foot-row" :data-tone="statusTone">
           <PanelLeft :size="15" />
-          <span>{{ statusText }}</span>
+          <span>{{ displayStatusText(statusText) }}</span>
         </div>
       </div>
     </aside>
@@ -1109,12 +1579,12 @@ function errorMessage(error: unknown) {
           <h1>{{ pageTitle }}</h1>
           <p>本地管理采集配置、上传目标和运行态。</p>
         </div>
-        <div class="topbar-tools">
-          <div class="metrics">
-            <div class="metric">{{ runtimeSummary?.collectionSync?.status ?? 'offline' }}</div>
-            <div class="metric">{{ baseConfiguration.updatedBy ?? 'local' }}</div>
-            <div class="metric">{{ baseConfiguration.upload?.protocol ?? 'SonnetDB' }}</div>
-          </div>
+          <div class="topbar-tools">
+            <div class="metrics">
+            <div class="metric">{{ displaySyncStatus(runtimeSummary?.collectionSync?.status) }}</div>
+            <div class="metric">{{ displayUpdatedBy(baseConfiguration.updatedBy) }}</div>
+            <div class="metric">{{ displayUploadProtocol(baseConfiguration.upload?.protocol) }}</div>
+            </div>
           <div class="actions">
             <button type="button" :disabled="isLoading" @click="loadAll">
               <RefreshCw :size="16" />
@@ -1146,9 +1616,9 @@ function errorMessage(error: unknown) {
             <div class="panel-head">
               <div>
                 <h2>本地运行态</h2>
-                <small>working set {{ formatBytes(runtimeSummary?.process?.workingSetBytes) }}</small>
+                <small>工作集 {{ formatBytes(runtimeSummary?.process?.workingSetBytes) }}</small>
               </div>
-              <span class="badge">{{ runtimeSummary?.edgeReporting?.enabled ? 'upstream enabled' : 'local mode' }}</span>
+              <span class="badge">{{ runtimeSummary?.edgeReporting?.enabled ? '上游已启用' : '本地模式' }}</span>
             </div>
             <pre class="code-block">{{ JSON.stringify(runtimeSummary ?? {}, null, 2) }}</pre>
           </article>
@@ -1161,45 +1631,78 @@ function errorMessage(error: unknown) {
                 <div class="protocol-title">
                   <div>
                     <h2>{{ selectedProtocol.displayName }} 采集</h2>
-                    <small>{{ selectedProtocol.category }} · {{ selectedProtocol.contractProtocol }}</small>
+                    <small>{{ displayProtocolCategory(selectedProtocol.category) }} · {{ selectedProtocol.contractProtocol }}</small>
                   </div>
                   <span class="badge" :class="lifecycleClass(selectedProtocol.lifecycle)">
-                    {{ lifecycleLabel(selectedProtocol.lifecycle) }}
+                    {{ displayLifecycleLabel(selectedProtocol.lifecycle) }}
                   </span>
                 </div>
                 <p>{{ selectedProtocol.description }}</p>
                 <div class="protocol-flags">
-                  <span v-for="flag in protocolFlags" :key="flag">{{ flag }}</span>
-                  <span>{{ selectedProtocol.riskLevel }}</span>
-                  <span>{{ protocolTaskCount }} task(s)</span>
-                  <span>{{ visibleConnectionSettings.length }} setting(s)</span>
+                  <span v-for="flag in protocolFlags" :key="flag">{{ displayCapability(flag) }}</span>
+                  <span>{{ displayRiskLabel(selectedProtocol.riskLevel) }}</span>
+                  <span>{{ protocolTaskCount }} 个任务</span>
+                  <span>{{ visibleConnectionSettings.length }} 个字段</span>
                 </div>
               </div>
 
               <div class="panel-section">
                 <div class="panel-head compact">
-                  <h2>任务与设备</h2>
-                  <span class="badge">contract</span>
+                  <h2>设备管理</h2>
+                  <span class="badge">{{ selectedDeviceCount ? `${selectedDeviceCount} 台` : '新设备草稿' }}</span>
+                </div>
+                <div class="device-manager">
+                  <label class="device-select">
+                    <span>选择设备</span>
+                    <select :disabled="!selectedDeviceCount" :value="selectedDeviceCount ? selectedDeviceIndex : -1" @change="handleDeviceSelectChange">
+                      <option v-if="!selectedDeviceCount" :value="-1">新设备草稿</option>
+                      <option v-for="(device, index) in topologyDevices" :key="device.deviceKey || index" :value="index">
+                        {{ displayDeviceLabel(device, index) }}
+                      </option>
+                    </select>
+                  </label>
+                  <div class="actions device-actions">
+                    <button type="button" @click="addDevice">
+                      <Plus :size="15" />
+                      <span>新建设备</span>
+                    </button>
+                    <button type="button" @click="saveCurrentDeviceConfiguration">
+                      <Save :size="15" />
+                      <span>保存当前设备配置</span>
+                    </button>
+                    <button type="button" :disabled="!selectedDevice" @click="removeDevice">
+                      <Trash2 :size="15" />
+                      <span>删除设备</span>
+                    </button>
+                  </div>
+                  <small class="device-summary">{{ selectedDeviceSummary }}</small>
+                </div>
+              </div>
+
+              <div class="panel-section">
+                <div class="panel-head compact">
+                  <h2>当前设备配置</h2>
+                  <span class="badge">当前</span>
                 </div>
                 <div class="form-grid">
-                  <label>Task Key<input v-model="topologyForm.taskKey" type="text" @input="markTopologyDirty" /></label>
-                  <label>Connection<input v-model="topologyForm.connectionName" type="text" @input="markTopologyDirty" /></label>
-                  <label>Device Key<input v-model="topologyForm.deviceKey" type="text" @input="markTopologyDirty" /></label>
-                  <label>Device Name<input v-model="topologyForm.deviceName" type="text" @input="markTopologyDirty" /></label>
-                  <label v-if="isModbusProtocol">Station / Slave<input v-model="topologyForm.stationNumber" type="number" min="1" max="247" @input="markTopologyDirty" /></label>
+                  <label>任务键<input v-model="topologyForm.taskKey" type="text" @input="markTopologyDirty" /></label>
+                  <label>连接名<input v-model="topologyForm.connectionName" type="text" @input="markTopologyDirty" /></label>
+                  <label>设备键<input v-model="topologyForm.deviceKey" type="text" @input="markTopologyDirty" /></label>
+                  <label>设备名称<input v-model="topologyForm.deviceName" type="text" @input="markTopologyDirty" /></label>
+                  <label v-if="isModbusProtocol">站号 / 从站<input v-model="topologyForm.stationNumber" type="number" min="1" max="247" @input="markTopologyDirty" /></label>
                 </div>
               </div>
 
               <div class="panel-section">
                 <div class="panel-head compact">
                   <h2>连接参数</h2>
-                  <span class="badge">schema</span>
+                  <span class="badge">字段</span>
                 </div>
                 <div v-if="visibleConnectionSettings.length" class="form-grid">
                   <label v-for="setting in visibleConnectionSettings" :key="setting.key" :class="{ 'checkbox-label': isBooleanSetting(setting) }">
-                    <span>{{ setting.label }}<em v-if="setting.required">*</em></span>
+                    <span>{{ displayConnectionSettingLabel(setting) }}<em v-if="setting.required">*</em></span>
                     <select v-if="isSelectSetting(setting)" v-model="connectionValues[setting.key]" @change="markTopologyDirty">
-                      <option v-for="option in setting.options ?? []" :key="option" :value="option">{{ option }}</option>
+                      <option v-for="option in displayConnectionSettingOptions(setting)" :key="option" :value="option">{{ displayConnectionOption(setting, option) }}</option>
                     </select>
                     <input
                       v-else-if="isBooleanSetting(setting)"
@@ -1214,7 +1717,7 @@ function errorMessage(error: unknown) {
                       :required="setting.required"
                       @input="markTopologyDirty"
                     />
-                    <small>{{ setting.description }}</small>
+                    <small>{{ displayConnectionSettingDescription(setting) }}</small>
                   </label>
                 </div>
                 <div v-else class="empty">当前协议还没有连接字段定义。</div>
@@ -1228,7 +1731,7 @@ function errorMessage(error: unknown) {
                       <Plus :size="15" />
                       <span>新增点位</span>
                     </button>
-                    <button type="button" @click="syncFormsToJson('topology synced to JSON')">
+                    <button type="button" @click="syncFormsToJson('采集拓扑已同步到 JSON')">
                       <Save :size="15" />
                       <span>同步到 JSON</span>
                     </button>
@@ -1238,49 +1741,49 @@ function errorMessage(error: unknown) {
                   <table>
                     <thead>
                       <tr>
-                        <th>Key</th>
-                        <th>Name</th>
-                        <th>Source</th>
-                        <th>Address</th>
-                        <th>Raw</th>
-                        <th>Length</th>
-                        <th>Target</th>
-                        <th>Value</th>
-                        <th>Period</th>
+                        <th>键</th>
+                        <th>名称</th>
+                        <th>来源</th>
+                        <th>地址</th>
+                        <th>原始</th>
+                        <th>长度</th>
+                        <th>目标</th>
+                        <th>值</th>
+                        <th>周期</th>
                         <th></th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr v-if="!pointRows.length">
-                        <td colspan="10" class="empty">No points.</td>
+                        <td colspan="10" class="empty">暂无点位。</td>
                       </tr>
                       <tr v-for="(point, index) in pointRows" :key="index">
                         <td><input v-model="point.pointKey" @input="markTopologyDirty" /></td>
                         <td><input v-model="point.pointName" @input="markTopologyDirty" /></td>
                         <td>
                           <select v-model="point.sourceType" @change="markTopologyDirty">
-                            <option v-for="option in pointSourceOptions(selectedProtocol)" :key="option" :value="option">{{ option }}</option>
+                            <option v-for="option in pointSourceOptions(selectedProtocol)" :key="option" :value="option">{{ displayPointSource(option) }}</option>
                           </select>
                         </td>
                         <td><input v-model="point.address" @input="markTopologyDirty" /></td>
                         <td>
                           <select v-model="point.rawValueType" @change="markTopologyDirty">
-                            <option>Float</option>
-                            <option>Double</option>
-                            <option>Int16</option>
-                            <option>Int32</option>
-                            <option>Boolean</option>
-                            <option>String</option>
+                            <option value="Float">浮点数</option>
+                            <option value="Double">双精度</option>
+                            <option value="Int16">16 位整数</option>
+                            <option value="Int32">32 位整数</option>
+                            <option value="Boolean">布尔</option>
+                            <option value="String">字符串</option>
                           </select>
                         </td>
                         <td><input v-model="point.length" type="number" min="1" @input="markTopologyDirty" /></td>
                         <td><input v-model="point.targetName" @input="markTopologyDirty" /></td>
                         <td>
                           <select v-model="point.valueType" @change="markTopologyDirty">
-                            <option>Double</option>
-                            <option>Int32</option>
-                            <option>Boolean</option>
-                            <option>String</option>
+                            <option value="Double">双精度</option>
+                            <option value="Int32">32 位整数</option>
+                            <option value="Boolean">布尔</option>
+                            <option value="String">字符串</option>
                           </select>
                         </td>
                         <td><input v-model="point.readPeriodMs" type="number" min="1000" step="1000" @input="markTopologyDirty" /></td>
@@ -1298,23 +1801,23 @@ function errorMessage(error: unknown) {
               <div class="panel-section">
                 <div class="panel-head compact">
                   <h2>运行拓扑</h2>
-                  <span class="badge">snapshot</span>
+                  <span class="badge">快照</span>
                 </div>
                 <div class="table-wrap">
                   <table>
                     <thead>
                       <tr>
-                        <th>Task</th>
-                        <th>Device</th>
-                        <th>Point</th>
-                        <th>Address</th>
-                        <th>Target</th>
-                        <th>Protocol</th>
+                        <th>任务</th>
+                        <th>设备</th>
+                        <th>点位</th>
+                        <th>地址</th>
+                        <th>目标</th>
+                        <th>协议</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr v-if="!topologyRows.length">
-                        <td colspan="6" class="empty">No {{ selectedProtocol.displayName }} topology configured yet.</td>
+                        <td colspan="6" class="empty">当前还未配置 {{ selectedProtocol.displayName }} 拓扑。</td>
                       </tr>
                       <tr v-for="row in topologyRows" :key="`${row.taskKey}-${row.deviceName}-${row.pointName}`">
                         <td>{{ row.taskKey }}</td>
@@ -1334,7 +1837,7 @@ function errorMessage(error: unknown) {
               <div class="panel-section stretch">
                 <div class="panel-head compact">
                   <h2>本地 JSON</h2>
-                  <span class="badge" :class="{ warn: jsonParseError }">{{ jsonParseError ? 'invalid' : 'editable' }}</span>
+                  <span class="badge" :class="{ warn: jsonParseError }">{{ jsonParseError ? '有误' : '可编辑' }}</span>
                 </div>
                 <textarea v-model="configurationText" spellcheck="false" @input="onJsonInput"></textarea>
                 <div v-if="jsonParseError" class="inline-warning">
@@ -1351,32 +1854,32 @@ function errorMessage(error: unknown) {
             <div>
               <div class="panel-head">
                 <h2>SonnetDB</h2>
-                <span class="badge">local target</span>
+                <span class="badge">本地上传</span>
               </div>
               <div class="info-list">
-                <div class="info-row"><span>Protocol</span><strong>{{ baseConfiguration.upload?.protocol ?? '--' }}</strong></div>
-                <div class="info-row"><span>Endpoint</span><strong>{{ baseConfiguration.upload?.endpoint || '--' }}</strong></div>
-                <div class="info-row"><span>Database</span><strong>{{ uploadSettings.database ?? '--' }}</strong></div>
-                <div class="info-row"><span>Measurement</span><strong>{{ uploadSettings.measurement ?? '--' }}</strong></div>
-                <div class="info-row"><span>Field</span><strong>{{ uploadSettings.field ?? '--' }}</strong></div>
-                <div class="info-row"><span>Site</span><strong>{{ uploadSettings.site ?? '--' }}</strong></div>
+                <div class="info-row"><span>协议</span><strong>{{ displayUploadProtocol(baseConfiguration.upload?.protocol) }}</strong></div>
+                <div class="info-row"><span>地址</span><strong>{{ baseConfiguration.upload?.endpoint || '--' }}</strong></div>
+                <div class="info-row"><span>数据库</span><strong>{{ uploadSettings.database ?? '--' }}</strong></div>
+                <div class="info-row"><span>测点集</span><strong>{{ uploadSettings.measurement ?? '--' }}</strong></div>
+                <div class="info-row"><span>字段</span><strong>{{ uploadSettings.field ?? '--' }}</strong></div>
+                <div class="info-row"><span>站点</span><strong>{{ uploadSettings.site ?? '--' }}</strong></div>
               </div>
             </div>
             <div>
               <div class="panel-head">
                 <h2>快速编辑</h2>
-                <span class="badge">settings</span>
+                <span class="badge">设置</span>
               </div>
               <div class="form-grid">
-                <label>Endpoint<input v-model="uploadForm.endpoint" type="text" @input="markUploadDirty" /></label>
-                <label>Database<input v-model="uploadForm.database" type="text" @input="markUploadDirty" /></label>
-                <label>Token<input v-model="uploadForm.token" type="password" @input="markUploadDirty" /></label>
-                <label>Measurement<input v-model="uploadForm.measurement" type="text" @input="markUploadDirty" /></label>
-                <label>Field<input v-model="uploadForm.field" type="text" @input="markUploadDirty" /></label>
-                <label>Site<input v-model="uploadForm.site" type="text" @input="markUploadDirty" /></label>
+                <label>地址<input v-model="uploadForm.endpoint" type="text" @input="markUploadDirty" /></label>
+                <label>数据库<input v-model="uploadForm.database" type="text" @input="markUploadDirty" /></label>
+                <label>令牌<input v-model="uploadForm.token" type="password" @input="markUploadDirty" /></label>
+                <label>测点集<input v-model="uploadForm.measurement" type="text" @input="markUploadDirty" /></label>
+                <label>字段<input v-model="uploadForm.field" type="text" @input="markUploadDirty" /></label>
+                <label>站点<input v-model="uploadForm.site" type="text" @input="markUploadDirty" /></label>
               </div>
               <div class="actions align-end">
-                <button type="button" @click="syncFormsToJson('SonnetDB settings synced to JSON')">
+                <button type="button" @click="syncFormsToJson('SonnetDB 设置已同步到 JSON')">
                   <Save :size="16" />
                   <span>同步到 JSON</span>
                 </button>
@@ -1393,7 +1896,7 @@ function errorMessage(error: unknown) {
           <article class="panel">
             <div class="panel-head">
               <h2>BASIC 采集脚本</h2>
-              <span class="badge">read-only</span>
+              <span class="badge">只读</span>
             </div>
             <pre class="code-block">{{ scriptText }}</pre>
           </article>
@@ -1403,9 +1906,9 @@ function errorMessage(error: unknown) {
           <article class="panel">
             <div class="panel-head">
               <h2>运行日志</h2>
-              <span class="badge">live</span>
+              <span class="badge">实时</span>
             </div>
-            <pre class="logs">{{ logLines.length ? logLines.join('\n\n') : 'No logs.' }}</pre>
+            <pre class="logs">{{ logLines.length ? logLines.join('\n\n') : '暂无日志。' }}</pre>
           </article>
         </section>
 
@@ -1413,7 +1916,7 @@ function errorMessage(error: unknown) {
           <article class="panel">
             <div class="panel-head">
               <h2>本地配置</h2>
-              <span class="badge">json</span>
+              <span class="badge">原始</span>
             </div>
             <pre class="code-block">{{ bootstrapJson }}</pre>
           </article>

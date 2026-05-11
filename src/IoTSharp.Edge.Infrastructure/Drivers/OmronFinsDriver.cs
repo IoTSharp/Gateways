@@ -5,18 +5,18 @@ internal sealed class OmronFinsDriver : DeviceDriverBase
     public override DriverMetadata Metadata { get; } = new(
         "omron-fins",
         DriverType.OmronFins,
-        "Omron FINS",
-        "IoTClient-backed Omron FINS driver.",
+        "欧姆龙 FINS",
+        "基于 IoTClient 的欧姆龙 FINS 驱动。",
         true,
         true,
         true,
         true,
         new[]
         {
-            new ConnectionSettingDefinition("host", "Host", "text", true, "PLC host name or IP."),
-            new ConnectionSettingDefinition("port", "Port", "number", true, "PLC port."),
-            new ConnectionSettingDefinition("timeout", "Timeout", "number", false, "Timeout in milliseconds."),
-            new ConnectionSettingDefinition("endianFormat", "Endian", "select", false, "Word/byte order.", Enum.GetNames<EndianFormat>())
+            new ConnectionSettingDefinition("host", "主机", "text", true, "PLC 主机名或 IP 地址。"),
+            new ConnectionSettingDefinition("port", "端口", "number", true, "PLC 端口。"),
+            new ConnectionSettingDefinition("timeout", "超时", "number", false, "超时时间，单位毫秒。"),
+            new ConnectionSettingDefinition("endianFormat", "字节序", "select", false, "字和字节的顺序。", Enum.GetNames<EndianFormat>())
         });
 
     public override Task<ConnectionTestResult> TestConnectionAsync(DriverConnectionContext context, CancellationToken cancellationToken)
@@ -49,7 +49,7 @@ internal sealed class OmronFinsDriver : DeviceDriverBase
                 GatewayDataType.UInt64 => ToReadResult(request.Address, client.ReadUInt64(request.Address)),
                 GatewayDataType.Float => ToReadResult(request.Address, client.ReadFloat(request.Address)),
                 GatewayDataType.Double => ToReadResult(request.Address, client.ReadDouble(request.Address)),
-                _ => new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"Unsupported Omron data type '{request.DataType}'.")
+                _ => new DriverReadResult(request.Address, null, null, DateTimeOffset.UtcNow, QualityStatus.Bad, $"不支持的欧姆龙数据类型“{request.DataType}”。")
             };
 
             return Task.FromResult(result);
@@ -77,7 +77,7 @@ internal sealed class OmronFinsDriver : DeviceDriverBase
                 GatewayDataType.UInt64 => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToUInt64(request.Value))),
                 GatewayDataType.Float => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToSingle(request.Value))),
                 GatewayDataType.Double => ToWriteResult(request.Address, request.Value, client.Write(request.Address, Convert.ToDouble(request.Value))),
-                _ => new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, $"Unsupported Omron data type '{request.DataType}'.")
+                _ => new DriverWriteResult(request.Address, request.Value, DateTimeOffset.UtcNow, QualityStatus.Bad, $"不支持的欧姆龙数据类型“{request.DataType}”。")
             };
 
             return Task.FromResult(result);

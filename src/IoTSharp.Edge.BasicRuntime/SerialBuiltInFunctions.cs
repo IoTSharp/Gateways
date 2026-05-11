@@ -113,7 +113,7 @@ internal static class SerialBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Serial open failed: {Unwrap(ex).Message}", BasicValue.FromNumber(0));
+            return Fail(state, $"串口打开失败：{Unwrap(ex).Message}", BasicValue.FromNumber(0));
         }
     }
 
@@ -135,7 +135,7 @@ internal static class SerialBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Serial close failed: {Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
+            return Fail(state, $"串口关闭失败：{Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
         }
     }
 
@@ -155,7 +155,7 @@ internal static class SerialBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Serial available failed: {Unwrap(ex).Message}", BasicValue.FromNumber(0), session);
+            return Fail(state, $"串口可读字节查询失败：{Unwrap(ex).Message}", BasicValue.FromNumber(0), session);
         }
     }
 
@@ -175,7 +175,7 @@ internal static class SerialBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Serial pending failed: {Unwrap(ex).Message}", BasicValue.FromNumber(0), session);
+            return Fail(state, $"串口待写字节查询失败：{Unwrap(ex).Message}", BasicValue.FromNumber(0), session);
         }
     }
 
@@ -196,7 +196,7 @@ internal static class SerialBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Serial read failed: {Unwrap(ex).Message}", BasicValue.Nil, session);
+            return Fail(state, $"串口读取失败：{Unwrap(ex).Message}", BasicValue.Nil, session);
         }
     }
 
@@ -221,7 +221,7 @@ internal static class SerialBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Serial text read failed: {Unwrap(ex).Message}", BasicValue.Nil, session);
+            return Fail(state, $"串口文本读取失败：{Unwrap(ex).Message}", BasicValue.Nil, session);
         }
     }
 
@@ -241,7 +241,7 @@ internal static class SerialBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Serial line read failed: {Unwrap(ex).Message}", BasicValue.Nil, session);
+            return Fail(state, $"串口行读取失败：{Unwrap(ex).Message}", BasicValue.Nil, session);
         }
     }
 
@@ -262,7 +262,7 @@ internal static class SerialBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Serial write failed: {Unwrap(ex).Message}", BasicValue.FromNumber(0), session);
+            return Fail(state, $"串口写入失败：{Unwrap(ex).Message}", BasicValue.FromNumber(0), session);
         }
     }
 
@@ -285,7 +285,7 @@ internal static class SerialBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Serial line write failed: {Unwrap(ex).Message}", BasicValue.FromNumber(0), session);
+            return Fail(state, $"串口行写入失败：{Unwrap(ex).Message}", BasicValue.FromNumber(0), session);
         }
     }
 
@@ -306,7 +306,7 @@ internal static class SerialBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Serial DTR update failed: {Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
+            return Fail(state, $"串口 DTR 更新失败：{Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
         }
     }
 
@@ -327,7 +327,7 @@ internal static class SerialBuiltInFunctions
         }
         catch (Exception ex)
         {
-            return Fail(state, $"Serial RTS update failed: {Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
+            return Fail(state, $"串口 RTS 更新失败：{Unwrap(ex).Message}", BasicValue.FromBoolean(false), session);
         }
     }
 
@@ -359,13 +359,13 @@ internal static class SerialBuiltInFunctions
 
         if (!TryGetHandle(args, index, out handle))
         {
-            runtime.SerialState.SetLastError("Serial handle is required.");
+            runtime.SerialState.SetLastError("需要串口句柄。");
             return false;
         }
 
         if (!runtime.SerialState.TryGet(handle, out session))
         {
-            runtime.SerialState.SetLastError("Serial handle not found.");
+            runtime.SerialState.SetLastError("未找到串口句柄。");
             return false;
         }
 
@@ -405,7 +405,7 @@ internal static class SerialBuiltInFunctions
         var portName = RequiredText(args, 0);
         if (string.IsNullOrWhiteSpace(portName))
         {
-            throw new BasicRuntimeException("Serial port name is required.");
+            throw new BasicRuntimeException("需要串口名称。");
         }
 
         var mode = ParseMode(args, 6);
@@ -450,7 +450,7 @@ internal static class SerialBuiltInFunctions
             "3" or "m" or "mark" => Parity.Mark,
             "4" or "s" or "space" => Parity.Space,
             _ when int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var raw) && Enum.IsDefined(typeof(Parity), raw) => (Parity)raw,
-            _ => throw new BasicRuntimeException("Serial parity must be one of N/E/O/M/S or 0-4.")
+            _ => throw new BasicRuntimeException("串口校验位必须是 N/E/O/M/S 或 0-4。")
         };
     }
 
@@ -471,7 +471,7 @@ internal static class SerialBuiltInFunctions
             _ when double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var raw) && Math.Abs(raw - 1.0) < 0.0000000001d => StopBits.One,
             _ when double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var rawHalf) && Math.Abs(rawHalf - 1.5d) < 0.0000000001d => StopBits.OnePointFive,
             _ when double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var rawTwo) && Math.Abs(rawTwo - 2d) < 0.0000000001d => StopBits.Two,
-            _ => throw new BasicRuntimeException("Serial stop bits must be 1, 1.5, or 2.")
+            _ => throw new BasicRuntimeException("串口停止位必须是 1、1.5 或 2。")
         };
     }
 
@@ -491,7 +491,7 @@ internal static class SerialBuiltInFunctions
             "2" or "rts" or "rtscts" or "requesttosend" or "hardware" => Handshake.RequestToSend,
             "3" or "rtsxonxoff" or "requesttosendxonxoff" => Handshake.RequestToSendXOnXOff,
             _ when int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var raw) && Enum.IsDefined(typeof(Handshake), raw) => (Handshake)raw,
-            _ => throw new BasicRuntimeException("Serial handshake must be none, xonxoff, rtscts, or requesttosendxonxoff.")
+            _ => throw new BasicRuntimeException("串口握手方式必须是 none、xonxoff、rtscts 或 requesttosendxonxoff。")
         };
     }
 
@@ -508,7 +508,7 @@ internal static class SerialBuiltInFunctions
         {
             "0" or "232" or "rs232" or "ttl" => BasicSerialBusMode.Rs232,
             "1" or "485" or "rs485" or "halfduplex" => BasicSerialBusMode.Rs485,
-            _ => throw new BasicRuntimeException("Serial mode must be rs232 or rs485.")
+            _ => throw new BasicRuntimeException("串口模式必须是 rs232 或 rs485。")
         };
     }
 
@@ -521,7 +521,7 @@ internal static class SerialBuiltInFunctions
         }
         catch (Exception ex)
         {
-            throw new BasicRuntimeException($"Serial encoding '{value}' is not supported: {ex.Message}");
+            throw new BasicRuntimeException($"串口编码“{value}”不受支持：{ex.Message}");
         }
     }
 
@@ -970,7 +970,7 @@ internal sealed class SystemBasicSerialPortSession : IBasicSerialPortSession
     {
         if (!IsOpen)
         {
-            throw new InvalidOperationException($"Serial port '{PortName}' is closed.");
+            throw new InvalidOperationException($"串口“{PortName}”已关闭。");
         }
     }
 

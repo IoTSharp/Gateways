@@ -331,7 +331,7 @@ internal sealed class BasicArray
     {
         if (indexes.Count != _dimensions.Length)
         {
-            throw new BasicRuntimeException($"Array expects {_dimensions.Length} indexes but received {indexes.Count}.");
+            throw new BasicRuntimeException($"数组需要 {_dimensions.Length} 个索引，但实际收到 {indexes.Count} 个。");
         }
 
         var offset = 0;

@@ -98,9 +98,9 @@ public sealed class GatewayRuntimeService
 
     public async Task<GatewayExecutionReport> ExecutePollingTaskAsync(Guid taskId, CancellationToken cancellationToken)
     {
-        var task = await _repository.GetPollingTaskAsync(taskId, cancellationToken) ?? throw new InvalidOperationException($"Polling task '{taskId}' was not found.");
-        var device = await _repository.GetDeviceAsync(task.DeviceId, cancellationToken) ?? throw new InvalidOperationException($"Device '{task.DeviceId}' was not found.");
-        var channel = await _repository.GetChannelAsync(device.ChannelId, cancellationToken) ?? throw new InvalidOperationException($"Channel '{device.ChannelId}' was not found.");
+        var task = await _repository.GetPollingTaskAsync(taskId, cancellationToken) ?? throw new InvalidOperationException($"未找到轮询任务“{taskId}”。");
+        var device = await _repository.GetDeviceAsync(task.DeviceId, cancellationToken) ?? throw new InvalidOperationException($"未找到设备“{task.DeviceId}”。");
+        var channel = await _repository.GetChannelAsync(device.ChannelId, cancellationToken) ?? throw new InvalidOperationException($"未找到通道“{device.ChannelId}”。");
         var configuredPointIds = GatewayJson.ParseGuidArray(task.PointIdsJson).ToHashSet();
         var points = (await _repository.GetPointsByDeviceAsync(device.Id, cancellationToken))
             .Where(point => point.Enabled && point.AccessMode is PointAccessMode.Read or PointAccessMode.ReadWrite)
@@ -140,7 +140,7 @@ public sealed class GatewayRuntimeService
                 MaxLoopIterations = 1_000_000
             });
 
-        var report = ExpectDictionary(result.ReturnValue, "Gateway polling script result");
+        var report = ExpectDictionary(result.ReturnValue, "网关轮询脚本结果");
         return new GatewayExecutionReport(
             task.Id,
             task.Name,
@@ -284,9 +284,9 @@ public sealed class GatewayRuntimeService
 
     public async Task<DriverWriteResult> ExecutePointWriteAsync(Guid deviceId, Guid pointId, object? value, CancellationToken cancellationToken)
     {
-        var device = await _repository.GetDeviceAsync(deviceId, cancellationToken) ?? throw new InvalidOperationException($"Device '{deviceId}' was not found.");
-        var point = await _repository.GetPointAsync(pointId, cancellationToken) ?? throw new InvalidOperationException($"Point '{pointId}' was not found.");
-        var channel = await _repository.GetChannelAsync(device.ChannelId, cancellationToken) ?? throw new InvalidOperationException($"Channel '{device.ChannelId}' was not found.");
+        var device = await _repository.GetDeviceAsync(deviceId, cancellationToken) ?? throw new InvalidOperationException($"未找到设备“{deviceId}”。");
+        var point = await _repository.GetPointAsync(pointId, cancellationToken) ?? throw new InvalidOperationException($"未找到点位“{pointId}”。");
+        var channel = await _repository.GetChannelAsync(device.ChannelId, cancellationToken) ?? throw new InvalidOperationException($"未找到通道“{device.ChannelId}”。");
         var connectionSettings = MergeSettings(channel.ConnectionJson, device.SettingsJson);
         var driver = _driverRegistry.GetRequiredDriver(channel.DriverCode);
         var request = new DriverWriteRequest(point.Address, point.DataType, value, point.Length, GatewayJson.Parse(point.SettingsJson));
@@ -318,7 +318,7 @@ public sealed class GatewayRuntimeService
             return new Dictionary<string, object?>(mutableDictionary, StringComparer.OrdinalIgnoreCase);
         }
 
-        throw new InvalidOperationException($"{description} must return a dictionary.");
+        throw new InvalidOperationException($"{description}必须返回字典。");
     }
 
     private static int ReadInt32(IReadOnlyDictionary<string, object?> values, string key)

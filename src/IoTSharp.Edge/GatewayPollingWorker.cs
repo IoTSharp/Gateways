@@ -46,7 +46,7 @@ public sealed class GatewayPollingWorker : BackgroundService
                     }
 
                     var report = await runtimeService.ExecutePollingTaskAsync(task.Id, stoppingToken);
-                    _logger.LogInformation("Executed polling task {TaskName} with {SuccessCount} successes and {FailureCount} failures.", report.TaskName, report.SuccessCount, report.FailureCount);
+                    _logger.LogInformation("轮询任务 {TaskName} 执行完成，成功 {SuccessCount} 项，失败 {FailureCount} 项。", report.TaskName, report.SuccessCount, report.FailureCount);
                     var taskNext = now.AddSeconds(Math.Max(task.IntervalSeconds, 1));
                     _nextRuns[task.Id] = taskNext;
                     if (taskNext < soonest)
@@ -57,7 +57,7 @@ public sealed class GatewayPollingWorker : BackgroundService
             }
             catch (Exception exception)
             {
-                _logger.LogError(exception, "Gateway polling iteration failed.");
+                _logger.LogError(exception, "网关轮询迭代失败。");
             }
 
             var delay = soonest - DateTimeOffset.UtcNow;
