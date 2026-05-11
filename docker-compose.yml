@@ -80,21 +80,6 @@ services:
     volumes:
       - edge-data:/data
 
-  edge-admin:
-    build:
-      context: .
-      dockerfile: src/IoTSharp.Edge.Admin/Dockerfile
-    container_name: iotsharp-edge-admin
-    restart: unless-stopped
-    depends_on:
-      edge:
-        condition: service_started
-    environment:
-      ASPNETCORE_URLS: http://+:8080
-      EdgeApi__BaseUrl: http://127.0.0.1:18180
-    ports:
-      - "18182:8080"
-
 volumes:
   sonnetdb-data:
   edge-data:

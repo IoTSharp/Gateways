@@ -17,3 +17,6 @@ src/IoTSharp.Gateways/bootstrap.json
 src/gateway-web/node_modules/
 src/gateway-web/dist/
 /src/gateway-web/package-lock.json
+src/IoTSharp.Edge/ClientApp/node_modules/
+src/IoTSharp.Edge/ClientApp/dist/
+src/IoTSharp.Edge/wwwroot/*

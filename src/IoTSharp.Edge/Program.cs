@@ -51,6 +51,7 @@ builder.Services.AddScoped<DriverCatalogService>();
 builder.Services.AddScoped<CollectionProtocolCatalogService>();
 builder.Services.AddScoped<GatewayRuntimeService>();
 builder.Services.AddGatewayInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<FrontendDevelopmentServerHostedService>();
 builder.Services.AddSingleton<IEdgeTaskReceiptReporter, EdgeTaskReceiptExample>();
 builder.Services.AddHostedService<GatewayPollingWorker>();
 builder.Services.AddHostedService<GatewayCollectionConfigurationWorker>();
@@ -58,6 +59,35 @@ builder.Services.AddHostedService<EdgeRuntimeReportingWorker>();
 
 var app = builder.Build();
 app.UseCors();
+
+if (app.Environment.IsDevelopment())
+{
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/health"))
+        {
+            await next();
+            return;
+        }
+
+        if (await FrontendSpaProxy.TryProxyAsync(context))
+        {
+            return;
+        }
+
+        await next();
+    });
+}
+
+app.UseDefaultFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        context.Context.Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+        context.Context.Response.Headers.Pragma = "no-cache";
+    }
+});
 
 using (var scope = app.Services.CreateScope())
 {
@@ -121,6 +151,12 @@ app.MapPost("/api/local/configuration/reset", async (LocalCollectionConfiguratio
         return Results.BadRequest(new { message = exception.Message });
     }
 });
+
+app.MapGet("/api/frontend/config", (HttpContext context) => Results.Ok(new
+{
+    edgeApiBaseUrl = $"{context.Request.Scheme}://{context.Request.Host}",
+    builtAtUtc = DateTime.UtcNow
+}));
 
 app.MapGet("/api/scripts/polling", () => Results.Ok(new
 {
@@ -252,6 +288,8 @@ app.MapGet("/api/diagnostics/summary", async (
         }
     });
 });
+
+app.MapFallbackToFile("index.html");
 
 app.Run();
 

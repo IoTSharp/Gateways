@@ -4,6 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <ClientAppRoot>$(MSBuildProjectDirectory)\ClientApp</ClientAppRoot>
+    <ClientAppPublishRoot>$(MSBuildProjectDirectory)\wwwroot</ClientAppPublishRoot>
+    <BuildClientApp Condition="'$(BuildClientApp)' == ''">true</BuildClientApp>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,4 +21,19 @@
   <ItemGroup>
     <Content Update="local-collection.docker.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <Target Name="BuildClientApp" BeforeTargets="ComputeFilesToPublish" Condition="'$(BuildClientApp)' == 'true'">
+    <Exec WorkingDirectory="$(ClientAppRoot)" Command="npm ci --no-audit --no-fund" />
+    <Exec WorkingDirectory="$(ClientAppRoot)" Command="npm run build" />
+    <RemoveDir Directories="$(ClientAppPublishRoot)" Condition="Exists('$(ClientAppPublishRoot)')" />
+    <MakeDir Directories="$(ClientAppPublishRoot)" />
+    <ItemGroup>
+      <ClientAppPublishFiles Include="$(ClientAppRoot)\dist\**\*" />
+    </ItemGroup>
+    <Copy
+      SourceFiles="@(ClientAppPublishFiles)"
+      DestinationFiles="@(ClientAppPublishFiles->'$(ClientAppPublishRoot)\%(RecursiveDir)%(Filename)%(Extension)')"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(ClientAppRoot)\dist')" />
+  </Target>
 </Project>
