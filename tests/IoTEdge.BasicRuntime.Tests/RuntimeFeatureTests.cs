@@ -85,4 +85,26 @@ public sealed class RuntimeFeatureTests
             Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public void Runtime_exposes_standard_time_functions()
+    {
+        var runtime = new BasicRuntime();
+        var result = runtime.Execute("""
+            before = TICKS()
+            if DELAY(0) <> 1 then
+              return "delay failed"
+            endif
+            if SLEEP(0) <> 1 then
+              return "sleep failed"
+            endif
+            after = TICKS()
+            if after < before then
+              return "ticks moved backward"
+            endif
+            return "ok"
+            """);
+
+        Assert.Equal("ok", result.ReturnValue);
+    }
 }

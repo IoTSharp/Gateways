@@ -112,6 +112,25 @@ public sealed class ModbusBuiltInFunctionTests
         Assert.Equal("未找到 Modbus 句柄。", result.ReturnValue);
     }
 
+    [Fact]
+    public void Runtime_defaults_modbus_byte_order_to_abcd()
+    {
+        var factory = new LoopbackModbusClientFactory();
+        var runtime = new BasicRuntime(modbusClientFactory: factory);
+        var result = runtime.Execute("""
+            tcp = MODBUS_CONNECT_TCP("127.0.0.1")
+            rtu = MODBUS_CONNECT_RTU("COM1")
+            if tcp = 0 or rtu = 0 then
+              return MODBUS_LAST_ERROR()
+            endif
+            return "ok"
+            """);
+
+        Assert.Equal("ok", result.ReturnValue);
+        Assert.Equal(2, factory.OpenedOptions.Count);
+        Assert.All(factory.OpenedOptions, options => Assert.Equal(EndianFormat.ABCD, options.EndianFormat));
+    }
+
     private sealed class LoopbackModbusClientFactory : IBasicModbusClientFactory
     {
         public List<BasicModbusConnectionOptions> OpenedOptions { get; } = [];

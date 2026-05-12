@@ -44,6 +44,9 @@ internal static class BuiltInFunctions
         runtime.RegisterInternalFunction("GET", (_, args) => GetIteratorValue(Arg(args, 0)));
         runtime.RegisterInternalFunction("OS", (_, _) => BasicValue.FromString(GetOsName()));
         runtime.RegisterInternalFunction("SYS", (_, args) => Sys(args));
+        runtime.RegisterInternalFunction("DELAY", (_, args) => Sleep(args));
+        runtime.RegisterInternalFunction("SLEEP", (_, args) => Sleep(args));
+        runtime.RegisterInternalFunction("TICKS", (_, _) => Ticks());
         runtime.RegisterInternalFunction("TYPE", (_, args) => BasicValue.FromString(TypeName(Arg(args, 0))));
         MqttBuiltInFunctions.Register(runtime);
         SerialBuiltInFunctions.Register(runtime);
@@ -194,6 +197,20 @@ internal static class BuiltInFunctions
         process?.WaitForExit();
         return BasicValue.FromNumber(process?.ExitCode ?? -1);
     }
+
+    private static BasicValue Sleep(IReadOnlyList<BasicValue> args)
+    {
+        var delayMs = args.Count > 0 ? Math.Max(0, (int)Arg(args, 0).AsNumber()) : 0;
+        if (delayMs > 0)
+        {
+            Thread.Sleep(delayMs);
+        }
+
+        return BasicValue.FromNumber(1);
+    }
+
+    private static BasicValue Ticks()
+        => BasicValue.FromNumber(Environment.TickCount64 < 0 ? 0 : Environment.TickCount64);
 
     private static BasicValue Arg(IReadOnlyList<BasicValue> args, int index)
         => index >= 0 && index < args.Count ? args[index] : BasicValue.Nil;
