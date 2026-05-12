@@ -1,16 +1,16 @@
-# IoTSharp.Edge 路线图
+# IoTEdge 路线图
 
 > 状态：✅ 已完成 ｜ 🚧 进行中 ｜ ⏳ 计划中 ｜ ⬜ 未开始 ｜ 🔁 持续维护
 >
 > 顺序：`[串行]` ｜ `[并行]` ｜ `[依赖: X]`
 
-> 在 IoTSharp.SaaS 生态中，本仓库被引用为 **`IoTSharp.Edge`** 的 C# AOT 边缘基座 / Gateway 宿主。
+> 在 IoTSharp.SaaS 生态中，本仓库被引用为 **`IoTEdge`** 的 C# AOT 边缘基座 / Gateway 宿主。
 
 ## 0. 范围
 
 本仓库提供：
 
-- 单宿主 Gateway（`IoTSharp.Edge`）：bootstrap、注册、心跳、采集配置同步、采集执行、回传
+- 单宿主 Gateway（`IoTEdge`）：bootstrap、注册、心跳、采集配置同步、采集执行、回传
 - C# AOT 边缘基座（被 SaaS 端 `IoTSharp.CodeGen.CSharpAot` 作为生成目标使用）
 - BasicRuntime 宿主接口（C# 版），用于承载 IoTEmBASIC 风格脚本
 - 采集、合成、上传逻辑优先由 BASIC 脚本承载；C# 侧提供宿主、可注入能力和 AOT/非 AOT 边界
@@ -54,7 +54,7 @@
 | --- | --- | --- | --- |
 | C1 | 🚧 | [依赖: B1] | BasicRuntime 接口注册表 / 扩展注入 / 脚本入口 |
 | C2 | ⏳ | [依赖: C1] | 脚本加载、签名校验、版本槽 |
-| C3 | ⏳ | [依赖: C1] | 与 `external/IoTSharp.Edge.Stm32` 接口签名对齐 |
+| C3 | ⏳ | [依赖: C1] | 与 `external/IoTEdge.Stm32` 接口签名对齐 |
 | C4 | ⏳ | [依赖: C2] | 沙箱与运行预算 |
 
 ## 5. Phase D — 协议与诊断　⏳
@@ -69,5 +69,5 @@
 ## 6. 接口稳定性公约
 
 - 与 `IoTSharp.SaaS` 端 `IoTSharp.CodeGen.CSharpAot` 之间的接口为公开契约；破坏性变更需 6 个月废弃期。
-- 与 `external/IoTSharp.Edge.Stm32`、`external/IoTSharp.Edge.Linux` 共同维护 BasicRuntime 接口签名表。
+- 与 `external/IoTEdge.Stm32`、`external/IoTEdge.Linux` 共同维护 BasicRuntime 接口签名表。
 - 本仓库不感知租户 / 计费 / License。

@@ -117,7 +117,7 @@ function toggleUploadCategory(category: string) {
         <Cpu :size="22" />
       </div>
       <div>
-        <div class="brand-title">IoTSharp Edge</div>
+        <div class="brand-title">IoTEdge</div>
         <div class="brand-subtitle">本地控制台</div>
       </div>
     </div>

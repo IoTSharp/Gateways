@@ -36,7 +36,7 @@ export const fallbackUploadProtocol: UploadProtocolDescriptor = {
   lifecycle: 'ready',
   connectionSettings: [
     { key: 'endpoint', label: '端点', valueType: 'text', required: true, description: 'IoTSharp 平台基础地址或完整上报地址。' },
-    { key: 'token', label: '访问令牌', valueType: 'password', required: true, description: 'IoTSharp Edge 访问令牌或设备令牌。' },
+    { key: 'token', label: '访问令牌', valueType: 'password', required: true, description: 'IoTEdge 访问令牌或设备令牌。' },
     { key: 'site', label: '站点', valueType: 'text', required: false, description: '可选的站点标识，会作为上传标签写入。' },
   ],
 }

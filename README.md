@@ -1,8 +1,8 @@
-# IoTSharp.Edge
+# IoTEdge
 
 统一的 Gateway 单宿主程序。
 
-当前模式已经收口为一个可执行程序 `IoTSharp.Edge`，Vue SPA 前端源码位于 `src/VueClient`，开发时由宿主通过 SpaProxy 拉起，发布时构建产物拷贝到 `wwwroot`。Gateway 的职责为：
+当前模式已经收口为一个可执行程序 `IoTEdge`，Vue SPA 前端源码位于 `src/VueClient`，开发时由宿主通过 SpaProxy 拉起，发布时构建产物拷贝到 `wwwroot`。Gateway 的职责为：
 
 - 读取本地 `bootstrap.json`
 - 向 IoTSharp 平台注册、心跳、上报能力
@@ -30,11 +30,11 @@ Gateway 侧负责：
 
 当上游平台不可用或未启用时，Edge 可以通过本地配置继续工作；当上游平台成功下发配置时，Edge 会缓存最新配置到本地，离线后仍可沿用。
 
-当 `EdgeEnableBasicRuntimeExtensions=true` 时，宿主会在启动时注入 `IoTSharp.Edge.RuntimeExtensions`，把驱动读取、驱动写入、变换应用和上传桥接能力暴露给 BASIC 脚本；AOT 发布会自动跳过这一层扩展。基础运行时里的 MQTT、串口、Modbus、PLC 能力始终可用。
+当 `EdgeEnableBasicRuntimeExtensions=true` 时，宿主会在启动时注入 `IoTEdge.RuntimeExtensions`，把驱动读取、驱动写入、变换应用和上传桥接能力暴露给 BASIC 脚本；AOT 发布会自动跳过这一层扩展。基础运行时里的 MQTT、串口、Modbus、PLC 能力始终可用。
 
 ## 本地管理界面
 
-本地管理界面随 `IoTSharp.Edge` 一起启动，源码位于 `src/VueClient`，通过 HTTP 调用同宿主暴露的本地 API。
+本地管理界面随 `IoTEdge` 一起启动，源码位于 `src/VueClient`，通过 HTTP 调用同宿主暴露的本地 API。
 
 当前界面提供：
 
@@ -94,17 +94,17 @@ Gateway 会周期性调用：
 
 ## 目录结构
 
-- `src/IoTSharp.Edge.Domain`
+- `src/IoTEdge.Domain`
   - 领域模型与统一驱动接口
-- `src/IoTSharp.Edge.Application`
+- `src/IoTEdge.Application`
   - 运行服务、配置快照、转换服务
-- `src/IoTSharp.Edge.Infrastructure`
+- `src/IoTEdge.Infrastructure`
   - SQLite 持久化、驱动适配、上传通道
-- `src/IoTSharp.Edge`
+- `src/IoTEdge`
   - 单宿主程序、bootstrap/诊断/本地配置 API、平台同步 worker、Vue SPA 托管入口
 - `src/VueClient`
   - 本地管理前端
-- `src/IoTSharp.Edge.DeviceSimulator`
+- `src/IoTEdge.DeviceSimulator`
   - 基于 IoTServer 的设备模拟程序
 
 ## 当前驱动

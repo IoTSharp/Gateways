@@ -1,7 +1,7 @@
 services:
   sonnetdb:
     image: iotsharp/sonnetdb:latest
-    container_name: iotsharp-edge-sonnetdb
+    container_name: iotedge-sonnetdb
     restart: unless-stopped
     ports:
       - "15080:5080"
@@ -10,7 +10,7 @@ services:
 
   sonnetdb-init:
     image: curlimages/curl:8.16.0
-    container_name: iotsharp-edge-sonnetdb-init
+    container_name: iotedge-sonnetdb-init
     depends_on:
       - sonnetdb
     environment:
@@ -28,7 +28,7 @@ services:
         if grep -q '"needsSetup":true' /tmp/setup.json; then
           curl -fsS -X POST "$$SONNETDB_URL/v1/setup/initialize" \
             -H "Content-Type: application/json" \
-            -d "{\"serverId\":\"iotsharp-edge-lab\",\"organization\":\"IoTSharp Lab\",\"username\":\"admin\",\"password\":\"Admin123!\",\"bearerToken\":\"$$SONNETDB_TOKEN\"}"
+            -d "{\"serverId\":\"iotedge-lab\",\"organization\":\"IoTSharp Lab\",\"username\":\"admin\",\"password\":\"Admin123!\",\"bearerToken\":\"$$SONNETDB_TOKEN\"}"
         fi
         curl -fsS -X POST "$$SONNETDB_URL/v1/db" \
           -H "Authorization: Bearer $$SONNETDB_TOKEN" \
@@ -42,8 +42,8 @@ services:
   device-simulator:
     build:
       context: .
-      dockerfile: src/IoTSharp.Edge.DeviceSimulator/Dockerfile
-    container_name: iotsharp-edge-device-simulator
+      dockerfile: src/IoTEdge.DeviceSimulator/Dockerfile
+    container_name: iotedge-device-simulator
     restart: unless-stopped
     environment:
       ASPNETCORE_URLS: http://+:8080
@@ -58,8 +58,8 @@ services:
   edge:
     build:
       context: .
-      dockerfile: src/IoTSharp.Edge/Dockerfile
-    container_name: iotsharp-edge-runtime
+      dockerfile: src/IoTEdge/Dockerfile
+    container_name: iotedge-runtime
     restart: unless-stopped
     depends_on:
       device-simulator:

@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <SpaRoot>..\VueClient</SpaRoot>
+    <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
+    <SpaProxyServerUrl>http://localhost:5173</SpaProxyServerUrl>
+    <VueClientRoot>$(MSBuildProjectDirectory)\..\VueClient</VueClientRoot>
+    <BuildVueClient Condition="'$(BuildVueClient)' == ''">true</BuildVueClient>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" />
+    <ProjectReference Include="..\IoTEdge.Application\IoTEdge.Application.csproj" />
+    <ProjectReference Include="..\IoTEdge.Infrastructure\IoTEdge.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EdgeEnableBasicRuntimeExtensions)' == 'true'">
+    <ProjectReference Include="..\IoTEdge.RuntimeExtensions\IoTEdge.RuntimeExtensions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="local-collection.docker.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="BuildVueClient" BeforeTargets="ComputeFilesToPublish" Condition="'$(BuildVueClient)' == 'true' and '$(PublishDir)' != ''">
+    <Exec WorkingDirectory="$(VueClientRoot)" Command="npm ci --no-audit --no-fund" />
+    <Exec WorkingDirectory="$(VueClientRoot)" Command="npm run build" />
+    <ItemGroup>
+      <VueClientPublishFiles Include="$(VueClientRoot)\dist\**\*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(PublishDir)wwwroot" Condition="Exists('$(PublishDir)wwwroot')" />
+    <MakeDir Directories="$(PublishDir)wwwroot" />
+    <Copy
+      SourceFiles="@(VueClientPublishFiles)"
+      DestinationFiles="@(VueClientPublishFiles->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(VueClientRoot)\dist')" />
+  </Target>
+</Project>

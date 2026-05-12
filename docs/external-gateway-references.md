@@ -1,6 +1,6 @@
 # External Gateway Reference Notes
 
-This note captures anonymized findings from two external industrial gateway codebases while evaluating OPC UA, OPC DA, MTConnect / MT CNC, Fanuc CNC, and related industrial protocols for IoTSharp.Edge.
+This note captures anonymized findings from two external industrial gateway codebases while evaluating OPC UA, OPC DA, MTConnect / MT CNC, Fanuc CNC, and related industrial protocols for IoTEdge.
 
 The source products are intentionally not named here. Treat this document as a technical dependency and design reference only.
 
@@ -17,7 +17,7 @@ Reference B is more useful as a protocol implementation reference. Its driver tr
 
 ## Protocol Dependency Matrix
 
-| Area | Reference A | Reference B | Practical take for IoTSharp.Edge |
+| Area | Reference A | Reference B | Practical take for IoTEdge |
 | --- | --- | --- | --- |
 | OPC UA | Packaged OPC UA plugin | `OPCFoundation.NetStandard.Opc.Ua.Client` `1.4.370.12` with a local helper wrapper | Stay with OPC Foundation packages. Prefer our current direct adapter over copying an older helper wrapper. |
 | OPC DA | Packaged OPC DA plugin | Local COM automation interop: `Interop.OPCAutomation.dll`, no NuGet package | Keep OPC DA Windows-only and isolated. A package such as `TitaniumAS.Opc.Client` is cleaner than hard-coding Automation COM in the cross-platform gateway. |
@@ -139,8 +139,8 @@ Recommended:
 - Keep OPC DA as a Windows-only optional adapter. Prefer a clean package boundary or an OPC DA to OPC UA bridge over embedding COM interop in the shared infrastructure assembly.
 - Keep MTConnect lightweight for simple `current` reads. Add a richer MTConnect client only when we need probe/assets/devices/history or more complete typed models.
 - Use the direct Fanuc FOCAS method surface as the primary reference for a future optional Fanuc adapter.
-- Consider borrowing the attribute-driven metadata idea for future optional drivers, but align it with IoTSharp.Edge's current driver catalog and configuration contracts.
-- Consider borrowing the plugin isolation shape if IoTSharp.Edge needs third-party driver drop-ins later.
+- Consider borrowing the attribute-driven metadata idea for future optional drivers, but align it with IoTEdge's current driver catalog and configuration contracts.
+- Consider borrowing the plugin isolation shape if IoTEdge needs third-party driver drop-ins later.
 
 Not recommended:
 

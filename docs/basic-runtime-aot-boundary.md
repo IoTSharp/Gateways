@@ -8,11 +8,11 @@ This repo keeps the BASIC runtime split into two layers:
 - evaluator
 - language objects
 - core built-ins from the .NET base class library
-- MQTT, serial, Modbus, and PLC built-ins stay compiled into `IoTSharp.Edge.BasicRuntime`
+- MQTT, serial, Modbus, and PLC built-ins stay compiled into `IoTEdge.BasicRuntime`
 
 ## Optional runtime extensions
 
-- gateway runtime bridges from `IoTSharp.Edge.RuntimeExtensions`
+- gateway runtime bridges from `IoTEdge.RuntimeExtensions`
 
 These gateway bridges are enabled by default in the normal build, but they are not referenced when the build passes `-MustAot`.
 

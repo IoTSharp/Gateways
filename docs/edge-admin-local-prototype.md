@@ -1,4 +1,4 @@
-# IoTSharp Edge Local SPA Prototype
+# IoTEdge Local SPA Prototype
 
 ## Goal
 
@@ -69,7 +69,7 @@ Shows local runtime logs from the Edge API, filtered to operational levels first
 
 ```text
 +---------------------------------------------------------------------+
-| IoTSharp Edge Console      Local Mode | Running | Last applied ...  |
+| IoTEdge Console      Local Mode | Running | Last applied ...  |
 +----------------------+----------------------------------------------+
 | Dashboard            | Runtime cards                                |
 | Topology             | - Health                                     |
@@ -87,7 +87,7 @@ Shows local runtime logs from the Edge API, filtered to operational levels first
 
 ## API Shape
 
-The SPA bundled with `src/IoTSharp.Edge` talks to the local APIs through HTTP.
+The SPA bundled with `src/IoTEdge` talks to the local APIs through HTTP.
 
 Required first-pass APIs:
 
@@ -112,10 +112,10 @@ Required first-pass APIs:
 
 ### Phase 1
 
-- Add local configuration file store in `src/IoTSharp.Edge`.
+- Add local configuration file store in `src/IoTEdge`.
 - Add APIs to read, save, apply, and reset the local configuration.
-- Embed the Vue SPA in `src/VueClient`, host it from `src/IoTSharp.Edge`, and use SpaProxy in development.
-- Remove `samples/IoTSharp.Edge.MockPlatform`.
+- Embed the Vue SPA in `src/VueClient`, host it from `src/IoTEdge`, and use SpaProxy in development.
+- Remove `samples/IoTEdge.MockPlatform`.
 - Update Docker Compose to run Edge, Device Simulator, and SonnetDB only.
 
 ### Phase 2

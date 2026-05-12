@@ -17,8 +17,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = $PSScriptRoot
-$solutionPath = Join-Path $repoRoot 'IoTSharp.Edge.sln'
-$publishProject = Join-Path (Join-Path $repoRoot 'src') (Join-Path 'IoTSharp.Edge' 'IoTSharp.Edge.csproj')
+$solutionPath = Join-Path $repoRoot 'IoTEdge.sln'
+$publishProject = Join-Path (Join-Path $repoRoot 'src') (Join-Path 'IoTEdge' 'IoTEdge.csproj')
 
 function Invoke-DotNet {
     param(
