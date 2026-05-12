@@ -59,6 +59,7 @@ internal static class BuiltInFunctions
         runtime.RegisterInternalFunction("SLEEP", (_, args) => Sleep(args));
         runtime.RegisterInternalFunction("TICKS", (_, _) => Ticks());
         runtime.RegisterInternalFunction("TYPE", (_, args) => BasicValue.FromString(TypeName(Arg(args, 0))));
+        BasicFormatFunctions.Register(runtime);
         MqttBuiltInFunctions.Register(runtime);
         SerialBuiltInFunctions.Register(runtime);
         ModbusBuiltInFunctions.Register(runtime);

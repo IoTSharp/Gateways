@@ -5,6 +5,7 @@ public sealed class CoreProfileConsistencyTests
     public static TheoryData<string> OutputCases => new()
     {
         "class-lambda",
+        "print-format",
         "print-empty-line",
         "print-separators"
     };
