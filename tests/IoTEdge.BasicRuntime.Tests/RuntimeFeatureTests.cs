@@ -126,4 +126,15 @@ public sealed class RuntimeFeatureTests
 
         Assert.Equal(7L, result.ReturnValue);
     }
+
+    [Fact]
+    public void String_literals_support_core_backslash_escapes()
+    {
+        var runtime = new BasicRuntime();
+        var result = runtime.Execute("""
+            return "a\nb\rc\td\"e\\f\z"
+            """);
+
+        Assert.Equal("a\nb\rc\td\"e\\f\\z", result.ReturnValue);
+    }
 }

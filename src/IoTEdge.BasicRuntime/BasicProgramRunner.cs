@@ -670,7 +670,7 @@ internal static class BasicProgramRunner
         var tokens = Slice(statement.Tokens, 1, statement.Tokens.Count);
         if (tokens.Count == 0)
         {
-            context.Execution.Write(string.Empty);
+            context.Execution.Write(Environment.NewLine);
             return;
         }
 
