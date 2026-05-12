@@ -18,6 +18,7 @@ internal static class BuiltInFunctions
         runtime.RegisterInternalFunction("CEIL", (_, args) => BasicValue.FromNumber(Math.Ceiling(Arg(args, 0).AsNumber())));
         runtime.RegisterInternalFunction("ROUND", (_, args) => BasicValue.FromNumber(Math.Round(Arg(args, 0).AsNumber())));
         runtime.RegisterInternalFunction("ABS", (_, args) => BasicValue.FromNumber(Math.Abs(Arg(args, 0).AsNumber())));
+        runtime.RegisterInternalFunction("SGN", (_, args) => BasicValue.FromNumber(Sign(Arg(args, 0).AsNumber())));
         runtime.RegisterInternalFunction("INT", (_, args) => BasicValue.FromNumber(Math.Truncate(Arg(args, 0).AsNumber())));
         runtime.RegisterInternalFunction("FIX", (_, args) => BasicValue.FromNumber(Math.Truncate(Arg(args, 0).AsNumber())));
         runtime.RegisterInternalFunction("SQR", (_, args) => BasicValue.FromNumber(Math.Sqrt(Arg(args, 0).AsNumber())));
@@ -25,23 +26,33 @@ internal static class BuiltInFunctions
         runtime.RegisterInternalFunction("SIN", (_, args) => BasicValue.FromNumber(Math.Sin(Arg(args, 0).AsNumber())));
         runtime.RegisterInternalFunction("COS", (_, args) => BasicValue.FromNumber(Math.Cos(Arg(args, 0).AsNumber())));
         runtime.RegisterInternalFunction("TAN", (_, args) => BasicValue.FromNumber(Math.Tan(Arg(args, 0).AsNumber())));
+        runtime.RegisterInternalFunction("ASIN", (_, args) => BasicValue.FromNumber(Math.Asin(Arg(args, 0).AsNumber())));
+        runtime.RegisterInternalFunction("ACOS", (_, args) => BasicValue.FromNumber(Math.Acos(Arg(args, 0).AsNumber())));
+        runtime.RegisterInternalFunction("ATAN", (_, args) => BasicValue.FromNumber(Math.Atan(Arg(args, 0).AsNumber())));
         runtime.RegisterInternalFunction("LOG", (_, args) => BasicValue.FromNumber(Math.Log(Arg(args, 0).AsNumber())));
         runtime.RegisterInternalFunction("EXP", (_, args) => BasicValue.FromNumber(Math.Exp(Arg(args, 0).AsNumber())));
         runtime.RegisterInternalFunction("MIN", (_, args) => BasicValue.FromNumber(args.Select(arg => arg.AsNumber()).DefaultIfEmpty(0).Min()));
         runtime.RegisterInternalFunction("MAX", (_, args) => BasicValue.FromNumber(args.Select(arg => arg.AsNumber()).DefaultIfEmpty(0).Max()));
-        runtime.RegisterInternalFunction("RND", (_, _) => BasicValue.FromNumber(Random.Shared.NextDouble()));
+        runtime.RegisterInternalFunction("SRND", (_, args) => SeedRandom(runtime, args));
+        runtime.RegisterInternalFunction("RND", (_, args) => RandomValue(runtime, args));
         runtime.RegisterInternalFunction("LIST", (_, args) => BasicValue.FromList(new BasicList(args)));
         runtime.RegisterInternalFunction("DICT", (_, _) => BasicValue.FromDictionary(new BasicDictionary()));
         runtime.RegisterInternalFunction("PUSH", (_, args) => Push(args));
         runtime.RegisterInternalFunction("POP", (_, args) => Pop(args));
+        runtime.RegisterInternalFunction("BACK", (_, args) => Back(args));
         runtime.RegisterInternalFunction("INSERT", (_, args) => Insert(args));
+        runtime.RegisterInternalFunction("SORT", (_, args) => Sort(args));
         runtime.RegisterInternalFunction("REMOVE", (_, args) => Remove(args));
         runtime.RegisterInternalFunction("COUNT", (_, args) => BasicValue.FromNumber(Length(Arg(args, 0))));
         runtime.RegisterInternalFunction("EXISTS", (_, args) => BasicValue.FromBoolean(Exists(args)));
+        runtime.RegisterInternalFunction("INDEX_OF", (_, args) => IndexOf(args));
         runtime.RegisterInternalFunction("CLEAR", (_, args) => Clear(args));
+        runtime.RegisterInternalFunction("CLONE", (_, args) => Arg(args, 0).CloneDeep());
+        runtime.RegisterInternalFunction("TO_ARRAY", (_, args) => ToArray(args));
         runtime.RegisterInternalFunction("ITERATOR", (_, args) => BasicValue.FromIterator(CreateIterator(Arg(args, 0))));
         runtime.RegisterInternalFunction("MOVE_NEXT", (_, args) => BasicValue.FromBoolean(MoveNext(Arg(args, 0))));
-        runtime.RegisterInternalFunction("GET", (_, args) => GetIteratorValue(Arg(args, 0)));
+        runtime.RegisterInternalFunction("GET", (context, args) => GetValue(context, args));
+        runtime.RegisterInternalFunction("SET", (_, args) => SetValue(args));
         runtime.RegisterInternalFunction("OS", (_, _) => BasicValue.FromString(GetOsName()));
         runtime.RegisterInternalFunction("SYS", (_, args) => Sys(args));
         runtime.RegisterInternalFunction("DELAY", (_, args) => Sleep(args));
@@ -81,6 +92,38 @@ internal static class BuiltInFunctions
         return count == 0 ? BasicValue.FromString(string.Empty) : BasicValue.FromString(text[^count..]);
     }
 
+    private static int Sign(double value)
+        => value > 0 ? 1 : value < 0 ? -1 : 0;
+
+    private static BasicValue SeedRandom(BasicRuntime runtime, IReadOnlyList<BasicValue> args)
+    {
+        runtime.SetRandomSeed((int)Arg(args, 0).AsNumber());
+        return BasicValue.Nil;
+    }
+
+    private static BasicValue RandomValue(BasicRuntime runtime, IReadOnlyList<BasicValue> args)
+    {
+        if (args.Count == 0)
+        {
+            return BasicValue.FromNumber(runtime.NextRandomDouble());
+        }
+
+        var low = 0L;
+        var high = (long)Arg(args, 0).AsNumber();
+        if (args.Count > 1)
+        {
+            low = high;
+            high = (long)Arg(args, 1).AsNumber();
+        }
+
+        if (low >= high)
+        {
+            throw new BasicRuntimeException("RND bounds require low < high.");
+        }
+
+        return BasicValue.FromNumber(runtime.NextRandomInt64Inclusive(low, high));
+    }
+
     private static BasicValue Push(IReadOnlyList<BasicValue> args)
     {
         var list = ExpectList(args, 0);
@@ -102,12 +145,25 @@ internal static class BuiltInFunctions
         return value;
     }
 
+    private static BasicValue Back(IReadOnlyList<BasicValue> args)
+    {
+        var list = ExpectList(args, 0);
+        return list.Items.Count == 0 ? BasicValue.Nil : list.Items[^1];
+    }
+
     private static BasicValue Insert(IReadOnlyList<BasicValue> args)
     {
         var list = ExpectList(args, 0);
         var index = Math.Clamp((int)Arg(args, 1).AsNumber(), 0, list.Items.Count);
         list.Items.Insert(index, Arg(args, 2));
         return BasicValue.FromNumber(list.Items.Count);
+    }
+
+    private static BasicValue Sort(IReadOnlyList<BasicValue> args)
+    {
+        var list = ExpectList(args, 0);
+        list.Items.Sort(CompareValues);
+        return BasicValue.FromList(list);
     }
 
     private static BasicValue Remove(IReadOnlyList<BasicValue> args)
@@ -138,6 +194,21 @@ internal static class BuiltInFunctions
         };
     }
 
+    private static BasicValue IndexOf(IReadOnlyList<BasicValue> args)
+    {
+        var list = ExpectList(args, 0);
+        var needle = Arg(args, 1);
+        for (var index = 0; index < list.Items.Count; index++)
+        {
+            if (list.Items[index].Equals(needle))
+            {
+                return BasicValue.FromNumber(index);
+            }
+        }
+
+        return BasicValue.Nil;
+    }
+
     private static BasicValue Clear(IReadOnlyList<BasicValue> args)
     {
         var value = Arg(args, 0);
@@ -157,6 +228,18 @@ internal static class BuiltInFunctions
         }
     }
 
+    private static BasicValue ToArray(IReadOnlyList<BasicValue> args)
+    {
+        var list = ExpectList(args, 0);
+        var array = new BasicArray([list.Items.Count]);
+        for (var index = 0; index < list.Items.Count; index++)
+        {
+            array.Set([index], list.Items[index]);
+        }
+
+        return BasicValue.FromArray(array);
+    }
+
     private static BasicIterator CreateIterator(BasicValue value)
     {
         return value.Kind switch
@@ -171,8 +254,58 @@ internal static class BuiltInFunctions
     private static bool MoveNext(BasicValue iteratorValue)
         => iteratorValue.Kind == BasicValueKind.Iterator && iteratorValue.Iterator.MoveNext();
 
-    private static BasicValue GetIteratorValue(BasicValue iteratorValue)
-        => iteratorValue.Kind == BasicValueKind.Iterator ? iteratorValue.Iterator.Current : BasicValue.Nil;
+    private static BasicValue GetValue(ExecutionContext context, IReadOnlyList<BasicValue> args)
+    {
+        var value = Arg(args, 0);
+        return value.Kind switch
+        {
+            BasicValueKind.List when args.Count > 1 => GetListValue(value.List, (int)Arg(args, 1).AsNumber()),
+            BasicValueKind.Array when args.Count > 1 => value.Array.Get(args.Skip(1).Select(argument => (int)argument.AsNumber()).ToArray()),
+            BasicValueKind.Dictionary when args.Count > 1 => value.Dictionary.Get(Arg(args, 1).AsString()),
+            BasicValueKind.Iterator => value.Iterator.Current,
+            BasicValueKind.Instance or BasicValueKind.Class when args.Count > 1
+                => value.ObjectValue.TryGetMember(Arg(args, 1).AsString(), context, out var member) ? member : BasicValue.Nil,
+            _ => BasicValue.Nil
+        };
+    }
+
+    private static BasicValue SetValue(IReadOnlyList<BasicValue> args)
+    {
+        var value = Arg(args, 0);
+        switch (value.Kind)
+        {
+            case BasicValueKind.List:
+                for (var index = 1; index + 1 < args.Count; index += 2)
+                {
+                    var itemIndex = (int)args[index].AsNumber();
+                    if (itemIndex < 0 || itemIndex >= value.List.Items.Count)
+                    {
+                        throw new BasicRuntimeException("LIST index is out of bounds.");
+                    }
+
+                    value.List.Items[itemIndex] = args[index + 1];
+                }
+
+                return value;
+            case BasicValueKind.Dictionary:
+                for (var index = 1; index + 1 < args.Count; index += 2)
+                {
+                    value.Dictionary.Set(args[index].AsString(), args[index + 1]);
+                }
+
+                return value;
+            case BasicValueKind.Instance:
+            case BasicValueKind.Class:
+                if (args.Count >= 3)
+                {
+                    value.ObjectValue.SetMember(args[1].AsString(), args[2]);
+                }
+
+                return value;
+            default:
+                return BasicValue.Nil;
+        }
+    }
 
     private static BasicValue Sys(IReadOnlyList<BasicValue> args)
     {
@@ -214,6 +347,25 @@ internal static class BuiltInFunctions
 
     private static BasicValue Arg(IReadOnlyList<BasicValue> args, int index)
         => index >= 0 && index < args.Count ? args[index] : BasicValue.Nil;
+
+    private static BasicValue GetListValue(BasicList list, int index)
+        => index >= 0 && index < list.Items.Count ? list.Items[index] : BasicValue.Nil;
+
+    private static int CompareValues(BasicValue left, BasicValue right)
+    {
+        if (left.Kind == right.Kind)
+        {
+            return left.Kind switch
+            {
+                BasicValueKind.Number => left.AsNumber().CompareTo(right.AsNumber()),
+                BasicValueKind.String => string.Compare(left.Text, right.Text, StringComparison.Ordinal),
+                BasicValueKind.Nil => 0,
+                _ => string.Compare(left.AsString(), right.AsString(), StringComparison.Ordinal)
+            };
+        }
+
+        return left.Kind.CompareTo(right.Kind);
+    }
 
     private static BasicList ExpectList(IReadOnlyList<BasicValue> args, int index)
     {

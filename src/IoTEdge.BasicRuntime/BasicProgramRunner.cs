@@ -119,7 +119,7 @@ internal static class BasicProgramRunner
                 return FindMatchingEndIf(context.Program.Statements, currentIndex + 1, endIndex) + 1;
             }
 
-            if (first.IsKeyword("ENDIF"))
+            if (statement.IsEndIf())
             {
                 return currentIndex + 1;
             }
@@ -260,7 +260,7 @@ internal static class BasicProgramRunner
             }
 
             var statement = context.Program.Statements[branch];
-            if (statement.StartsWithKeyword("ENDIF"))
+            if (statement.IsEndIf())
             {
                 return branch + 1;
             }
@@ -1022,7 +1022,7 @@ internal static class BasicProgramRunner
                 continue;
             }
 
-            if (statements[index].StartsWithKeyword("ENDIF"))
+            if (statements[index].IsEndIf())
             {
                 if (depth == 0)
                 {
@@ -1045,7 +1045,7 @@ internal static class BasicProgramRunner
     private static int FindMatchingEndIf(IReadOnlyList<Statement> statements, int startIndex, int endIndex)
     {
         var branch = FindNextIfBranch(statements, startIndex, endIndex);
-        while (branch >= 0 && !statements[branch].StartsWithKeyword("ENDIF"))
+        while (branch >= 0 && !statements[branch].IsEndIf())
         {
             branch = FindNextIfBranch(statements, branch + 1, endIndex);
         }

@@ -15,6 +15,10 @@ internal sealed record Statement(IReadOnlyList<Token> Tokens, StatementTerminato
 
     public bool StartsWithKeyword(string keyword)
         => Tokens.Count > 0 && Tokens[0].IsKeyword(keyword);
+
+    public bool IsEndIf()
+        => StartsWithKeyword("ENDIF")
+            || (Tokens.Count == 2 && Tokens[0].IsKeyword("END") && Tokens[1].IsKeyword("IF"));
 }
 
 internal sealed record FunctionDefinition(string Name, IReadOnlyList<string> Parameters, bool IsVariadic, int BodyStart, int BodyEnd);

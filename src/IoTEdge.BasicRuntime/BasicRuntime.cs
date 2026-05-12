@@ -17,6 +17,8 @@ public sealed class BasicRuntime : IDisposable
     private readonly Dictionary<string, InternalBasicFunction> _functions = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<string> _registeredExtensions = [];
     private readonly HashSet<string> _registeredExtensionNames = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _randomLock = new();
+    private Random _random = new();
     private bool _disposed;
 
     public BasicRuntime(
@@ -193,6 +195,36 @@ public sealed class BasicRuntime : IDisposable
 
     internal bool TryGetFunction(string name, out InternalBasicFunction function)
         => _functions.TryGetValue(name, out function!);
+
+    internal void SetRandomSeed(int seed)
+    {
+        lock (_randomLock)
+        {
+            _random = new Random(seed);
+        }
+    }
+
+    internal double NextRandomDouble()
+    {
+        lock (_randomLock)
+        {
+            return _random.NextDouble();
+        }
+    }
+
+    internal long NextRandomInt64Inclusive(long low, long high)
+    {
+        if (low > high)
+        {
+            throw new ArgumentOutOfRangeException(nameof(low), "The low bound must be less than or equal to the high bound.");
+        }
+
+        lock (_randomLock)
+        {
+            var span = (double)high - low + 1d;
+            return low + (long)Math.Floor(_random.NextDouble() * span);
+        }
+    }
 
     private static string ExpandImports(string source, string? sourcePath, HashSet<string> importedPaths)
     {

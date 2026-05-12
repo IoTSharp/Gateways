@@ -107,4 +107,23 @@ public sealed class RuntimeFeatureTests
 
         Assert.Equal("ok", result.ReturnValue);
     }
+
+    [Fact]
+    public void End_if_is_accepted_as_endif_compatibility_alias()
+    {
+        var runtime = new BasicRuntime();
+        var result = runtime.Execute("""
+            value = 0
+            if true then
+              if false then
+                value = -1
+              else
+                value = 7
+              end if
+            end if
+            return value
+            """);
+
+        Assert.Equal(7L, result.ReturnValue);
+    }
 }
