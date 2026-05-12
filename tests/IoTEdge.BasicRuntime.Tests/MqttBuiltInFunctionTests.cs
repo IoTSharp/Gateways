@@ -32,6 +32,10 @@ public sealed class MqttBuiltInFunctionTests
                   return "ping failed: " + MQTT_LAST_ERROR(client)
                 endif
 
+                if MQTT_CONNECTED(client) = 0 then
+                  return "connected failed: " + MQTT_LAST_ERROR(client)
+                endif
+
                 if MQTT_SUBSCRIBE(client, "basic/runtime/tests", 1) = 0 then
                   return "subscribe failed: " + MQTT_LAST_ERROR(client)
                 endif

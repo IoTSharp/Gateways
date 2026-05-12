@@ -14,6 +14,7 @@ internal static class MqttBuiltInFunctions
     {
         runtime.RegisterInternalFunction("MQTT_CONNECT", (_, args) => Connect(runtime, args));
         runtime.RegisterInternalFunction("MQTT_DISCONNECT", (_, args) => Disconnect(runtime, args));
+        runtime.RegisterInternalFunction("MQTT_CONNECTED", (_, args) => Connected(runtime, args));
         runtime.RegisterInternalFunction("MQTT_PING", (_, args) => Ping(runtime, args));
         runtime.RegisterInternalFunction("MQTT_PUBLISH", (_, args) => Publish(runtime, args));
         runtime.RegisterInternalFunction("MQTT_SUBSCRIBE", (_, args) => Subscribe(runtime, args));
@@ -109,6 +110,19 @@ internal static class MqttBuiltInFunctions
         {
             return Fail(state, $"MQTT 断开失败：{Unwrap(ex).Message}");
         }
+    }
+
+    private static BasicValue Connected(BasicRuntime runtime, IReadOnlyList<BasicValue> args)
+    {
+        var state = runtime.MqttState;
+        if (!TryGetSession(runtime, args, 0, out var session))
+        {
+            return BasicValue.FromBoolean(false);
+        }
+
+        state.ClearLastError();
+        session.ClearLastError();
+        return BasicValue.FromBoolean(session.Client.IsConnected);
     }
 
     private static BasicValue Ping(BasicRuntime runtime, IReadOnlyList<BasicValue> args)
